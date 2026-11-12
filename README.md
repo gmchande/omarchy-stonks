@@ -434,14 +434,15 @@ time, when Yahoo's charts are empty.
   and the currency rate a P/E needs. With only the pill on screen, Stonks
   asks for the pill's stock alone: every minute while its market trades,
   every 5 minutes before and after the session, and every 15 minutes while
-  it's closed. As the shell starts, it asks once for every row. When you
-  open the panel or the window, it asks for the stock at the top, then the
-  rows you can see, then the rest of All, and keeps them fresh while it's
-  open: every minute while a row's market trades, and every 5 minutes
-  before and after the session (every minute for the stock on show). It
-  leaves out a row whose market hasn't traded since its last price. When
-  you pause on a search result you haven't added, it asks for that stock
-  too, while it's on screen.
+  it's closed. With no pill in a bar, it asks for none until you open the
+  panel or the window. As the shell starts, it asks once for every row.
+  When you open the panel or the window, it asks for the stock at the top,
+  then the rows you can see, then the rest of All, and keeps them fresh
+  while it's open: every minute while a row's market trades, and every 5
+  minutes before and after the session (every minute for the stock on
+  show). It leaves out a row whose market hasn't traded since its last
+  price. When you pause on a search result you haven't added, it asks for
+  that stock too, while it's on screen.
 - `query2.finance.yahoo.com` for search, as you type. Words Yahoo has
   answered since you opened search aren't asked again.
 - `api.robinhood.com` for overnight prices, and for the trades that fill a

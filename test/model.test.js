@@ -1580,14 +1580,16 @@ test("only the request sent alone after a pause speaks for the host: answers to 
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
-    open: false, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
+    open: false, pill: true, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
     allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
   // live; what Robinhood has answered for it is enough, failed or not. The
-  // pill moved to another stock asks about that one.
+  // pill moved to another stock asks about that one. With no pill in any
+  // bar, nothing, by day or at night.
   const noon = at(WED, "14:00")
+  expect([asks({ now: noon, pill: false }), asks({ pill: false })]).toEqual([null, null])
   expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
   const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })

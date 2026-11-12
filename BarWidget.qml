@@ -112,7 +112,19 @@ BarWidget {
   Component.onCompleted: {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
+    holdService()
   }
+  // The service asks for the stock you last looked at only while a pill
+  // shows it (`Service.pillShown`).
+  property var heldService: null
+  function holdService() {
+    if (heldService === service) return
+    if (heldService) heldService.pillShown(root, false)
+    heldService = service
+    if (service) service.pillShown(root, true)
+  }
+  onServiceChanged: holdService()
+  Component.onDestruction: if (heldService) heldService.pillShown(root, false)
   // On a clear bar over a light wallpaper, the light ground its text was chosen for.
   readonly property color barGround: Tones.barGround(!!bar && bar.transparent === true, bar && bar.barForeground, bar && bar.foreground, Commons.Color.bar.background)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)

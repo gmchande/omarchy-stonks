@@ -270,10 +270,11 @@ function quoteCadence(quote, now, interval, charted, calNow) {
 
 // Trades due within half an interval go with those due now, so the list
 // stays one request each night's 5 minutes. With nothing open while a
-// night trades, the pill's symbol is asked so its newest price stays
+// night trades, a pill's symbol is asked so its newest price stays
 // current. `allDay` and `nights` are Robinhood's entries; `quoteEntries`
 // Yahoo's.
 function overnightAsks(s) {
+  if (!s.open && !s.pill) return null
   var featured = s.featured
   var cal = Overnight.overnightMarket(s.calendars)
   var tonight = cal && !s.open ? Overnight.nightAt(cal, s.now) : null

@@ -488,6 +488,23 @@ Harness {
       body.cancelAdding()
       closeWindow()
 
+      // No pill in any bar and nothing open: nothing is asked for the stock
+      // you last looked at, though its market trades. A pill put back in a
+      // bar asks for it at once.
+      var unseen = countsOver("Thursday, no pill in any bar and nothing open: nothing is asked for, the stock you last looked at included",
+        900, counts([0, 0, 0, 0, 0, 0, 0, 0]), function() {
+          pillLoader.active = false
+          otherPillLoader.active = false
+          startAt(service.now + 5)()
+        })
+      var pillFrom = harness.requests().length
+      pillLoader.active = true
+      var asksAgain = within(2000, function() { return harness.quoteCounts(harness.requests().slice(pillFrom)).NEST === 1 })
+      settle()
+      harness.check("with no pill, Robinhood is asked nothing either, and a pill put back asks for its stock at once",
+        unseen.filter(function(l) { return /^(overnight|instruments) /.test(l) }).length === 0 && asksAgain,
+        unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
+
       harness.finish()
     }
   }

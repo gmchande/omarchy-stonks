@@ -1785,7 +1785,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const allDay = Object.fromEntries(names.map(s => [s, { status: "ok", allDay: true, at: asked }]))
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
-    return M.overnightAsks({ open: false, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
+    return M.overnightAsks({ open: false, pill: true, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
       quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
