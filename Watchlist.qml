@@ -344,10 +344,11 @@ Flickable {
     return Rows.rowWhole(index, rowSize(), top, sightHeight)
   }
 
-  // The rows in sight where the list is headed, which the service fetches
-  // ahead. From row numbers, so it changes only as a row crosses the edge.
-  readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY, sightHeight).first
-  readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY, sightHeight).last
+  // The rows drawn where the list is headed, a row past each edge as a row
+  // in sight is (`inSight`), which the service fetches ahead. From row
+  // numbers, so it changes only as a row crosses the edge.
+  readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).first
+  readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).last
   readonly property var sightSymbols: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
 
   function restingTopFor(index, top) {

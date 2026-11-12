@@ -331,11 +331,12 @@ Harness {
       var judgedAway = harness.yahoo(harness.requests()).filter(function(l) { return /^chart /.test(l) && l.split(" ")[1] !== "NEST" })
       harness.check("nothing open: no listing but the pill's is asked a chart", judgedAway.length === 0, judgedAway.join(", "))
 
-      // The window open with a few rows in sight: their days are judged, and
-      // Robinhood is asked the night's trades for them and the stock on show
-      // alone. A row scrolled into sight has its trades asked at once.
+      // The window open with a row in sight: the rows drawn (it and the one
+      // past each edge) have their days judged, and Robinhood is asked the
+      // night's trades for them and the stock on show alone. A row scrolled
+      // into sight has its trades asked at once.
       var nightsFrom = harness.requests().length
-      app.floatingWindow.implicitHeight = 600
+      app.floatingWindow.implicitHeight = 560
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
       settle()

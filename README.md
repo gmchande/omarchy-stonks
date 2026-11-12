@@ -471,10 +471,11 @@ time, when Yahoo's charts are empty.
   stretch Yahoo left empty: once a day for which stocks trade overnight, at
   most once for each stock the pill shows, and again 5 minutes after a
   first check that failed; every 5 minutes through the night for the
-  pill's stock, and for every row that trades overnight while the panel or
-  the window is open; and once more on a morning Yahoo sends no
-  prices for half an hour or more of the pre-market. It asks the same for
-  a US stock or ETF you pause on in search and haven't added.
+  pill's stock, and while the panel or the window is open, for the stock
+  on show and the rows you can see that trade overnight; and once more on
+  a morning Yahoo sends no prices for half an hour or more of the
+  pre-market. It asks the same for a US stock or ETF you pause on in
+  search and haven't added.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.
