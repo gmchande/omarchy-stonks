@@ -1119,10 +1119,6 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   expect(said(M.yearLine({ ...quote, price: 345.03 }, null, null, rates, [])).split(" · ")[1]).toBe("225.95–345.03+ @345.03")
   // A trade that reads as the mark, short of it by float noise, leaves it.
   expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime, p: 344.57 + 1e-9 }])).split(" · ")[1]).toBe("225.95–344.57 @325.13")
-  // On 1Y the line keeps the range's own low and high, whatever trade is shown.
-  const ends = { low: { p: 200, t: 0 }, high: { p: 350, t: 0 } }
-  expect(said(M.yearLine(quote, null, ends, rates, [{ t: quote.marketTime, p: 400 }, { t: quote.marketTime, p: 100 }])).split(" · ")[1])
-    .toBe(said(M.yearLine(quote, null, ends, rates)).split(" · ")[1])
 })
 
 // Yahoo's 52 weeks leave out the 1Y range's first day, so on 1Y the line is
@@ -1160,6 +1156,11 @@ test("on 1Y the 52-week line is the range's low and high", () => {
   capped[capped.length - 1].h = goog.q.dayHigh + 1e-9
   const googQ = { ...goog.q, fiftyTwoWeekHigh: goog.q.dayHigh }
   expect(ends(M.yearLine(googQ, null, M.rangeEnds({ ...goog.h, bars: capped }, null, googQ)))).toBe("241.18–355.25+")
+  // A trade Stonks shows past the chart's high, as tonight's, is the 1Y
+  // range's high and the 52-week line's, in the 52-week high's tone.
+  const night = [{ t: goog.q.marketTime + 4 * 3600, p: 410 }]
+  const lifted = M.rangeEnds(goog.h, null, goog.q, night)
+  expect([ends(M.rangeLine(goog.h, lifted, goog.q)), ends(M.yearLine(goog.q, null, lifted, null, night))]).toEqual(["241.18–410.00", "241.18–410.00+"])
 })
 
 test("each symbol is asked for on its own market's clock", () => {
@@ -1497,6 +1498,7 @@ test("a range marks its high and low on its chart, over their bars, with their d
   const month = M.parseHistory(fixture("history/nest-1mo.json"), "1M")
   const fab = M.parseHistory(fixture("history/fab-max.json"), "All")
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
+  const quarters = M.parseHistory(fixture("history/msft-2026-11-11-1800-max.json"), "All")
   const marks = h => {
     const m = marksOf(h)
     return `HIGH ${m.high.price} ${m.high.date} · LOW ${m.low.price} ${m.low.date}`
@@ -1508,8 +1510,11 @@ test("a range marks its high and low on its chart, over their bars, with their d
   // The year whole, as the scrub writes it: "JAN 23" would read as 23
   // January.
   expect(marks(weekly)).toBe("HIGH 344.57 JUL 2026 · LOW 124.17 JAN 2023")
+  // MSFT's All comes in quarters: each names its three months, as its high
+  // could be in any of them.
+  expect(marks(quarters)).toBe("HIGH 559.15 SEP–NOV 2026 · LOW 0.09 JUN–AUG 1986")
   // Each stands where the chart draws the bar that made it.
-  for (const h of [aapl, week, month, fab, weekly]) {
+  for (const h of [aapl, week, month, fab, weekly, quarters]) {
     const m = marksOf(h)
     const highs = h.bars.map(b => b.h).filter(Number.isFinite)
     const lows = h.bars.map(b => b.l).filter(Number.isFinite)
@@ -1532,14 +1537,28 @@ test("a range marks its high and low on its chart, over their bars, with their d
   expect(M.historyScrubForms(month, month.bars[0])[0]).toBe("12 AUG 09:30 · 233.17")
   expect(M.historyScrubForms({ ...week, interval: "1wk" }, week.bars[0])[0]).toBe("WEEK OF 4 SEP · 213.58")
   expect(M.historyScrubForms({ ...aapl, interval: "1mo" }, aapl.bars[0])[0]).toBe("SEP 2025 · 234.07")
-  expect(M.historyScrubForms({ ...aapl, interval: "3mo" }, aapl.bars[0])[0]).toBe("SEP 2025 · 234.07")
+  // A quarter names its year on each side of a new year. The live moment
+  // Yahoo appends to the quarters is a moment, so its own month.
+  const december = quarters.bars.filter(b => new Date(b.t * 1000).getUTCMonth() === 11).at(-1)
+  expect([december, quarters.bars.at(-1)].map(b => M.historyScrubForms(quarters, b)[0])).toEqual(["DEC 2025–FEB 2026 · 392.74", "NOV 2026 · 521.13"])
+  // A week whose trading days cross into a new month names both months, as
+  // its high could be in either: a stock's Monday to Friday, a coin's Monday
+  // to Sunday. The scrub names the week by its Monday.
+  const weekOf = date => weekly.bars.find(b => M.historyScrubForms(weekly, b)[1] === `WEEK OF ${date}`)
+  const highOf = (bar, quote) => marksOf({ ...weekly, bars: weekly.bars.map(b => (b === bar ? { ...b, h: 1000 } : b)) }, quote).high.date
+  const stock = { priceDigits: 2 }
+  const coin = { priceDigits: 2, crypto: true }
+  expect([stock, coin].map(q => highOf(weekOf("27 OCT 2025"), q))).toEqual(["OCT 2025", "OCT–NOV 2025"])
+  expect([stock, coin].map(q => highOf(weekOf("29 DEC 2025"), q))).toEqual(["DEC 2025–JAN 2026", "DEC 2025–JAN 2026"])
+  expect([stock, coin].map(q => highOf(weekOf("5 JAN 2026"), q))).toEqual(["JAN 2026", "JAN 2026"])
 })
 
-// A range is fetched each hour and the quote each minute, so a range's last
-// bar can trail the day: while that bar holds the quote's session, the
-// quote's day high and low count as its own. RGTI made its 52-week low of
-// 11.77 on 14 October 2026; its 1Y answer from before had the day at 12.05.
-test("a range's line and marks take in the quote's day while its last bar is that day's", () => {
+// A range is fetched each hour and the quote each minute, so the quote's day
+// can pass every bar a range holds, or come before the range has a bar for
+// it: on every range, its high and low count, dated by its day. RGTI made its
+// 52-week low of 11.77 on 14 October 2026; its 1Y answer from before had the
+// day at 12.05.
+test("every range's line and marks take in the quote's day, dated by its day", () => {
   const saved = name => ({
     q: M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`)),
     h: M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
@@ -1550,26 +1569,46 @@ test("a range's line and marks take in the quote's day while its last bar is tha
   expect(`${low.price} ${low.date}`).toBe("11.77 14 OCT 2026")
   expect(M.historyBarAt(earlier, low.x)).toBe(earlier.bars[earlier.bars.length - 1])
   expect(M.rangeLine(earlier, M.rangeEnds(earlier, null, rgti.q), rgti.q).range.lowText).toBe("11.77")
-  // A week's bar holds each day of its week. Yahoo's weekly answer ends
-  // with the week of Monday 7 September and the live moment, Friday the
-  // 11th, as a bar of its own: Thursday is that week's, and the Monday after
-  // the live moment is not.
+  // A quarter's bar begins months before the day, so the day keeps its own
+  // month, at the line's end. At 18:00 on 11 November, MSFT's All ends on
+  // its after-hours price, after the quarter of 1 September.
+  const evening = topsAt("ranges-2026-11-11-1800")
+  const quarters = M.viewChart("MSFT", "All", evening.quotes, {},
+    { "MSFT|All": { status: "ok", history: M.parseHistory(fixture("history/msft-2026-11-11-1800-max.json"), "All") } }, evening.nights, evening.allDay, calendars).history
+  expect(marksOf(quarters, { ...evening.quotes.MSFT, dayHigh: 600 }).high).toEqual({ x: 1, price: "600.00", date: "NOV 2026" })
+  // So does a week's: Yahoo's weekly answer ends with the week of Monday 7
+  // September and the live moment, Friday the 11th, as a bar of its own.
+  // A day after the range's last bar counts too, at its end: the Monday
+  // after the live moment, and the Nikkei's 14 October, its bar taken away
+  // or sent without its close.
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
   const weekOf = weekly.bars[weekly.bars.length - 2]
   expect(weekly.bars[weekly.bars.length - 1].t).toBe(weekly.liveAt)
   const thursday = { figuresDay: weekOf.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
-  expect(marksOf(weekly, thursday).high.price).toBe("400.00")
-  expect(marksOf(weekly, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
-  // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
-  // 1Y answer, its 14 October bar taken away, ends on 13 October.
+  for (const day of [thursday, { ...thursday, figuresDay: weekOf.t + 7 * DAY }])
+    expect(marksOf(weekly, day).high).toEqual({ x: 1, price: "400.00", date: "SEP 2026" })
   const n225 = saved("n225")
-  expect(marksOf({ ...n225.h, unclosed: [] }, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
-  // With that bar, sent without its close, the day is the quote's.
-  expect(marksOf(n225.h, { ...n225.q, dayHigh: 80000 }).high).toEqual({ x: 1, price: "80,000", date: "14 OCT 2026" })
-  // An intraday bar holds only part of a day, so a day's high is not its.
+  for (const h of [{ ...n225.h, unclosed: [] }, n225.h])
+    expect(marksOf(h, { ...n225.q, dayHigh: 80000 }).high).toEqual({ x: 1, price: "80,000", date: "14 OCT 2026" })
+  // On 15-minute bars the day's high stands at its last bar: NEST's week
+  // to Friday 11 September, a high past every bar's.
   const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
-  const lastBar = week.bars[week.bars.length - 1]
-  expect(marksOf(week, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+  const lastBar = week.bars.at(-1)
+  const open = week.bars.find(b => lastBar.t - b.t < 7 * 3600)
+  const high = marksOf(week, { figuresDay: open.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high
+  expect([M.historyBarAt(week, high.x), high.price, high.date]).toEqual([lastBar, "999.00", "11 SEP"])
+  // A coin's 24 hours cross midnight, so each end is dated by the bar it
+  // came from: Bitcoin's at 13:22 New York on 28 October began at 17:20 UTC
+  // on the 27th, and its high of 81,694 came at 08:35 UTC on the 28th.
+  const coin = M.parseChart(fixture("moments/coin-2026-10-28-1322/btc-usd.json"), cents)
+  const year = M.parseHistory(fixture("history/btc-usd-1y.json"), "1Y")
+  const under = { ...year, bars: year.bars.map(b => ({ ...b, h: Math.min(b.h, 80000) })) }
+  expect(marksOf(under, coin).high).toEqual({ x: 1, price: "81,694", date: "28 OCT 2026" })
+  // A quote kept from before the range counts for nothing, nor do its
+  // trades: MSFT's of 11 September beside its week to 11 November.
+  const september = M.parseChart(fixture("msft-2026-09-11-day-prepost.json"))
+  const november = M.parseHistory(fixture("history/msft-2026-11-11-1800-5d.json"), "1W")
+  expect(M.rangeEnds(november, null, september, september.points)).toEqual(M.rangeEnds(november))
 })
 
 // Yahoo's daily answer for Tokyo leaves the day's close out after the
@@ -2439,10 +2478,26 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
     const history = M.viewChart("NBIS", "1W", gap.quotes, {}, { "NBIS|1W": { status: "ok", history: raw } }, gap.nights, gap.allDay, calendars).history
     expect([M.historyScrubForms(history, history.bars.at(-1))[1], load("Share.js").barDate(history, history.bars.at(-1))]).toEqual(["1 NOV 21:40", "1 NOV 21:40 EST"])
+    // So does a high made earlier that night, by the exchange's clock then,
+    // though the week, or the quote too, is held from before the change:
+    // 23:30 EST would read 00:30 on the 2nd by EDT.
+    const peak = (Math.ceil(M.periodStats(raw).high.p * 100) + 100) / 100
+    const night = [{ t: at("2026-11-01", "23:30"), p: peak, s: "overnight" }]
+    for (const quote of [gap.quotes.NBIS, topsAt("watch-2026-10-26-2005").quotes.NBIS]) {
+      const ends = M.rangeEnds(history, null, quote, night)
+      expect(M.rangeMarks(history, ends, quote, t => M.tradeClock(quote, t, calendars)).high.date).toBe("1 NOV")
+    }
   }
-  const week = M.viewChart("NBIS", "1W", sunday.quotes, {},
-    { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
+  const sundayWeek = M.viewChart("NBIS", "1W", sunday.quotes, {},
+    { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars)
+  const week = sundayWeek.history
   expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })
+  // Every trade Stonks shows counts, as on the 52W line: the night's 152.15
+  // at 22:50, which the 1D chart draws before the newest price, is the
+  // week's low, dated that night.
+  const shown = sundayWeek.day.trades.concat([sunday.newest.NBIS])
+  const ends = M.rangeEnds(week, null, sunday.quotes.NBIS, shown)
+  expect([ends.low, M.rangeMarks(week, ends, sunday.quotes.NBIS).low.date]).toMatchObject([{ p: 152.15, t: at("2026-10-25", "22:50") }, "25 OCT"])
   // Monday 17:58 on 1W, Yahoo's week as it stood then (the 20:05 answer cut
   // to its bars before 17:58): the line under the price shows the close and
   // its day's move, as 1D does, and the caption under the change the range

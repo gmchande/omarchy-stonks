@@ -270,9 +270,11 @@ function barOffset(history, t) {
   return offset
 }
 
-function historyDateParts(history, t) {
+// `clock` is a trade's own, where it isn't one of the history's bars: a
+// history held from before a change of clocks reads the old offset.
+function historyDateParts(history, t, clock) {
   if (!Format.isFiniteNumber(t)) return null
-  var d = new Date((t + barOffset(history, t)) * 1000)
+  var d = new Date((t + (clock ? clock.offset : barOffset(history, t))) * 1000)
   return { day: d.getUTCDate(), month: d.getUTCMonth(), year: d.getUTCFullYear() }
 }
 
@@ -284,16 +286,38 @@ function historySpansYears(history) {
   return !!(first && last && first.year !== last.year)
 }
 
-function historyDateText(history, t, withYear, interval) {
-  var date = historyDateParts(history, t)
+// A quarter of Yahoo's own names its three months, as SEP–NOV 2025, and a
+// week whose trading days cross into a new month, given `weekDays`, both, as
+// NOV–DEC 2025: one month alone would date its high or its close to the
+// wrong one. The live moment Yahoo appends to them, the newest price, the
+// quote's day and a trade (with its `clock`) are moments, each its own month.
+function historyDateText(history, t, withYear, interval, clock, weekDays) {
+  var date = historyDateParts(history, t, clock)
   if (!date) return "—"
-  var text = interval === "1mo" || interval === "3mo" ? Format.MONTHS[date.month] : date.day + " " + Format.MONTHS[date.month]
-  return text + (withYear ? " " + date.year : "")
+  var year = function(d) { return withYear ? " " + d.year : "" }
+  if (interval !== "1mo" && interval !== "3mo") return date.day + " " + Format.MONTHS[date.month] + year(date)
+  var last = clock ? null : spanEnd(history, t, date, weekDays)
+  if (!last || (last.month === date.month && last.year === date.year)) return Format.MONTHS[date.month] + year(date)
+  return Format.MONTHS[date.month] + (last.year !== date.year ? year(date) : "") + "–" + Format.MONTHS[last.month] + year(last)
 }
 
-function historyStatsDateText(history, t, withYear, interval) {
+// The last trading day of a bar of Yahoo's own stamped `t`, which begins on
+// `first`: a quarter's third month, or the `weekDays`th day from its week's
+// Monday (a new listing's first week can start later). Null for any other
+// moment.
+function spanEnd(history, t, first, weekDays) {
+  var week = history.interval === "1wk" && !!weekDays
+  if ((history.interval !== "3mo" && !week) || t === history.liveAt) return null
+  if (!history.bars.concat(history.unclosed || []).some(function(bar) { return bar.t === t && !bar.newest })) return null
+  var sinceMonday = (new Date(Date.UTC(first.year, first.month, first.day)).getUTCDay() + 6) % 7
+  var end = week ? new Date(Date.UTC(first.year, first.month, first.day - sinceMonday + weekDays - 1))
+    : new Date(Date.UTC(first.year, first.month + 2, 1))
+  return { month: end.getUTCMonth(), year: end.getUTCFullYear() }
+}
+
+function historyStatsDateText(history, t, withYear, interval, clock, weekDays) {
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
+  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d", clock, weekDays)
 }
 
 // Yahoo appends the live moment to weekly, monthly and quarterly bars as a
@@ -352,44 +376,42 @@ function ownLast(history) {
   return history.bars.length - (liveBarAppended(history) || newestBar(history) ? 2 : 1)
 }
 
-function closelessLast(history) {
-  var bars = history && history.bars ? history.bars : []
-  var open = history && history.unclosed ? history.unclosed : []
-  var after = bars.length ? bars[bars.length - 1].t : -Infinity
-  var found = null
-  for (var i = 0; i < open.length; i++) if (open[i].t > after && (!found || open[i].t > found.t)) found = open[i]
-  return found
-}
-
-function lastBarHolds(history, t) {
-  var bars = history && history.bars ? history.bars : []
-  var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
-  var span = spans[history ? history.interval : ""]
-  if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
-  var closeless = closelessLast(history)
-  var start = closeless ? closeless.t : bars[ownLast(history)].t
-  var day = historyDateParts(history, t)
-  var first = historyDateParts(history, start)
-  var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
-  var months = (day.year - first.year) * 12 + day.month - first.month
-  if (span === "day") return days === 0
-  if (span === "week") return days >= 0 && days < 7
-  return months >= 0 && months < (span === "month" ? 1 : 3)
-}
-
-// The range is fetched hourly and the quote each minute, so the quote's day
-// high and low stand in for the last bar's while it holds that day.
-function rangeEnds(history, stats, quote) {
+// The range's low and high: its bars', the quote's day's, and the trades
+// Stonks shows (`trades`: the 1D chart's, tonight's too, and the newest), as
+// the 52W line takes them in (`Fundamentals.yearLine`), so no range reads
+// under the day. The range is fetched hourly and the quote each minute, so
+// the day can pass every bar: it is dated by its day, and drawn at its last
+// bar on 15-minute and hourly bars; a coin's 24 hours by the bar each end
+// came from. A trade is a moment of its own (`moment`), dated when it traded
+// (`rangeMarks`). Nothing before the range's first bar counts, as a quote
+// kept from an older day. Each compares at the listing's decimals, so float
+// noise never moves a mark.
+function rangeEnds(history, stats, quote, trades) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
   var high = stats.high
   var low = stats.low
-  if (quote && lastBarHolds(history, quote.figuresDay)) {
-    var closeless = closelessLast(history)
-    var today = closeless ? closeless.t : history.bars[ownLast(history)].t
-    if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
-    if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
+  var from = history.bars[0].t
+  var digits = quote ? quote.priceDigits : undefined
+  var reads = function(v) { return Number(Format.fixed(v, Format.isFiniteNumber(digits) ? digits : Format.moneyDigits(Math.abs(v)))) }
+  var highRead = reads(high.p)
+  var lowRead = reads(low.p)
+  var take = function(p, t) {
+    if (!Format.isFiniteNumber(p) || t < from) return
+    var read = reads(p)
+    if (read > highRead) { high = { p: p, t: t, moment: true }; highRead = read }
+    if (read < lowRead) { low = { p: p, t: t, moment: true }; lowRead = read }
   }
+  if (quote && Format.isFiniteNumber(quote.figuresDay)) {
+    var at = quote.figuresDay
+    var last = history.bars[ownLast(history)]
+    var day = historyDateParts(history, at)
+    var lastDay = historyDateParts(history, last.t)
+    if (last.t > at && lastDay.day === day.day && lastDay.month === day.month && lastDay.year === day.year) at = last.t
+    take(quote.dayHigh, Format.isFiniteNumber(quote.dayHighAt) ? quote.dayHighAt : at)
+    take(quote.dayLow, Format.isFiniteNumber(quote.dayLowAt) ? quote.dayLowAt : at)
+  }
+  ;(trades || []).forEach(function(trade) { take(trade.p, trade.t) })
   return { high: high, low: low }
 }
 
@@ -428,26 +450,32 @@ function rangeLine(history, ends, quote) {
 
 // The line each range held for a symbol would show under its chart, so the
 // info table keeps room for all of them and a change of range moves nothing.
-function heldLines(histories, symbol, quote) {
+function heldLines(histories, symbol, quote, trades) {
   var lines = []
   Object.keys(HISTORY_RANGES).forEach(function(range) {
     var entry = histories[historyKey(symbol, range)]
-    var line = entry && entry.history ? rangeLine(entry.history, rangeEnds(entry.history, null, quote), quote) : null
+    var line = entry && entry.history ? rangeLine(entry.history, rangeEnds(entry.history, null, quote, trades), quote) : null
     if (line) lines.push(line)
   })
   return lines
 }
 
-function rangeMarks(history, ends, quote) {
+// A moment that isn't one of the range's bars (`rangeEnds`) is dated by
+// `clockAt(t)`, the exchange's clock then (`Market.tradeClock`), as the
+// newest price is: a range or a quote held from before a change of clocks
+// would read the old one. A week's bar trades Monday to Friday, or to Sunday
+// for a coin, which never closes.
+function rangeMarks(history, ends, quote, clockAt) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
   var drawnTo = history.bars[history.bars.length - 1].t
+  var weekDays = quote ? (quote.crypto ? 7 : 5) : null
   var mark = function(point) {
     return {
       x: point.t > drawnTo ? 1 : historyFraction(history, point.t),
       price: Format.money(point.p, digits),
-      date: historyStatsDateText(history, point.t, years, history.interval)
+      date: historyStatsDateText(history, point.t, years, history.interval, point.moment && clockAt ? clockAt(point.t) : null, weekDays)
     }
   }
   return { high: mark(ends.high), low: mark(ends.low) }

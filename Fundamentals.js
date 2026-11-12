@@ -158,12 +158,14 @@ function peText(value) {
 
 // On 1Y the range is the chart's own low and high (`yearEnds`), so the line
 // and the chart's marks agree: Yahoo's 52 weeks leave out the 1Y range's
-// first day. Elsewhere a trade Stonks shows past Yahoo's marks widens them,
-// as the day does: Yahoo's 52 weeks leave out the night and the hours around
-// the session. A longer range never stands in: its ends can be older than a
-// year. Trades, and on 1Y the day's high and low, compare at the listing's
-// decimals, so float noise never passes a mark. The cap and P/E slots stay
-// while unknown, so the line keeps its shape.
+// first day. Those ends take in the trades Stonks shows (`History.rangeEnds`),
+// so an end the day or a trade reaches takes its tone. Elsewhere a trade
+// Stonks shows past Yahoo's marks widens them, as the day does: Yahoo's 52
+// weeks leave out the night and the hours around the session. A longer range
+// never stands in: its ends can be older than a year. Trades, and on 1Y the
+// day's high and low, compare at the listing's decimals, so float noise never
+// passes a mark. The cap and P/E slots stay while unknown, so the line keeps
+// its shape.
 function yearLine(quote, fundamentals, yearEnds, rates, trades) {
   if (!quote) return null
   var q = quote
@@ -177,8 +179,10 @@ function yearLine(quote, fundamentals, yearEnds, rates, trades) {
   if (yearEnds) {
     low = yearEnds.low.p
     high = yearEnds.high.p
-    atHigh = Format.isFiniteNumber(q.dayHigh) && reads(q.dayHigh) >= reads(high)
-    atLow = Format.isFiniteNumber(q.dayLow) && reads(q.dayLow) <= reads(low)
+    var reached = [q.dayHigh, q.dayLow].concat((trades || []).map(function(trade) { return trade.p }))
+      .filter(function(p) { return Format.isFiniteNumber(p) })
+    atHigh = reached.some(function(p) { return reads(p) >= reads(high) })
+    atLow = reached.some(function(p) { return reads(p) <= reads(low) })
   } else if (both) {
     atHigh = Format.isFiniteNumber(q.dayHigh) && q.dayHigh >= q.fiftyTwoWeekHigh
     atLow = Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow

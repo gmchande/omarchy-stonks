@@ -80,7 +80,14 @@ header.
 
 Under the ranges, the first line shows the range's low and high, with the
 price between them. On 1D they take in the trades the chart draws outside
-the session too: that day's night, pre-market and after hours. Beside
+the session too: that day's night, pre-market and after hours. On a
+longer range they take in every trade the 1D chart draws, tonight's too,
+so a range never reads under the day. The chart marks the high and the
+low with their date, or on 5Y and longer with their month: both months,
+such as NOV–DEC 2025, when the week's trading days cross into a new one,
+Monday to Friday for a stock and to Sunday for a coin. Where Yahoo sends
+ALL in quarters, a mark names its quarter's three months, such as
+SEP–NOV 2025. A high or low the 1D chart shows names its own month. Beside
 them are the open and the volume on 1D, or the range's starting price and
 volume on a longer range. The second line shows
 the 52-week low and high, with the market cap and P/E. On 1Y those are
