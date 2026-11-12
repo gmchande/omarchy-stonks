@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -344,6 +345,16 @@ Harness {
       tick(3, 1)
       var rRuns = harness.runs().slice(runsBefore).filter(function(r) { return /chart:/.test(r) })
       harness.check("r twice within 5 s asks once", rRuns.length === 1, rRuns.join(" / "))
+
+      // omarchy-shell's refresh asks as r does, through the shell's own
+      // socket where the shell has one (Omarchy 4.0.6 has none).
+      tick(20)
+      var socketFrom = harness.runs().length
+      var socket = Commons.IpcRegistry ? Commons.IpcRegistry.call(plugin.pluginId, "refresh", []) : null
+      tick(2, 1)
+      var socketRuns = harness.runs().slice(socketFrom).filter(function(r) { return /chart:/.test(r) })
+      if (socket) harness.check("omarchy-shell's refresh reaches Stonks through the shell's own socket and asks again",
+        socket.ran && socketRuns.length === 1, socket.ran + " | " + socketRuns.join(" / "))
 
       // A range's history is asked once, and kept a quarter hour: picked
       // again inside it, nothing is asked, and after it, once more.
