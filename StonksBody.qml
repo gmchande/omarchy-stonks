@@ -274,16 +274,19 @@ Item {
   // nothing. A range first fetched with more digits than any held widens it
   // once.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
-  readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
+  // The trades Stonks shows for the stock, beyond Yahoo's bars and figures:
+  // the 1D chart's, tonight's too, and the newest. The ranges and the 52W
+  // line take them in, so none reads under the day.
+  readonly property var shownTrades: (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])
+  readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote, shownTrades) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
-  readonly property var heldLines: chart ? History.heldLines(histories, chartSymbol, featuredQuote) : []
+  readonly property var heldLines: chart ? History.heldLines(histories, chartSymbol, featuredQuote, shownTrades) : []
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
     .concat(heldLines.map(function(line) { return line.facts }))
   readonly property var infoRanges: !dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range }))
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
-    historyShown && history.range === "1Y" ? rangeEnds : null, rates,
-    (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
+    historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // Said under the price: what a scrub's move counts from, the dashed line
   // under the pointer.

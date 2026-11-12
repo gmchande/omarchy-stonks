@@ -284,11 +284,24 @@ function historySpansYears(history) {
   return !!(first && last && first.year !== last.year)
 }
 
+// A quarter of Yahoo's own names its three months, as SEP–NOV 2025: a month
+// alone would date its high or its close to the wrong one. The live moment
+// Yahoo appends to the quarters, the newest price and the quote's day are
+// moments, each its own month.
 function historyDateText(history, t, withYear, interval) {
   var date = historyDateParts(history, t)
   if (!date) return "—"
-  var text = interval === "1mo" || interval === "3mo" ? Format.MONTHS[date.month] : date.day + " " + Format.MONTHS[date.month]
-  return text + (withYear ? " " + date.year : "")
+  var year = function(d) { return withYear ? " " + d.year : "" }
+  if (interval !== "1mo" && interval !== "3mo") return date.day + " " + Format.MONTHS[date.month] + year(date)
+  if (!isQuarter(history, t)) return Format.MONTHS[date.month] + year(date)
+  var end = new Date(Date.UTC(date.year, date.month + 2, 1))
+  var last = { month: end.getUTCMonth(), year: end.getUTCFullYear() }
+  return Format.MONTHS[date.month] + (last.year !== date.year ? year(date) : "") + "–" + Format.MONTHS[last.month] + year(last)
+}
+
+function isQuarter(history, t) {
+  if (history.interval !== "3mo" || t === history.liveAt) return false
+  return history.bars.concat(history.unclosed || []).some(function(bar) { return bar.t === t && !bar.newest })
 }
 
 function historyStatsDateText(history, t, withYear, interval) {
@@ -352,44 +365,35 @@ function ownLast(history) {
   return history.bars.length - (liveBarAppended(history) || newestBar(history) ? 2 : 1)
 }
 
-function closelessLast(history) {
-  var bars = history && history.bars ? history.bars : []
-  var open = history && history.unclosed ? history.unclosed : []
-  var after = bars.length ? bars[bars.length - 1].t : -Infinity
-  var found = null
-  for (var i = 0; i < open.length; i++) if (open[i].t > after && (!found || open[i].t > found.t)) found = open[i]
-  return found
-}
-
-function lastBarHolds(history, t) {
-  var bars = history && history.bars ? history.bars : []
-  var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
-  var span = spans[history ? history.interval : ""]
-  if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
-  var closeless = closelessLast(history)
-  var start = closeless ? closeless.t : bars[ownLast(history)].t
-  var day = historyDateParts(history, t)
-  var first = historyDateParts(history, start)
-  var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
-  var months = (day.year - first.year) * 12 + day.month - first.month
-  if (span === "day") return days === 0
-  if (span === "week") return days >= 0 && days < 7
-  return months >= 0 && months < (span === "month" ? 1 : 3)
-}
-
-// The range is fetched hourly and the quote each minute, so the quote's day
-// high and low stand in for the last bar's while it holds that day.
-function rangeEnds(history, stats, quote) {
+// The range's low and high: its bars', the quote's day's, and the trades
+// Stonks shows (`trades`: the 1D chart's, tonight's too, and the newest), as
+// the 52W line takes them in (`Fundamentals.yearLine`), so no range reads
+// under the day. The range is fetched hourly and the quote each minute, so
+// the day can pass every bar: it is dated by its day, and drawn at its last
+// bar on 15-minute and hourly bars. A trade is dated when it traded. Each
+// compares at the listing's decimals, so float noise never moves a mark.
+function rangeEnds(history, stats, quote, trades) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
   var high = stats.high
   var low = stats.low
-  if (quote && lastBarHolds(history, quote.figuresDay)) {
-    var closeless = closelessLast(history)
-    var today = closeless ? closeless.t : history.bars[ownLast(history)].t
-    if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
-    if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
+  var digits = quote ? quote.priceDigits : undefined
+  var reads = function(v) { return Number(Format.fixed(v, Format.isFiniteNumber(digits) ? digits : Format.moneyDigits(Math.abs(v)))) }
+  var take = function(p, t) {
+    if (!Format.isFiniteNumber(p)) return
+    if (reads(p) > reads(high.p)) high = { p: p, t: t }
+    if (reads(p) < reads(low.p)) low = { p: p, t: t }
   }
+  if (quote && Format.isFiniteNumber(quote.figuresDay)) {
+    var at = quote.figuresDay
+    var last = history.bars[ownLast(history)]
+    var day = historyDateParts(history, at)
+    var lastDay = historyDateParts(history, last.t)
+    if (last.t > at && lastDay.day === day.day && lastDay.month === day.month && lastDay.year === day.year) at = last.t
+    take(quote.dayHigh, at)
+    take(quote.dayLow, at)
+  }
+  ;(trades || []).forEach(function(trade) { take(trade.p, trade.t) })
   return { high: high, low: low }
 }
 
@@ -428,11 +432,11 @@ function rangeLine(history, ends, quote) {
 
 // The line each range held for a symbol would show under its chart, so the
 // info table keeps room for all of them and a change of range moves nothing.
-function heldLines(histories, symbol, quote) {
+function heldLines(histories, symbol, quote, trades) {
   var lines = []
   Object.keys(HISTORY_RANGES).forEach(function(range) {
     var entry = histories[historyKey(symbol, range)]
-    var line = entry && entry.history ? rangeLine(entry.history, rangeEnds(entry.history, null, quote), quote) : null
+    var line = entry && entry.history ? rangeLine(entry.history, rangeEnds(entry.history, null, quote, trades), quote) : null
     if (line) lines.push(line)
   })
   return lines
