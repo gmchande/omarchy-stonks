@@ -245,7 +245,7 @@ function twoDays(quote, now, calendars) {
   var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.epochAt(cal, date, cal.post.close) && !tradedSince(pre)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   return !!open && now >= open.start && now < open.end && !tradedSince(open.start)

@@ -192,6 +192,14 @@ function closeBefore(cal, dayStart) {
   return segs[segs.length - 1].end
 }
 
+// The after-hours last as long after a half day's 13:00 close as after a
+// full day's, so they end at 17:00. For a day the market trades.
+function postClose(cal, date) {
+  var segs = segmentsOn(cal, date)
+  var full = epochAt(cal, date, cal.post.close)
+  return Math.min(full, segs[segs.length - 1].end + full - epochAt(cal, date, cal.post.open))
+}
+
 function clockOf(local) {
   return Format.pad2(local.hour) + ":" + Format.pad2(local.minute)
 }
@@ -202,7 +210,7 @@ function tradingDay(cal, date) {
   var open = nextOpen(cal, epochAt(cal, nextDateString(date), "00:00"))
   return {
     from: segs.length ? opens(date, segs[0].start) : 0,
-    to: segs.length ? (cal.post ? epochAt(cal, date, cal.post.close) : segs[segs.length - 1].end) : 0,
+    to: segs.length ? (cal.post ? postClose(cal, date) : segs[segs.length - 1].end) : 0,
     next: open ? opens(open.dateString, open.t) : 0
   }
 }
