@@ -16,10 +16,13 @@
 // dividend moves Yahoo's base, and Yahoo's stands. A Stonks that holds no
 // close from the session before leaves the move out until Yahoo has caught
 // up (`CATCH_UP`): no field of Yahoo's answers names that close at every
-// open. A stock that doesn't trade again can't show Yahoo catching up, so
-// the clock ends the wait too (`BEHIND`). A US stock's day turns at 04:00,
-// hours before its first trade: a calendar with a pre-market keeps Yahoo's,
-// and so does a listing with no calendar, which may be one.
+// open. Without a calendar, a close held from before a weekday with no
+// session seen names none either: that weekday may have been a holiday or a
+// day Stonks missed. A stock that doesn't trade again can't show Yahoo
+// catching up, so the clock ends the wait too (`BEHIND`). A US stock's day
+// turns at 04:00, hours before its first trade: a calendar with a
+// pre-market keeps Yahoo's, and so does a listing with no calendar and no
+// close held, which may be one.
 function carryClose(previous, quote, calendars, now) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = Calendar.calendarFor(calendars, quote)
@@ -34,7 +37,7 @@ function carryClose(previous, quote, calendars, now) {
   var stale = traded && held && quote.prevClose === seen.before && seen.before !== seen.close
   var restated = stale && head.price === seen.close
   var first = traded ? firstTrade(quote, head) : null
-  var unknown = traded && !held && !!cal && head.t < first + CATCH_UP && now < first + CATCH_UP + BEHIND
+  var unknown = traded && !held && (!!cal || !!seen) && head.t < first + CATCH_UP && now < first + CATCH_UP + BEHIND
   if (!seen && !unknown) return quote
   var carried = seen ? Object.assign({}, quote, { closeSeen: seen }) : quote
   // Yahoo restating the last close: no move, and no open, until it moves on.

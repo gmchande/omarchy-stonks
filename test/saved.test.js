@@ -2986,11 +2986,11 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // its trades 14 minutes past the first, shows it.
   const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
   const nyOn3 = time => at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2))
-  const opening = (place, symbol, times, mode = "pct") => {
+  const opening = (place, symbol, times, mode = "pct", cals = calendars) => {
     let held = null
     return times.map(time => {
-      const two = M.twoDays(held, nyOn3(time), calendars)
-      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), calendars, nyOn3(time))
+      const two = M.twoDays(held, nyOn3(time), cals)
+      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), cals, nyOn3(time))
       const row = M.rowModel(held, 0, mode)
       return `${time} ${row.priceText} ${row.changeText}`
     })
@@ -3029,6 +3029,12 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
     "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
+  // With no calendar for Tokyo, the close held, Monday's, is from before a
+  // weekday with no session seen, so it names no close either: the move is
+  // left out, never −0.62% from Friday's close.
+  const noTokyo = { ...calendars, calendars: Object.fromEntries(Object.entries(calendars.calendars).filter(([id]) => id !== "JPX")) }
+  expect(opening("tokyo", "7203.t", tokyoTimes, "pct", noTokyo)).toEqual(["1855 3,051.00 \u22120.62%",
+    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   // Nor does either know the day's open: the only bars of Wednesday are
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
