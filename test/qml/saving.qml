@@ -83,12 +83,17 @@ Harness {
       // The file is made its owner's a moment after each write.
       var mode = ""
       within(3000, function() { mode = sh('stat -c %a "$1"'); return mode === "600" })
+      // The prices are saved once the first answers are in.
+      var cached = within(5000, function() { return harness.readFile(service.quotesPath) !== "" })
+      var priced = Object.keys(service.quotes)
       var next = restart.createObject(started)
       var began = within(5000, function() { return next.ready })
       var read = [next.listName, next.symbols.join(","), next.order, next.featuredSymbol, next.range].join(" ")
+      var unpriced = priced.filter(function(s) { return !next.quotes[s] })
       next.destroy()
-      harness.check("a change is in the file, the file is its owner's alone, and a fresh start reads what was saved",
-        wrote && mode === "600" && began && read === "Tech MSFT,NVDA symbol NVDA 1Y", [wrote, mode, began, read].join(" | "))
+      harness.check("a change is in the file, the file is its owner's alone, and a fresh start reads what was saved, the prices too",
+        wrote && mode === "600" && began && read === "Tech MSFT,NVDA symbol NVDA 1Y" && cached && priced.length > 0 && unpriced.length === 0,
+        [wrote, mode, began, read, cached, priced.length + " priced, a fresh start without " + unpriced.join(",")].join(" | "))
 
       // Half a JSON object, as a hand edit leaves one.
       var good = harness.readFile(harness.file)

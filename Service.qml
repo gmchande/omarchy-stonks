@@ -983,13 +983,24 @@ Item {
   // At most every 10 minutes, and only once an answer has come, so quotes
   // from an earlier session are never written back as they are. It waits
   // while a surface opens or a chart draws in, and for the runs out and asks
-  // due when it fell due (`saveWaitsFor`): a long list takes 20 ms of the
-  // shell's thread, which would stall an open's prices.
+  // due when it fell due (`saveWaitsFor`): a long list's file is a megabyte,
+  // written on the shell's thread, which would stall an open's prices.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
   property var saveWaitsFor: null
   // What came is saved, though every price may have failed since.
   property bool answeredOnce: false
+
+  // Each of All's quotes as the cache's text, made by a save for a quote
+  // changed since the last, a few milliseconds a turn: the whole cache in
+  // one JSON.stringify took 40 ms of the shell's thread for 150 stocks.
+  // `quoteTexts` doesn't notify.
+  readonly property var quoteTexts: ({ by: {} })
+  Timer {
+    id: quoteTextStep
+    interval: 0
+    onTriggered: root.writeQuotes()
+  }
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
@@ -1002,11 +1013,30 @@ Item {
     root.saveWaitsFor = null
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
-    var saved = {}
-    root.allSymbols.forEach(function(s) {
-      if (feed.quotes[s]) saved[s] = { quote: feed.quotes[s], receivedAt: (feed.entries[s] || {}).receivedAt || 0 }
+    root.writeQuotes()
+  }
+
+  // Written in a turn of its own once every text is made: the text
+  // JSON.stringify makes of { version: 1, quotes: { symbol: { quote,
+  // receivedAt } } }, in All's order, as the quotes stand then.
+  function writeQuotes() {
+    var until = Date.now() + 4
+    var by = root.quoteTexts.by
+    var held = root.allSymbols.filter(function(s) { return !!feed.quotes[s] })
+    var stale = held.filter(function(s) { return !by[s] || by[s].quote !== feed.quotes[s] })
+    if (stale.length > 0) {
+      for (var i = 0; i < stale.length && Date.now() < until; i++)
+        by[stale[i]] = { quote: feed.quotes[stale[i]], text: JSON.stringify(feed.quotes[stale[i]]) }
+      quoteTextStep.start()
+      return
+    }
+    var kept = {}
+    var saved = held.map(function(s) {
+      kept[s] = by[s]
+      return JSON.stringify(s) + ':{"quote":' + by[s].text + ',"receivedAt":' + JSON.stringify((feed.entries[s] || {}).receivedAt || 0) + "}"
     })
-    ownerOnly.write(root.quotesPath, JSON.stringify({ version: 1, quotes: saved }) + "\n")
+    root.quoteTexts.by = kept
+    ownerOnly.write(root.quotesPath, '{"version":1,"quotes":{' + saved.join(",") + "}}\n")
   }
 
   // ---- The screens
