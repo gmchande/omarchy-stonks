@@ -3,7 +3,8 @@
 # (test/unit.sh), the source boundaries, QML lint, the font's glyphs, the
 # manifest and the launcher entry, and the walks through the real plugin:
 # keys, mouse, saving, fetching, what a long list costs, and the
-# screenshot. Needs Omarchy installed and a Wayland session for the walks.
+# screenshot. The walks draw offscreen, but need Quickshell, Omarchy's
+# shell, and a display for Qt's GTK theme.
 # How Stonks looks is for the pictures (test/qml/render.sh), and how it
 # moves and feels for a hand on the running plugin.
 #
