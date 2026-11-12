@@ -294,12 +294,12 @@ Item {
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
     function(t) { return Market.tradeClock(featuredQuote, t, calendars) }) : null
   // Said under the price: what a scrub's move counts from, the dashed line
-  // under the pointer.
+  // under the pointer, or since the open the day's open.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? "┄ " + Figures.scrubBaselineText(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars) : "")
+    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars, changeMode, featuredNewest) : "")
 
   // The moment shown against the baseline; the pill's reads the day.
-  readonly property string animalKind: Figures.animalKind(featured)
+  readonly property string animalKind: Figures.headerAnimal(featured)
   // A change of chart, list, or look is no turn: the animal changes at once.
   // A failed range's stand-in day is another chart than its history.
   readonly property string animalChart: [motion.chartKeyOf(chart), view.listKey, retro].join(" ")
@@ -958,6 +958,7 @@ Item {
       latest: motion.latest,
       view: featured,
       scrubT: scrubShown,
+      legend: scrubShown ? baselineText : "",
       changeMode: changeMode,
       range: historyShown ? chartRange : "1D",
       now: now,
@@ -1194,8 +1195,9 @@ Item {
     still: !root.surfaceOpen
     held: root.chartLoading
     dimmed: motion.dimmed
-    // Nothing is said to be on its way while the header says no prices come.
-    loadingText: root.yahooDown ? "" : root.loadingText
+    // While the header says no prices come, the empty chart says why.
+    waitingText: root.yahooDown && !root.featuredQuote ? "No price for " + root.featuredSymbol + " yet · Yahoo hasn't sent one"
+      : root.yahooDown || !root.chartLoading ? "" : root.loadingText + "…"
     // Before any chart, the coming symbol, never a dash.
     symbol: root.chartSymbol || root.featuredSymbol
     nameOnLine: !root.headerTitled

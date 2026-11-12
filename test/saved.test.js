@@ -3075,11 +3075,14 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const fresh = (time, file, mode = "pct") => M.rowModel(M.carryClose(null, open(time, file), calendars, nyAt(time)), 0, mode).changeText
   expect(["1915", "1920", "1921"].map(time => fresh(time, "2d/7203.t.json"))).toEqual(["\u2014", "\u2014", "\u2014"])
   expect(["1915", "1920"].map(time => fresh(time, "2d/7203.t.json", "open"))).toEqual(["\u2014", "\u22121.26%"])
-  // The lines under the price and the move are left out with it: neither
-  // names a close the shell doesn't hold.
+  // The line under the price is left out with it, naming no close the shell
+  // doesn't hold, and the caption under the dash says the move comes after
+  // the day's first trades. The header's animal stays, as the plain bull:
+  // no move to cheer or mourn.
   const started1915 = M.carryClose(null, open("1915", "2d/7203.t.json"), calendars, nyAt("1915"))
   expect(M.heroLines(started1915, M.rowModel(started1915, 0, "pct"), null, nyAt("1915"), null, calendars, "pct", false))
-    .toEqual({ close: null, caption: { label: "", changeText: "", tone: "flat" } })
+    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" } })
+  expect(M.headerAnimal(M.rowModel(started1915, 0, "pct"))).toBe("plain")
   let started = null
   const startedRows = []
   for (const time of ["1915", "1920", "1921"]) {
@@ -3143,6 +3146,15 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("london", "shel.l", ["0255", "0303", "0310", "0320", "0330"])).toEqual(["0255 3,921.00 \u22122.86%",
     "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%", "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
   expect([startedAt("london", "shel.l", "0320"), startedAt("london", "shel.l", "0330")]).toEqual(["\u2014", "\u22120.20%"])
+  // While it's left out, the caption and the plain bull, as at Tokyo's; then
+  // the day's move and its animal.
+  const waiting = (place, symbol, time) => {
+    const quote = M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars, nyOn3(time))
+    const row = M.rowModel(quote, 0, "pct")
+    return [time, M.heroLines(quote, row, null, nyOn3(time), null, calendars, "pct", false).caption.label, M.headerAnimal(row)]
+  }
+  expect([waiting("london", "shel.l", "0320"), waiting("london", "shel.l", "0330")])
+    .toEqual([["0320", "FIRST TRADES · MOVE SOON", "plain"], ["0330", "TODAY", "bear"]])
   // BHP at Sydney's open on Wednesday 4 November, 09:55 to 10:30 there
   // (Tuesday 17:55 to 18:30 New York): Tuesday's move from Monday's 56.74,
   // then Wednesday's from Tuesday's 56.42, Yahoo's own from its first bars.
@@ -3701,14 +3713,17 @@ test("a screenshot's foot says when its price is from, a close as the close, and
   const weekHistory = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
   expect([null, weekHistory].map(history => Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history, latest: nbis.latest,
     newest: tops.newest.NBIS, scrubT: 0, calendars }).foot)).toEqual(["MON 26 OCT 2026 · 17:58 EDT", "MON 26 OCT 2026 · 17:58 EDT"])
-  // Since the open, the picture says the open its move counts from, which
-  // the panel says under its ranges, at rest and scrubbed into the session;
-  // not where the move counts from a close, nor at night, where the day
-  // ahead hasn't opened and the move is a dash.
+  // Since the open, the picture at rest says the open its move counts from,
+  // which the panel says under its ranges; not where the move counts from a
+  // close, nor at night, where the day ahead hasn't opened and the move is a
+  // dash. Scrubbed into the session, the panel's legend and the picture's
+  // name that open, where from a close they name the dashed line.
   const openOf = (at, built, s, mode, scrubT = 0) => Share.words({ quote: at.quotes[s], day: built.day, history: null, latest: built.latest,
     newest: at.newest[s] || null, scrubT, changeMode: mode, calendars }).open
   const noon = at("2026-10-26", "12:00")
   expect([openOf(tops, nbis, "NBIS", "open"), openOf(tops, nbis, "NBIS", "open", noon), openOf(tops, nbis, "NBIS", "pct")])
-    .toEqual([{ label: "OPEN", price: "153.97" }, { label: "OPEN", price: "153.97" }, null])
+    .toEqual([{ label: "OPEN", price: "153.97" }, null, null])
+  const legend = mode => M.scrubLegend(nbis.day, noon, M.exchangeDay(nbis.day, at("2026-10-26", "18:00")), calendars, mode, tops.newest.NBIS || null)
+  expect([legend("open"), legend("pct")]).toEqual(["OPEN 153.97", "┄ FRI CLOSE 158.74"])
   expect(openOf(topsAt("watch-2026-10-27-0350"), dayAt("watch-2026-10-27-0350", "nbis"), "NBIS", "open")).toBeNull()
 })
