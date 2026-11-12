@@ -213,22 +213,30 @@ function withSymbolAdded(settings, symbol) {
   })
 }
 
+// The row after `symbol` in `shown`, or before it from the last row.
+function neighbour(shown, symbol) {
+  var at = (shown || []).indexOf(symbol)
+  return at < 0 ? "" : shown[at === shown.length - 1 ? at - 1 : at + 1] || ""
+}
+
+// The stock on the chart leaving the rows shown hands the chart to its
+// neighbour there.
 function withMembership(settings, symbol, name, member, shown) {
   var without = function(list) { return list.filter(function(s) { return s !== symbol }) }
-  if (listIndex(settings.lists, name) >= 0) {
-    return withList(settings, name, function(list) {
+  var charted = String(settings.featured).toUpperCase() === symbol
+  var i = listIndex(settings.lists, name)
+  if (i >= 0) {
+    var next = withList(settings, name, function(list) {
       return Object.assign({}, list, { symbols: member ? list.symbols.concat([symbol]) : without(list.symbols) })
     })
+    var after = neighbour(shown, symbol)
+    if (!member && charted && after && i === listIndex(settings.lists, settings.list)) next.featured = after
+    return next
   }
   // Every symbol is in All already.
   if (member || !canRemove(settings.symbols) || settings.symbols.indexOf(symbol) < 0) return settings
   var symbols = without(settings.symbols)
-  var featured = settings.featured
-  if (String(featured).toUpperCase() === symbol) {
-    var at = (shown || []).indexOf(symbol)
-    featured = at < 0 ? symbols[0] : shown[at === shown.length - 1 ? at - 1 : at + 1]
-  }
-  return fileSettings(Object.assign({}, settings, { symbols: symbols, featured: featured,
+  return fileSettings(Object.assign({}, settings, { symbols: symbols, featured: charted ? neighbour(shown, symbol) || symbols[0] : settings.featured,
     lists: settings.lists.map(function(list) { return Object.assign({}, list, { symbols: without(list.symbols) }) }) }))
 }
 

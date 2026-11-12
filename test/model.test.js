@@ -759,6 +759,10 @@ test("membership across several lists", () => {
   const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
   expect([offGrowth.symbols, offGrowth.lists.map(list => list.symbols)])
     .toEqual([["NEST", "BO", "IRIS", "SPY"], [["NEST", "BO"], ["IRIS"]]])
+  // The stock on the chart leaving the list shown hands the chart to the
+  // next row there, as in All; leaving another list keeps it on the chart.
+  expect(M.withMembership(library({ list: "Growth", featured: "BO" }), "BO", "Growth", false, ["BO", "IRIS"]).featured).toBe("IRIS")
+  expect(M.withMembership(library({ list: "My Watchlist", featured: "BO" }), "BO", "Growth", false, ["NEST", "BO"]).featured).toBe("BO")
   const offAll = M.withMembership(library(), "BO", "", false, ["BO", "NEST", "IRIS", "SPY"])
   expect([offAll.symbols, offAll.lists.map(list => list.symbols)])
     .toEqual([["NEST", "IRIS", "SPY"], [["NEST"], ["IRIS"]]])
@@ -834,9 +838,12 @@ test("undo puts a removed stock back at its place in All and in each list that h
   expect(heroOut.featured).toBe("BO")
   expect(M.withRemovalUndone(heroOut, before, "NEST", heroOut.featured).featured).toBe("NEST")
   expect(M.withRemovalUndone(M.fileSettings({ ...heroOut, featured: "SPY" }), before, "NEST", heroOut.featured).featured).toBe("SPY")
-  // Out of one list only, it goes back into that list at its place.
-  const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
-  expect(M.withRemovalUndone(offGrowth, library({ list: "Growth" }), "BO", offGrowth.featured).lists[1].symbols).toEqual(["BO", "IRIS"])
+  // Out of one list only, it goes back into that list at its place, and to
+  // the chart if it was there.
+  const growth = library({ list: "Growth", featured: "BO" })
+  const offGrowth = M.withMembership(growth, "BO", "Growth", false, ["BO", "IRIS"])
+  const growthBack = M.withRemovalUndone(offGrowth, growth, "BO", offGrowth.featured)
+  expect([growthBack.lists[1].symbols, growthBack.featured]).toEqual([["BO", "IRIS"], "BO"])
 })
 
 test("the rule under the list name counts up, flat, and down as the rows' tones read them, and a row with no quote as none", () => {
