@@ -53,7 +53,8 @@
 # code, and the URL's place. An answer over --max-filesize is cut there
 # with exit code 63. While STONKS_FAKE_STATE/<HOST>.refuse exists (YAHOO,
 # ROBINHOOD, GITHUB), that host answers 429 to every request; while
-# <HOST>.offline exists, it gives no answer at all.
+# <HOST>.offline exists, it gives no answer at all. While <kind>.<name>.hold
+# exists, as requests.log names a URL, its answer waits, counted.
 
 set -u
 fixtures="${STONKS_FIXTURES:?}"
@@ -327,6 +328,7 @@ for i in "${!urls[@]}"; do
       exit_code=63
     fi
   fi
+  while [ -e "$state/$kind.$name.hold" ]; do sleep 0.05; done
   echo "$kind $name $status" >> "$state/requests.log"
   printf '%s' "$body"
   out=${format//'%{urlnum}'/$i}

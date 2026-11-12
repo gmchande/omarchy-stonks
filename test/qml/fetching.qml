@@ -600,6 +600,26 @@ Harness {
       hyprlandStandIn.panelScreen = null
       hyprlandStandIn.monitors = { values: [] }
 
+      // A click that stops a run ahead shows its chart from the answers the
+      // run already has: KILN's is in, SPY's still on its way.
+      openWindow()
+      var kilnFrom = harness.calls("KILN.history")
+      var spyFrom = harness.calls("SPY.history")
+      var aheadFrom = harness.requests().length
+      touch("history.SPY.hold")
+      body.selectRange("1Y")
+      var kilnIn = within(10000, function() {
+        return harness.calls("SPY.history") > spyFrom && harness.requests().slice(aheadFrom).indexOf("history KILN 200") >= 0
+      })
+      body.featureSymbol("KILN")
+      var kilnShown = within(3000, function() { return body.historyShown && body.chartSymbol === "KILN" && body.chartRange === "1Y" })
+      remove("history.SPY.hold")
+      settle()
+      harness.check("a click on a chart a run ahead already holds shows it without downloading it again",
+        kilnIn && kilnShown && harness.calls("KILN.history") === kilnFrom + 1,
+        [kilnIn, kilnShown, harness.calls("KILN.history") - kilnFrom].join(" "))
+      body.selectRange("1D")
+
       harness.finish()
     }
   }

@@ -21,7 +21,7 @@ Item {
   // Launched and not yet answered, its retry pause included.
   property var job: null
   property int attempts: 0
-  // The job's curl was stopped; its answer is dropped.
+  // The job's curl was stopped; only the answers it got whole are kept.
   property bool stopped: false
   property bool waitingForScreen: false
 
@@ -92,7 +92,7 @@ Item {
         heldTimer.stop()
         root.endJob()
       } else if (!stopped) {
-        // Its stream ends at once, empty, and receive drops it.
+        // Its stream ends at once, and receive keeps what came whole.
         root.stopped = true
         fetchRun.stop()
       }
@@ -158,12 +158,16 @@ Item {
 
   function receive(got) {
     var request = job
+    var answers = request.charts.map(function(c, i) { return got.filter(function(a) { return a.index === i })[0] || null })
+    var histories = answers.map(function(a) { return root.parse(a, request.range) })
     if (stopped || !covers(request, wanted)) {
+      // A click that stops a run ahead finds its chart here if it came.
+      var kept = root.goodEntries(request, histories)
+      if (wanted && !wanted.ahead && wanted.charts[0].key in kept) root.wanted = null
+      if (Object.keys(kept).length > 0) root.setEntries(kept)
       root.endJob()
       return
     }
-    var answers = request.charts.map(function(c, i) { return got.filter(function(a) { return a.index === i })[0] || null })
-    var histories = answers.map(function(a) { return root.parse(a, request.range) })
     var answer = answers[0]
     if (!request.ahead && !histories[0] && attempts < 2 && answer && (answer.kind === "bad" || answer.kind === "ok")) {
       retryTimer.restart()
@@ -172,29 +176,36 @@ Item {
     root.settle(histories)
   }
 
+  function goodEntries(request, histories) {
+    var now = root.stamp()
+    var values = {}
+    request.charts.forEach(function(chart, i) {
+      var history = histories[i]
+      if (!history) return
+      var dropped = Quote.bucketTimes(history.droppedTimes)
+      var previous = entries[chart.key]
+      var previousDropped = Quote.bucketTimes(previous && previous.history
+        ? previous.history.droppedTimes : null)
+      if (dropped && dropped !== previousDropped)
+        console.warn("stonks: " + chart.symbol + " " + request.range
+          + " dropped stray buckets " + dropped)
+      values[chart.key] = { status: "ok", history: history, receivedAt: now, answeredAt: now }
+    })
+    return values
+  }
+
   function settle(histories) {
     var request = job
     // Cleared before `entries` changes: a reader may want the next chart at
     // once, and that want must stand.
     root.wanted = null
     var now = root.stamp()
-    var values = {}
-    var misses = []
+    var values = root.goodEntries(request, histories)
     request.charts.forEach(function(chart, i) {
-      var history = histories[i]
-      if (history) {
-        var dropped = Quote.bucketTimes(history.droppedTimes)
-        var previous = entries[chart.key]
-        var previousDropped = Quote.bucketTimes(previous && previous.history
-          ? previous.history.droppedTimes : null)
-        if (dropped && dropped !== previousDropped)
-          console.warn("stonks: " + chart.symbol + " " + request.range
-            + " dropped stray buckets " + dropped)
-        values[chart.key] = { status: "ok", history: history, receivedAt: now, answeredAt: now }
-      } else if (request.ahead) misses.push(chart.key)
+      if (histories[i]) return
+      if (request.ahead) root.missed(chart.key)
       else values[chart.key] = { status: "failed", answeredAt: now }
     })
-    misses.forEach(function(key) { root.missed(key) })
     if (Object.keys(values).length > 0) root.setEntries(values)
     root.endJob()
   }
