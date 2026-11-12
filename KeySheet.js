@@ -1,7 +1,7 @@
 .pragma library
 
 // The keys a person uses every day, the same in every order and on both
-// surfaces. The README's table has every key. Each line fits the panel's
+// surfaces. The README has every key. Each line fits the panel's
 // half column.
 function sheet() {
   return {

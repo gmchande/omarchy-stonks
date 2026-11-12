@@ -66,7 +66,7 @@ pointing at it shows tonight's.
 
 ## Reading the chart
 
-<img src="media/scrub.png" width="480" alt="The panel scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
+<img src="media/scrub.png" width="480" alt="The panel scrubbed back an hour and a half, to 10:16 in the morning. The price, the change, and the rows show that moment">
 
 Run the pointer along the chart to see where a stock was at any moment,
 such as the morning's low. The price, the change and the rows follow it.
@@ -215,7 +215,7 @@ clipboard, with a notification that opens it in your screenshot editor.
 
 ## Keys
 
-`?` lists the keys you'll use every day. This table has them all:
+`?` lists the keys you'll use every day. This table has all of Stonks' own:
 
 | Key | Does |
 | --- | --- |
@@ -245,6 +245,10 @@ clipboard, with a notification that opens it in your screenshot editor.
 | Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
 | `?` | Show the keys you'll use every day |
 | `Esc` | Close |
+
+In the panel, Omarchy's panel keys work too: `j` `k` move the selection,
+`h` `l` move along the chart, Space shows the selected row's chart, and `x`
+removes the selected row.
 
 ## If something's wrong
 
