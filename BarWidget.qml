@@ -39,7 +39,7 @@ BarWidget {
   // night for tonight's price and move; the hover says them.
   readonly property string newestNote: newest
     ? Figures.pillNote(featuredQuote, newest, service.changeMode, service.now, service.calendars, retro) : ""
-  readonly property string newestKey: newest ? newest.t + (newest.joined ? " joined" : "") : ""
+  readonly property string newestKey: newest ? [newest.t, newest.joined, service.changeMode].join(" ") : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
@@ -80,10 +80,10 @@ BarWidget {
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
   // to the bar again while it stays: a warning's, a new symbol's, a newest
-  // price's time, the pill's turn from the day to its row's newest price.
-  // Qt.callLater runs a function once, so changes together show once. A
-  // new figure alone never does, so a resting pointer sees no blink but for
-  // a newer trade or that turn.
+  // price's time, the pill's turn from the day to its row's newest price,
+  // a change of unit made in the window. Qt.callLater runs a function once,
+  // so changes together show once. A new figure alone never does, so a
+  // resting pointer sees no blink but for a newer trade or those turns.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
@@ -410,14 +410,24 @@ BarWidget {
       }
 
       Text {
+        id: moveText
         visible: !root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
+        // A dash keeps a small move's room, so the pill keeps its width as
+        // the move since the open comes and goes.
+        width: root.featured && root.featured.pct === null ? Math.max(implicitWidth, Math.ceil(dashRoom.width)) : implicitWidth
         textFormat: Text.PlainText
         text: root.changeText
         // With no price, trouble is in the bar's ink, as the header says it.
         color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
+
+        TextMetrics {
+          id: dashRoom
+          font: moveText.font
+          text: "+0.00%" + (root.service && root.service.changeMode === "open" ? " open" : "")
+        }
       }
 
       Text {
