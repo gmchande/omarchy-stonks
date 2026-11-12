@@ -621,6 +621,14 @@ Item {
   }
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
+  // Whether the night trades now, and the listings whose newest price may
+  // be a trade Robinhood failed to send meanwhile: their "!".
+  readonly property bool nightTrading: {
+    var cal = Overnight.overnightMarket(calendars)
+    var night = cal ? Overnight.nightAt(cal, now) : null
+    return !!night && night.open
+  }
+  readonly property var nightFailed: Overnight.nightFailures(allDayFeed.entries, overnightFeed.entries, nightTrading)
   // The feeds themselves, for whoever waits until no run is out.
   readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
@@ -679,6 +687,19 @@ Item {
 
   // ---- What is asked, and when
 
+  // The pills in the bars (`BarWidget`). With none, the stock you last
+  // looked at is asked for only while a surface is open.
+  property var pills: []
+  function pillShown(pill, shown) {
+    var others = root.pills.filter(function(p) { return p !== pill })
+    root.pills = shown ? others.concat([pill]) : others
+  }
+  readonly property bool pillInBar: pills.length > 0
+  onPillInBarChanged: {
+    askDue()
+    askOvernight()
+  }
+
   property var watched: []
 
   // `askDue` reads the wall clock, which `now` trails between ticks while
@@ -692,7 +713,7 @@ Item {
     var open = root.openSurfaces.length > 0
     var featured = root.view.featured
     var calNow = Asks.calendarsAt(root.calendars, now)
-    var watched = Asks.watchedSymbols(root.allSymbols, featured, open)
+    var watched = Asks.watchedSymbols(root.allSymbols, root.pillInBar ? featured : "", open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
     var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.chartedOnShow(), featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
@@ -716,6 +737,7 @@ Item {
     var previewed = root.previewSymbol
     return Asks.overnightAsks({
       open: root.openSurfaces.length > 0,
+      pill: root.pillInBar,
       featured: root.view.featured,
       quoteEntries: feed.entries,
       quotes: feed.quotes,

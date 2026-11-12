@@ -690,11 +690,18 @@ function readingAt(quote, t) {
   return { price: pts[k].p, t: t, close: false }
 }
 
-function change(quote, priceNow, mode) {
+// `digits`, the price's, makes the move the price shown less the close or
+// open shown, so the two add up to the price on top. Each rounding its own
+// half-cent away from zero, 348.22 and −0.50 sat under 347.73 (Yahoo's
+// 347.725). A price shown with fewer digits than the move, whole from
+// 10,000, can't add up, so its move is the difference itself. The percent
+// is always the difference's.
+function change(quote, priceNow, mode, digits) {
   var base = mode === "open" ? quote.dayOpen : quote.prevClose
   if (!Format.isFiniteNumber(priceNow) || !Format.isFiniteNumber(base)) return { abs: null, pct: null, up: true }
   var abs = priceNow - base
-  return { abs: abs, pct: base ? (abs / base) * 100 : 0, up: abs >= 0 }
+  var shown = Format.isFiniteNumber(digits) && digits >= 2 ? Number(Format.fixed(priceNow, digits)) - Number(Format.fixed(base, digits)) : abs
+  return { abs: shown, pct: base ? (abs / base) * 100 : 0, up: abs >= 0 }
 }
 
 // The bell's bucket is the session's when it holds the closing trade, and so

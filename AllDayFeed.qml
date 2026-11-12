@@ -35,12 +35,7 @@ Item {
       var answer = got.filter(function(a) { return a.index === b })[0]
       var parsed = null
       try { parsed = answer && answer.kind === "ok" ? Overnight.parseAllDay(JSON.parse(answer.body), batch) : null } catch (e) { parsed = null }
-      batch.forEach(function(symbol) {
-        var had = entries[symbol]
-        next[symbol] = parsed
-          ? { status: "ok", allDay: parsed[symbol], at: askedAt }
-          : { status: "failed", allDay: had ? had.allDay : false, at: askedAt }
-      })
+      batch.forEach(function(symbol) { next[symbol] = Overnight.allDayEntry(parsed, symbol, entries[symbol], askedAt) })
     })
     root.batches = []
     root.entries = next

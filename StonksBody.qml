@@ -119,6 +119,9 @@ Item {
   property var owed: ({})
   // Symbols asked for under 2 s ago: a quote opened old isn't late yet.
   property var asking: ({})
+  // Listings whose Robinhood answer failed while the night trades
+  // (`Service.nightFailed`).
+  property var nightFailed: ({})
   // A refresh the reader asked for is out.
   property bool refreshing: false
   // A closed surface's clock holds still too.
@@ -138,6 +141,7 @@ Item {
   Binding on newestTrades { when: root.reading; value: root.service?.newestTrades; restoreMode: Binding.RestoreNone }
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
   Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
+  Binding on nightFailed { when: root.reading; value: root.service?.nightFailed; restoreMode: Binding.RestoreNone }
   Binding on slideAt { when: root.showing; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
@@ -257,7 +261,7 @@ Item {
   // The day the 1D chart draws; its baseline is `prevClose`.
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Freshness.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest)
+    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest, !!nightFailed[chartSymbol || featuredSymbol])
   readonly property var featuredGeometry: motion.geometry
   readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestTrade(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
@@ -1256,6 +1260,7 @@ Item {
     now: root.now
     owed: root.owed
     asking: root.asking
+    nightFailed: root.nightFailed
     look: root.look
     rowHeight: root.listRowHeight
     rowGap: root.rowGap

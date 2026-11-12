@@ -487,7 +487,7 @@ function historyRowModel(history, quote, scrubT) {
   var head = !bar && !tail && quote ? Quote.headlineQuote(quote) : null
   var price = bar && Format.isFiniteNumber(bar.c) ? bar.c
     : tail ? tail.c : (head ? head.price : stats.last)
-  var chg = Quote.change({ prevClose: history.baseline, points: [] }, price, "pct")
+  var chg = Quote.change({ prevClose: history.baseline, points: [] }, price, "pct", quote ? quote.priceDigits : undefined)
   return {
     symbol: history.symbol || (quote ? quote.symbol : ""),
     name: quote ? quote.name : (history.symbol || ""),

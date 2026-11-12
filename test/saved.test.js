@@ -1325,6 +1325,16 @@ test("outside trading an old close is normal, but a failed refresh still shows",
   expect(M.freshnessText(M.freshness(ok, closeQuote, night, 0), q)).toBe("")
   const failed = { status: "failed", receivedAt: night - 60 }
   expect(M.freshness(failed, closeQuote, night, 0).state).toBe("failed")
+  // So does Robinhood's while a night trades: a first check that failed,
+  // leaving unknown whether the night trades the listing, or the trades of
+  // one it trades all day. A failed check after an answer keeps that
+  // answer. By day Yahoo's price is the newest, and nothing is said.
+  const firstCheck = M.allDayEntry(null, "AAPL", undefined, night - 60)
+  const allDay = { AAPL: firstCheck, MSFT: { status: "ok", allDay: true, at: 0 }, JNJ: M.allDayEntry(null, "JNJ", { status: "ok", allDay: false, at: 0 }, night - 60) }
+  const nights = { MSFT: { status: "failed", bars: [], through: null, at: night - 60 } }
+  expect([firstCheck.allDay, M.nightFailures(allDay, nights, true), M.nightFailures(allDay, nights, false)]).toEqual([null, { AAPL: true, MSFT: true }, {}])
+  const robinhoodFailed = M.freshness(ok, closeQuote, night, 0, false, null, true)
+  expect([robinhoodFailed.state, M.freshnessWarns(robinhoodFailed), M.freshnessText(robinhoodFailed, q)]).toEqual(["failed", true, "REFRESH FAILED · AS OF 16:00"])
 })
 
 test("parseSearch keeps tradable results with names and readable exchanges", () => {
@@ -1785,7 +1795,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const allDay = Object.fromEntries(names.map(s => [s, { status: "ok", allDay: true, at: asked }]))
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
-    return M.overnightAsks({ open: false, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
+    return M.overnightAsks({ open: false, pill: true, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
       quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
@@ -2275,8 +2285,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
       .toEqual(["24H AGO 80,711", "24H \u2212795.72"])
   }
   // Wherever those lines show, at every saved watch moment: the close plus
-  // the move under the change is the price on top, give or take the rounding
-  // of each, and a price from a past day never says TODAY.
+  // the move under the change is the price on top, to its last digit where
+  // the price shows cents, and a price from a past day never says TODAY.
+  const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
+  const addsUp = (close, move, price, digits) => Math.abs(number(close) + number(move) - number(price)) < (digits >= 2 ? 1e-9 : 2 * Math.pow(10, -digits))
   {
     const off = []
     const sets = readdirSync(join(fixtures, "moments")).filter(set => set.startsWith("watch-") && existsSync(join(fixtures, "moments", set, "times.txt")))
@@ -2286,13 +2298,33 @@ test("in every phase, a stock that has traded since its close shows that newest 
         const view = M.rowModel(at.quotes[s], 0, "pct", at.newest[s] || null)
         const lines = under(at, s)
         if (!lines.close || lines.close.changeText !== "" || lines.caption.changeText === "") continue
-        const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
-        const digits = at.quotes[s].priceDigits
-        const off_by = Math.abs(number(lines.close.price) + number(lines.caption.changeText) - number(view.priceText))
         const today = M.exchangeDay(at.quotes[s], at.now) === M.exchangeDay(at.quotes[s], view.asOf)
-        if (off_by > 2 * Math.pow(10, -digits) || (lines.caption.label === "TODAY" && !today))
+        if (!addsUp(lines.close.price, lines.caption.changeText, view.priceText, at.quotes[s].priceDigits) || (lines.caption.label === "TODAY" && !today))
           off.push(`${set} ${s}: ${view.priceText} ${view.changeText} | ${said(lines).join(" | ")}`)
       }
+    }
+    expect(off).toEqual([])
+  }
+  // And in every saved answer read at rest, where Yahoo sends half-cents:
+  // AAPL's 347.725 under a close of 348.22 shows 347.73 and −0.49, not −0.50.
+  {
+    const off = []
+    const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith(".json") ? [join(dir, e.name)] : [])
+    const check = (quote, file) => {
+      const row = quote && M.rowModel(quote, 0, "abs")
+      if (!row || row.pct === null || !M.isFiniteNumber(row.close)) return
+      const close = M.money(row.close, quote.priceDigits)
+      if (!addsUp(close, row.changeText, row.priceText, quote.priceDigits)) off.push(`${file.slice(fixtures.length + 1)} ${quote.symbol}: ${close} ${row.changeText} ${row.priceText}`)
+    }
+    for (const file of walk(fixtures)) {
+      let answer
+      try { answer = JSON.parse(readFileSync(file, "utf8")) } catch { continue }
+      if (answer && answer.spark && answer.spark.result) {
+        for (const r of answer.spark.result) {
+          const day = r.response && r.response[0]
+          if (day && day.meta) check(M.sparkQuote(day, null, cents)?.quote, file)
+        }
+      } else if (answer && answer.chart && answer.chart.result) check(M.parseChart(answer, cents), file)
     }
     expect(off).toEqual([])
   }
@@ -2986,11 +3018,11 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // its trades 14 minutes past the first, shows it.
   const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
   const nyOn3 = time => at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2))
-  const opening = (place, symbol, times, mode = "pct") => {
+  const opening = (place, symbol, times, mode = "pct", cals = calendars) => {
     let held = null
     return times.map(time => {
-      const two = M.twoDays(held, nyOn3(time), calendars)
-      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), calendars, nyOn3(time))
+      const two = M.twoDays(held, nyOn3(time), cals)
+      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), cals, nyOn3(time))
       const row = M.rowModel(held, 0, mode)
       return `${time} ${row.priceText} ${row.changeText}`
     })
@@ -3029,6 +3061,40 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
     "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
+  // With no calendar for Tokyo, the close held, Monday's, is from before a
+  // weekday with no session seen, and Yahoo still counts from the close
+  // before it: the move is left out, never −0.62% from Friday's close.
+  const noTokyo = { ...calendars, calendars: Object.fromEntries(Object.entries(calendars.calendars).filter(([id]) => id !== "JPX")) }
+  expect(opening("tokyo", "7203.t", tokyoTimes, "pct", noTokyo)).toEqual(["1855 3,051.00 \u22120.62%",
+    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+  // Saudi's exchange trades Sunday to Thursday, 10:00 to 15:00 at UTC+3,
+  // with no calendar here. No saved answer is from it, so Toyota's day is
+  // moved to Thursday 22 October, closing at 2,856 from 2,900, and to Sunday
+  // 25 October at 10:05, priced 2,880. By the weekdays Sunday's open skips
+  // Friday, but Yahoo counts from Thursday's close, the one held: the move
+  // shows from the first bar. Had Yahoo still counted from Wednesday's, it
+  // would be left out.
+  const saudiDay = (day, through, price, prevClose) => {
+    const json = structuredClone(fixture("7203-t-day.json"))
+    const r = json.chart.result[0]
+    const start = day + 7 * 3600, end = day + 12 * 3600
+    const shift = start - r.meta.currentTradingPeriod.regular.start
+    r.timestamp = r.timestamp.map(t => t + shift).filter(t => t <= through)
+    for (const k of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][k] = r.indicators.quote[0][k].slice(0, r.timestamp.length)
+    const p = { timezone: "AST", gmtoffset: 10800 }
+    const periods = { pre: { ...p, start, end: start }, regular: { ...p, start, end }, post: { ...p, start: end, end } }
+    Object.assign(r.meta, { symbol: "2222.SR", exchangeName: "SAU", timezone: "AST", exchangeTimezoneName: "Asia/Riyadh", gmtoffset: 10800,
+      currency: "SAR", regularMarketPrice: price, regularMarketTime: Math.min(through, end), previousClose: prevClose, chartPreviousClose: prevClose,
+      currentTradingPeriod: periods, tradingPeriods: { pre: [[periods.pre]], regular: [[periods.regular]], post: [[periods.post]] } })
+    return M.parseChart(json, cents, through)
+  }
+  const saudiThursday = Date.UTC(2026, 9, 22) / 1000, saudiSunday = Date.UTC(2026, 9, 25) / 1000
+  const thursdayClosed = saudiDay(saudiThursday, saudiThursday + 13 * 3600, 2856, 2900)
+  const sundayMove = prevClose => {
+    const now = saudiSunday + 7 * 3600 + 300
+    return M.rowModel(M.carryClose(thursdayClosed, saudiDay(saudiSunday, now, 2880, prevClose), calendars, now), 0, "pct").changeText
+  }
+  expect([sundayMove(2856), sundayMove(2900)]).toEqual(["+0.84%", "\u2014"])
   // Nor does either know the day's open: the only bars of Wednesday are
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
@@ -3380,6 +3446,12 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   // Saturday Thursday and Friday have traded, and it is asked again.
   expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(at("2026-10-08", "04:00"))
   expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-10", "12:00"))).toBe(0)
+  // A half day's after-hours end at 17:00: answered at 17:20 on the Friday
+  // after Thanksgiving, it waits for Monday's pre-market, not until 20:15.
+  const halfDay = clock => at("2026-11-27", clock)
+  const half = { pre: { start: halfDay("04:00"), end: halfDay("09:30") }, regular: { start: halfDay("09:30"), end: halfDay("13:00") },
+    post: { start: halfDay("13:00"), end: halfDay("17:00") } }
+  expect(quiet({ ...nest, session: half, current: half }, halfDay("17:20"), halfDay("18:00"))).toBe(at("2026-11-30", "04:00"))
   // The S&P 500 is on the US calendar (S&P is one of its exchanges), at the
   // refresh interval through Thursday's session. Its periods stay the last
   // session's until its open, so its calendar's hours say whether it may

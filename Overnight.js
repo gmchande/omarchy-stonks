@@ -108,6 +108,13 @@ function parseAllDay(json, symbols) {
   return out
 }
 
+// Robinhood's word on whether `symbol` trades all day, from a check's
+// answer (`parsed`, null when the check failed). A failed check keeps the
+// last answer, or none: `allDay` null, never said either way.
+function allDayEntry(parsed, symbol, had, at) {
+  return parsed ? { status: "ok", allDay: parsed[symbol], at: at } : { status: "failed", allDay: had ? had.allDay : null, at: at }
+}
+
 function allDayDue(entry, now) {
   if (!entry) return true
   return now - entry.at >= (entry.status === "ok" ? ALL_DAY_INTERVAL : OVERNIGHT_INTERVAL)
@@ -181,6 +188,21 @@ function nightTrades(quote, allDay, t, calendars) {
   var cal = allDay ? Calendar.calendarFor(calendars, quote) : null
   var night = cal && cal.overnight ? nightAt(cal, t) : null
   return !!night && night.open
+}
+
+// The listings whose newest price may be a trade Robinhood failed to send,
+// while the night trades (`open`): those it has never said trade all day or
+// not, its last check failed, and those it trades all day whose trades
+// failed. `allDay` and `nights` are Robinhood's entries.
+function nightFailures(allDay, nights, open) {
+  var out = {}
+  if (!open) return out
+  for (var symbol in allDay) {
+    var tradability = allDay[symbol]
+    var night = nights[symbol]
+    if (tradability.allDay === null ? tradability.status === "failed" : tradability.allDay && !!night && night.status === "failed") out[symbol] = true
+  }
+  return out
 }
 
 function marketAsleep(quote, allDay, t, calendars) {

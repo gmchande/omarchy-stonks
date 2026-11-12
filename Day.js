@@ -31,7 +31,7 @@ function dayWindow(cal, date) {
     date: date,
     start: Overnight.marketDay(cal, date).start,
     midnight: Calendar.epochAt(cal, date, "00:00"),
-    end: nextKind === "open" ? Calendar.epochAt(cal, date, cal.overnight.open) : postClose(cal, date)
+    end: nextKind === "open" ? Calendar.epochAt(cal, date, cal.overnight.open) : Calendar.postClose(cal, date)
   }
 }
 
@@ -44,14 +44,6 @@ function dayWindow(cal, date) {
 function slidWindow(win, open, slideAt) {
   var slid = slideAt > open ? Math.floor((slideAt - open) / Overnight.SLOT) * Overnight.SLOT : 0
   return Object.assign({}, win, { start: Math.min(win.midnight, win.start + slid) })
-}
-
-// Robinhood's post-market lasts as long after a half day's 13:00 close as
-// after a full day's, so it ends at 17:00.
-function postClose(cal, date) {
-  var segs = Calendar.segmentsOn(cal, date)
-  var full = Calendar.epochAt(cal, date, cal.post.close)
-  return Math.min(full, segs[segs.length - 1].end + full - Calendar.epochAt(cal, date, cal.post.open))
 }
 
 // A day stays on through the weekend or holiday after it, until the next
@@ -93,7 +85,7 @@ function windowSession(cal, quote, win) {
   var open = segs[0].start
   var close = segs[segs.length - 1].end
   return { pre: { start: Calendar.epochAt(cal, win.date, cal.pre.open), end: open }, regular: { start: open, end: close },
-    post: { start: close, end: postClose(cal, win.date) } }
+    post: { start: close, end: Calendar.postClose(cal, win.date) } }
 }
 
 // Hours before the first trade drawn and after the last take no room, so a

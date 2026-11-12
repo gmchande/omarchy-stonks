@@ -440,6 +440,23 @@ Harness {
       hyprlandStandIn.toplevels = { values: [] }
       hyprlandStandIn.monitors = { values: [] }
 
+      // Robinhood gone in the night, nothing open: the pill marks its price
+      // with a "!" from the trades' failed ask, says the refresh failed, and
+      // drops the "!" once Robinhood answers again.
+      touch("ROBINHOOD.offline")
+      var markedAt = 0, hover = ""
+      tick(600, 5, function() {
+        if (!markedAt && pill.warns) {
+          markedAt = service.now
+          hover = pill.warningText
+        }
+      })
+      remove("ROBINHOOD.offline")
+      var clearedAt = 0
+      tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
+      harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",
+        markedAt > 0 && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, hover, clearedAt].join(" | "))
+
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
       // turns a screen on asks at once for the pill's, with the clock still.
@@ -487,6 +504,23 @@ Harness {
         held && darkSearches === 0 && sent, [held, darkSearches, harness.calls("SEARCH.asked") - searchesFrom].join(" "))
       body.cancelAdding()
       closeWindow()
+
+      // No pill in any bar and nothing open: nothing is asked for the stock
+      // you last looked at, though its market trades. A pill put back in a
+      // bar asks for it at once.
+      var unseen = countsOver("Thursday, no pill in any bar and nothing open: nothing is asked for, the stock you last looked at included",
+        900, counts([0, 0, 0, 0, 0, 0, 0, 0]), function() {
+          pillLoader.active = false
+          otherPillLoader.active = false
+          startAt(service.now + 5)()
+        })
+      var pillFrom = harness.requests().length
+      pillLoader.active = true
+      var asksAgain = within(2000, function() { return harness.quoteCounts(harness.requests().slice(pillFrom)).NEST === 1 })
+      settle()
+      harness.check("with no pill, Robinhood is asked nothing either, and a pill put back asks for its stock at once",
+        unseen.filter(function(l) { return /^(overnight|instruments) /.test(l) }).length === 0 && asksAgain,
+        unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
 
       harness.finish()
     }

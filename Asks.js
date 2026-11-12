@@ -245,7 +245,7 @@ function twoDays(quote, now, calendars) {
   var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.epochAt(cal, date, cal.post.close) && !tradedSince(pre)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   return !!open && now >= open.start && now < open.end && !tradedSince(open.start)
@@ -270,10 +270,11 @@ function quoteCadence(quote, now, interval, charted, calNow) {
 
 // Trades due within half an interval go with those due now, so the list
 // stays one request each night's 5 minutes. With nothing open while a
-// night trades, the pill's symbol is asked so its newest price stays
+// night trades, a pill's symbol is asked so its newest price stays
 // current. `allDay` and `nights` are Robinhood's entries; `quoteEntries`
 // Yahoo's.
 function overnightAsks(s) {
+  if (!s.open && !s.pill) return null
   var featured = s.featured
   var cal = Overnight.overnightMarket(s.calendars)
   var tonight = cal && !s.open ? Overnight.nightAt(cal, s.now) : null
@@ -286,8 +287,11 @@ function overnightAsks(s) {
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : featured
   var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [featured]
+  // By day with nothing open, once each stock the pill shows, and again
+  // while no check has said whether it trades all day.
   var tradability = listings.filter(function(x) {
-    return kept ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
+    var entry = s.allDay[x]
+    return Overnight.allDayDue(entry, s.now) && (kept || !entry || entry.allDay === null)
   })
   var drawn = listings.filter(function(x) { return !s.allDay[x] || s.allDay[x].allDay })
   // Listings asked together share `entry.at`, so each ask is judged once.

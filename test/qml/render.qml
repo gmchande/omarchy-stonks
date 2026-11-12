@@ -329,6 +329,8 @@ Harness {
   QtObject {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
+    // The pill says it shows; a stub asks nothing either way.
+    function pillShown(pill, shown) {}
     // The copy's id (dev-<state>), as its lists file is named.
     readonly property string pluginId: root.copyId
     property bool listsUnreadable: false
@@ -376,6 +378,7 @@ Harness {
     // each listing has Yahoo's own day (`Chart.dayDrawn`).
     property var nights: ({})
     property var allDay: null
+    property var nightFailed: ({})
     // Each listing's newest price since its close, as the service reads it.
     readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
@@ -1408,6 +1411,7 @@ Harness {
               QtObject {
                 id: pillService
                 readonly property bool night: pillRow.modelData.day === "night" && !!root.nightPill
+                function pillShown(pill, shown) {}
                 property string featuredSymbol: night ? "JNJ" : "NEST"
                 property var quotes: night ? ({ JNJ: root.nightPill.quote })
                   : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
@@ -1422,6 +1426,7 @@ Harness {
                 property var newestTrades: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
+                property var nightFailed: ({})
                 property var calendars: night ? stub.calendars : null
               }
               QtObject {

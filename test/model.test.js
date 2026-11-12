@@ -654,15 +654,19 @@ test("the data file reads as written and repairs hand edits", () => {
   expect(orphan.list).toBe("")
   expect(M.fileSettings({ symbols: ["NEST"], lists: [{ name: "Growth" }], list: "growth" }).list).toBe("Growth")
   // A hand edit's unknown order is manual, manual is never reversed, and
-  // list names are trimmed, kept once ignoring case, and never All or empty.
+  // list names are trimmed. A list named as another in another case, All, or
+  // nothing keeps what it holds under a free name.
   const edited = M.fileSettings({ symbols: ["BO"], order: "bogus", reversed: true, lists: [
     { name: "  Growth  ", symbols: ["bo", "BO"], reversed: true }, { name: "growth", symbols: ["X"] },
     { name: "All", symbols: [] }, { name: "", symbols: [] }, { name: "Wins", order: "bogus" },
     { name: "Losers", order: "pct", reversed: true }
   ] })
-  expect([edited.order, edited.reversed]).toEqual(["manual", false])
+  expect([edited.order, edited.reversed, edited.symbols]).toEqual(["manual", false, ["BO", "X"]])
   expect(edited.lists).toEqual([
     { name: "Growth", symbols: ["BO"], order: "manual", reversed: false },
+    { name: "growth 2", symbols: ["X"], order: "manual", reversed: false },
+    { name: "All 2", symbols: [], order: "manual", reversed: false },
+    { name: "List", symbols: [], order: "manual", reversed: false },
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
@@ -1576,14 +1580,16 @@ test("only the request sent alone after a pause speaks for the host: answers to 
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
-    open: false, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
+    open: false, pill: true, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
     allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
   // live; what Robinhood has answered for it is enough, failed or not. The
-  // pill moved to another stock asks about that one.
+  // pill moved to another stock asks about that one. With no pill in any
+  // bar, nothing, by day or at night.
   const noon = at(WED, "14:00")
+  expect([asks({ now: noon, pill: false }), asks({ pill: false })]).toEqual([null, null])
   expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
   const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
@@ -1591,6 +1597,11 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("ok"), featured: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
     .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  // A first check that failed leaves it unknown, and is asked again 5
+  // minutes on, with only the pill by day too.
+  const failedFirst = at => ({ allDay: { AAPL: M.allDayEntry(null, "AAPL", undefined, at) } })
+  expect([asks({ now: noon, ...failedFirst(noon - 60) }), asks({ now: noon, ...failedFirst(noon - 5 * 60) })])
+    .toEqual([null, { tradability: ["AAPL"], trades: [] }])
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
   // surface to open, asked or not.
