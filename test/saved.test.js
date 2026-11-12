@@ -3197,8 +3197,10 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // new one's first trades joined after it, the dot at the newest, until the
   // new one has three bars. One or two alone, scaled to the chart's height,
   // drew a dot, a line from top to bottom, or, from BHP's close above, a
-  // crash. A shell started in those minutes drew no dashed line before the
-  // open, and draws none.
+  // crash. At the bell the dashed line steps to the close the move counts
+  // from, as at night, where that is known. A shell started in those minutes
+  // drew no dashed line before the open, and draws none for the last
+  // session.
   const charted = (place, symbol, times, started = false) => {
     let held = null
     return times.map(time => {
@@ -3206,13 +3208,19 @@ test("at the open the chart moves to the new session, and a listing abroad shows
         calendars, nyOn3(time))
       const day = M.viewChart(held.symbol, "1D", { [held.symbol]: held }, {}, {}, {}, {}, calendars).day
       const weekday = M.WEEKDAYS[M.localClock(day.session.regular.start, day.gmtoffset).weekday]
-      return `${time} ${weekday} ${M.money(M.dayBase(day), day.priceDigits) || "\u2014"} ${M.money(day.points.at(-1).p, day.priceDigits)}`
+      const money = p => M.money(p, day.priceDigits) || "\u2014"
+      const step = M.chartGeometry(day, calendars).step ? money(M.regularClose(day)) : "\u2014"
+      return `${time} ${weekday} ${money(M.dayBase(day))} ${step} ${money(day.points.at(-1).p)}`
     })
   }
-  expect(charted("tokyo", "7203.t", ["1910", "1915", "1920"])).toEqual(["1910 Mon 3,070.00 3,051.00", "1915 Mon 3,070.00 3,051.00", "1920 Mon 3,070.00 3,048.00"])
-  expect(charted("london", "shel.l", ["0310", "0320", "0330"])).toEqual(["0310 Mon 4,036.50 3,921.00", "0320 Mon 4,036.50 3,906.50", "0330 Tue 3,921.00 3,913.00"])
-  expect(charted("sydney", "bhp.ax", ["1810", "1820", "1830"])).toEqual(["1810 Tue 56.74 56.42", "1820 Tue 56.74 55.78", "1830 Tue 56.74 55.74"])
-  expect(charted("sydney", "bhp.ax", ["1820", "1830"], true)).toEqual(["1820 Tue \u2014 55.78", "1830 Tue \u2014 55.74"])
+  expect(charted("tokyo", "7203.t", ["1910", "1915", "1920"]))
+    .toEqual(["1910 Mon 3,070.00 \u2014 3,051.00", "1915 Mon 3,070.00 \u2014 3,051.00", "1920 Mon 3,070.00 3,051.00 3,048.00"])
+  expect(charted("london", "shel.l", ["0310", "0320", "0330"]))
+    .toEqual(["0310 Mon 4,036.50 \u2014 3,921.00", "0320 Mon 4,036.50 3,921.00 3,906.50", "0330 Tue 3,921.00 \u2014 3,913.00"])
+  expect(charted("sydney", "bhp.ax", ["1810", "1820", "1830"]))
+    .toEqual(["1810 Tue 56.74 \u2014 56.42", "1820 Tue 56.74 56.42 55.78", "1830 Tue 56.74 56.42 55.74"])
+  expect(charted("sydney", "bhp.ax", ["1820", "1830"], true)).toEqual(["1820 Tue \u2014 56.42 55.78", "1830 Tue \u2014 56.42 55.74"])
+  expect(charted("tokyo", "7203.t", ["1915"], true)).toEqual(["1915 Mon \u2014 \u2014 3,051.00"])
   // With no calendar for Tokyo, the close held, Monday's, is from before a
   // weekday with no session seen, and at 09:15 Yahoo still counts from the
   // close before it: the move is left out, never −0.62% from Friday's close.
