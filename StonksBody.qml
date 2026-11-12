@@ -287,7 +287,8 @@ Item {
   readonly property var infoRanges: !dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range }))
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades) : null
-  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
+  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
+    function(t) { return Market.tradeClock(featuredQuote, t, calendars) }) : null
   // Said under the price: what a scrub's move counts from, the dashed line
   // under the pointer.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)

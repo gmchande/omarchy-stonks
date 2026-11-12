@@ -373,10 +373,10 @@ function ownLast(history) {
 // under the day. The range is fetched hourly and the quote each minute, so
 // the day can pass every bar: it is dated by its day, and drawn at its last
 // bar on 15-minute and hourly bars; a coin's 24 hours by the bar each end
-// came from. A trade is dated when it traded, by the quote's clock: a history
-// held from before a change of clocks reads the old one. Nothing before the
-// range's first bar counts, as a quote kept from an older day. Each compares
-// at the listing's decimals, so float noise never moves a mark.
+// came from. A trade is a moment of its own (`moment`), dated when it traded
+// (`rangeMarks`). Nothing before the range's first bar counts, as a quote
+// kept from an older day. Each compares at the listing's decimals, so float
+// noise never moves a mark.
 function rangeEnds(history, stats, quote, trades) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
@@ -390,14 +390,13 @@ function rangeEnds(history, stats, quote, trades) {
   var take = function(p, t) {
     if (!Format.isFiniteNumber(p) || t < from) return
     var read = reads(p)
-    if (read > highRead) { high = { p: p, t: t, clock: Quote.clockAt(quote, t) }; highRead = read }
-    if (read < lowRead) { low = { p: p, t: t, clock: Quote.clockAt(quote, t) }; lowRead = read }
+    if (read > highRead) { high = { p: p, t: t, moment: true }; highRead = read }
+    if (read < lowRead) { low = { p: p, t: t, moment: true }; lowRead = read }
   }
-  if (!quote) return { high: high, low: low }
-  if (Format.isFiniteNumber(quote.figuresDay)) {
+  if (quote && Format.isFiniteNumber(quote.figuresDay)) {
     var at = quote.figuresDay
     var last = history.bars[ownLast(history)]
-    var day = historyDateParts(history, at, Quote.clockAt(quote, at))
+    var day = historyDateParts(history, at)
     var lastDay = historyDateParts(history, last.t)
     if (last.t > at && lastDay.day === day.day && lastDay.month === day.month && lastDay.year === day.year) at = last.t
     take(quote.dayHigh, Format.isFiniteNumber(quote.dayHighAt) ? quote.dayHighAt : at)
@@ -452,7 +451,11 @@ function heldLines(histories, symbol, quote, trades) {
   return lines
 }
 
-function rangeMarks(history, ends, quote) {
+// A moment that isn't one of the range's bars (`rangeEnds`) is dated by
+// `clockAt(t)`, the exchange's clock then (`Market.tradeClock`), as the
+// newest price is: a range or a quote held from before a change of clocks
+// would read the old one.
+function rangeMarks(history, ends, quote, clockAt) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
@@ -461,7 +464,7 @@ function rangeMarks(history, ends, quote) {
     return {
       x: point.t > drawnTo ? 1 : historyFraction(history, point.t),
       price: Format.money(point.p, digits),
-      date: historyStatsDateText(history, point.t, years, history.interval, point.clock)
+      date: historyStatsDateText(history, point.t, years, history.interval, point.moment && clockAt ? clockAt(point.t) : null)
     }
   }
   return { high: mark(ends.high), low: mark(ends.low) }
