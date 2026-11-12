@@ -101,7 +101,9 @@ Harness {
     property var monitors: ({ values: [] })
     property var toplevels: ({ values: [] })
     property var focusedWorkspace: workspaceHere
-    function monitorFor(screen) { return null }
+    // The screen a pill's panel sits on, which a step names.
+    property var panelScreen: null
+    function monitorFor(screen) { return panelScreen }
     function refreshMonitors() { monitors.values.forEach(function(m) { m.refresh() }) }
     function dispatch(request) {}
     // Hyprland's events, which ask the screens again while every one is
@@ -568,6 +570,35 @@ Harness {
       harness.check("with no pill, Robinhood is asked nothing either, and a pill put back asks for its stock at once",
         unseen.filter(function(l) { return /^(overnight|instruments) /.test(l) }).length === 0 && asksAgain,
         unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
+
+      // The panel open on a screen that's off, the other screen on: its rows
+      // are asked as with the panel closed, the pill's stock alone. The key
+      // that wakes its screen asks for them at once, with the clock still.
+      hyprlandStandIn.monitors = { values: [otherScreen, screenStandIn] }
+      hyprlandStandIn.panelScreen = screenStandIn
+      pill.open()
+      tryVerify(function() { return !!pill.panel && !!pill.panel.body && service.openSurfaces.length === 1 }, 3000)
+      settle()
+      screenStandIn.on = false
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      countsOver("the panel open on a screen that's off, another on: the pill's stock alone, every minute",
+        300, counts([5, 0, 0, 0, 0, 0, 0, 0]), function() {
+          startAt(service.now + 5)()
+          answerScreens()
+        }, answerScreens)
+      var wakeFrom = harness.requests().length
+      inputStandIn.isIdle = true
+      screenStandIn.on = true
+      inputStandIn.isIdle = false
+      var rowsBack = within(2000, function() { return harness.quoteCounts(harness.requests().slice(wakeFrom)).KILN > 0 })
+      harness.check("the key that wakes the panel's screen asks for its rows at once", rowsBack,
+        harness.requests().slice(wakeFrom).join(", "))
+      settle()
+      pill.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      hyprlandStandIn.panelScreen = null
+      hyprlandStandIn.monitors = { values: [] }
 
       harness.finish()
     }

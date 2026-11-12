@@ -46,19 +46,28 @@ Item {
       function onLastIpcObjectChanged() { root.screensAnswered() }
     }
   }
+  // Open panels on a screen that's off (`Panel`): asked again as every
+  // screen off is, so their rows come back as that screen wakes.
+  property var darkPanels: []
+  function panelDark(panel, dark) {
+    var others = darkPanels.filter(function(p) { return p !== panel })
+    var next = dark ? others.concat([panel]) : others
+    if (next.length !== darkPanels.length) root.darkPanels = next
+  }
+  readonly property bool waking: screensOff || darkPanels.length > 0
   Connections {
     target: root.hyprland
-    enabled: root.screensOff || (root.watching && root.monitors.length > 0)
+    enabled: root.waking || (root.watching && root.monitors.length > 0)
     function onRawEvent(event) {
       if (root.screensOff || root.screenOff || event.name === "activespecial") root.hyprland.refreshMonitors()
     }
   }
-  // Hyprland sends no event when a screen wakes, so while all are off the
-  // input that wakes them asks again.
+  // Hyprland sends no event when a screen wakes, so while `waking` the
+  // input that wakes one asks again.
   Connections {
     target: root.input
     function onIsIdleChanged() {
-      if (!root.input.isIdle && root.screensOff) root.hyprland.refreshMonitors()
+      if (!root.input.isIdle && root.waking) root.hyprland.refreshMonitors()
     }
   }
 }

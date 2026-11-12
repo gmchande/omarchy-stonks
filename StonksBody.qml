@@ -33,8 +33,8 @@ Item {
   property var sounds: null
   property var camera: null
   property bool surfaceOpen: false
-  // False for the window on a workspace no screen shows: it stays open, as
-  // it was left, but asks for nothing.
+  // False for the window on a workspace no screen shows, or the panel on a
+  // screen that's off: it stays open, as it was left, but asks for nothing.
   property bool onScreen: true
   property string headerWhenMissing: "No data"
   // The panel's: Tab steps to the next widget's panel.
@@ -57,9 +57,7 @@ Item {
   // for the key sheet or a view.
   property int rowsRoom: 0
 
-  // The panel's own screen on. The panel's asks heed only every screen
-  // off: one that waited for its own screen might not ask again when it
-  // wakes. The animal's fidget, which asks for nothing, heeds this too.
+  // False holds the animal's fidget still.
   property bool screenOn: true
 
   property color foreground: Commons.Color.foreground
@@ -206,8 +204,8 @@ Item {
   }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
 
-  // On a screen that's on: the panel's `onScreen` doesn't follow screens
-  // turning off.
+  // On a screen that's on, as far as Hyprland has said: `onScreen` counts a
+  // surface whose screen it hasn't named as shown.
   readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
 
   // Asked for first on open, and fetched ahead on a range.
