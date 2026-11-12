@@ -270,9 +270,11 @@ function barOffset(history, t) {
   return offset
 }
 
-function historyDateParts(history, t) {
+// `clock` is a trade's own, where it isn't one of the history's bars: a
+// history held from before a change of clocks reads the old offset.
+function historyDateParts(history, t, clock) {
   if (!Format.isFiniteNumber(t)) return null
-  var d = new Date((t + barOffset(history, t)) * 1000)
+  var d = new Date((t + (clock ? clock.offset : barOffset(history, t))) * 1000)
   return { day: d.getUTCDate(), month: d.getUTCMonth(), year: d.getUTCFullYear() }
 }
 
@@ -286,14 +288,14 @@ function historySpansYears(history) {
 
 // A quarter of Yahoo's own names its three months, as SEP–NOV 2025: a month
 // alone would date its high or its close to the wrong one. The live moment
-// Yahoo appends to the quarters, the newest price and the quote's day are
-// moments, each its own month.
-function historyDateText(history, t, withYear, interval) {
-  var date = historyDateParts(history, t)
+// Yahoo appends to the quarters, the newest price, the quote's day and a
+// trade (with its `clock`) are moments, each its own month.
+function historyDateText(history, t, withYear, interval, clock) {
+  var date = historyDateParts(history, t, clock)
   if (!date) return "—"
   var year = function(d) { return withYear ? " " + d.year : "" }
   if (interval !== "1mo" && interval !== "3mo") return date.day + " " + Format.MONTHS[date.month] + year(date)
-  if (!isQuarter(history, t)) return Format.MONTHS[date.month] + year(date)
+  if (clock || !isQuarter(history, t)) return Format.MONTHS[date.month] + year(date)
   var end = new Date(Date.UTC(date.year, date.month + 2, 1))
   var last = { month: end.getUTCMonth(), year: end.getUTCFullYear() }
   return Format.MONTHS[date.month] + (last.year !== date.year ? year(date) : "") + "–" + Format.MONTHS[last.month] + year(last)
@@ -304,9 +306,9 @@ function isQuarter(history, t) {
   return history.bars.concat(history.unclosed || []).some(function(bar) { return bar.t === t && !bar.newest })
 }
 
-function historyStatsDateText(history, t, withYear, interval) {
+function historyStatsDateText(history, t, withYear, interval, clock) {
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
+  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d", clock)
 }
 
 // Yahoo appends the live moment to weekly, monthly and quarterly bars as a
@@ -371,9 +373,10 @@ function ownLast(history) {
 // under the day. The range is fetched hourly and the quote each minute, so
 // the day can pass every bar: it is dated by its day, and drawn at its last
 // bar on 15-minute and hourly bars; a coin's 24 hours by the bar each end
-// came from. A trade is dated when it traded. Nothing before the range's
-// first bar counts, as a quote kept from an older day. Each compares at the
-// listing's decimals, so float noise never moves a mark.
+// came from. A trade is dated when it traded, by the quote's clock: a history
+// held from before a change of clocks reads the old one. Nothing before the
+// range's first bar counts, as a quote kept from an older day. Each compares
+// at the listing's decimals, so float noise never moves a mark.
 function rangeEnds(history, stats, quote, trades) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
@@ -387,13 +390,14 @@ function rangeEnds(history, stats, quote, trades) {
   var take = function(p, t) {
     if (!Format.isFiniteNumber(p) || t < from) return
     var read = reads(p)
-    if (read > highRead) { high = { p: p, t: t }; highRead = read }
-    if (read < lowRead) { low = { p: p, t: t }; lowRead = read }
+    if (read > highRead) { high = { p: p, t: t, clock: Quote.clockAt(quote, t) }; highRead = read }
+    if (read < lowRead) { low = { p: p, t: t, clock: Quote.clockAt(quote, t) }; lowRead = read }
   }
-  if (quote && Format.isFiniteNumber(quote.figuresDay)) {
+  if (!quote) return { high: high, low: low }
+  if (Format.isFiniteNumber(quote.figuresDay)) {
     var at = quote.figuresDay
     var last = history.bars[ownLast(history)]
-    var day = historyDateParts(history, at)
+    var day = historyDateParts(history, at, Quote.clockAt(quote, at))
     var lastDay = historyDateParts(history, last.t)
     if (last.t > at && lastDay.day === day.day && lastDay.month === day.month && lastDay.year === day.year) at = last.t
     take(quote.dayHigh, Format.isFiniteNumber(quote.dayHighAt) ? quote.dayHighAt : at)
@@ -457,7 +461,7 @@ function rangeMarks(history, ends, quote) {
     return {
       x: point.t > drawnTo ? 1 : historyFraction(history, point.t),
       price: Format.money(point.p, digits),
-      date: historyStatsDateText(history, point.t, years, history.interval)
+      date: historyStatsDateText(history, point.t, years, history.interval, point.clock)
     }
   }
   return { high: mark(ends.high), low: mark(ends.low) }

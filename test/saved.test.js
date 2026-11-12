@@ -2436,6 +2436,11 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
     const history = M.viewChart("NBIS", "1W", gap.quotes, {}, { "NBIS|1W": { status: "ok", history: raw } }, gap.nights, gap.allDay, calendars).history
     expect([M.historyScrubForms(history, history.bars.at(-1))[1], load("Share.js").barDate(history, history.bars.at(-1))]).toEqual(["1 NOV 21:40", "1 NOV 21:40 EST"])
+    // So does a high made earlier that night: 23:30 EST would read 00:30 on
+    // the 2nd by the week's EDT.
+    const peak = (Math.ceil(M.periodStats(raw).high.p * 100) + 100) / 100
+    const night = [{ t: at("2026-11-01", "23:30"), p: peak, s: "overnight" }]
+    expect(M.rangeMarks(history, M.rangeEnds(history, null, gap.quotes.NBIS, night), gap.quotes.NBIS).high.date).toBe("1 NOV")
   }
   const sundayWeek = M.viewChart("NBIS", "1W", sunday.quotes, {},
     { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars)
@@ -2446,7 +2451,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // week's low, dated that night.
   const shown = sundayWeek.day.trades.concat([sunday.newest.NBIS])
   const ends = M.rangeEnds(week, null, sunday.quotes.NBIS, shown)
-  expect([ends.low, M.rangeMarks(week, ends, sunday.quotes.NBIS).low.date]).toEqual([{ p: 152.15, t: at("2026-10-25", "22:50") }, "25 OCT"])
+  expect([ends.low, M.rangeMarks(week, ends, sunday.quotes.NBIS).low.date]).toMatchObject([{ p: 152.15, t: at("2026-10-25", "22:50") }, "25 OCT"])
   // Monday 17:58 on 1W, Yahoo's week as it stood then (the 20:05 answer cut
   // to its bars before 17:58): the line under the price shows the close and
   // its day's move, as 1D does, and the caption under the change the range
