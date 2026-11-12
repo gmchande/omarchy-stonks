@@ -511,7 +511,7 @@ Item {
   // shows at rest. Asked only while search is open.
   readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
-    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestTrades[symbol] || null) : null
+    var row = quote ? Figures.listRow(quote, 0, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
       move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
   }) : []

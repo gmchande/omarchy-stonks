@@ -323,6 +323,13 @@ function newestTrade(quote, latest, calendars, day) {
     closed: own && trade.t >= quote.session.regular.end, joined: joined, dayStart: day.session.regular.start }
 }
 
+// The newest trade as the rows and the pill read it at rest: none once
+// tonight has traded, so they keep the day's close and move until 04:00,
+// when a pre-market trade takes over. The panel's price on top is tonight's.
+function restingNewest(newest) {
+  return newest && newest.joined ? null : newest
+}
+
 function overnightDue(askedAt, now, calendars, failed) {
   var cal = overnightMarket(calendars)
   if (!cal) return false
