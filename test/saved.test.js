@@ -2066,13 +2066,13 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
   // Where Yahoo sent no price, the headline is the chart's 15:55 bar: the
   // line beneath calls it the last trade, never the close. The line above
-  // the price says the night's price on top is the 00:50 trade; a row says
-  // that time after its name, so it keeps its name.
+  // the price, and a row in place of its name, say the night's price on top
+  // is the 00:50 trade.
   const untraded = { ...quote, price: null }
   const lines = M.heroLines(untraded, M.rowModel(untraded, 0, "pct", newest), null, one, day, calendars, "pct", false)
   expect(lines.close).toMatchObject({ label: "LAST TRADE", time: "TUE 15:55", price: "249.78", changeText: "+7.40%" })
   const untradedFresh = M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, newest)
-  expect([M.freshnessText(untradedFresh, untraded, calendars), M.freshnessText(untradedFresh, untraded, calendars, true)]).toEqual(["OVERNIGHT 00:50", ""])
+  expect(M.freshnessText(untradedFresh, untraded, calendars)).toBe("OVERNIGHT 00:50")
 })
 
 // A watch moment's listings as the service holds them, answered at the
@@ -2179,15 +2179,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
   }
   // The list's header names the day the rows measure: Friday all weekend,
   // Sunday night too, today until midnight, then Monday until the new day's
-  // first trade. A row says its newest price's time alone, the night's
-  // too: the header keeps the day.
+  // first trade.
   const header = set => { const at = topsAt(set); return M.rowsDay(at.symbols, at.quotes, at.newest, at.now, calendars) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
     .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
-  {
-    const at = topsAt("watch-2026-10-26-2005")
-    expect(["NBIS", "JNJ"].map(s => M.newestTime(at.quotes[s], at.newest[s], at.now, calendars))).toEqual(["20:00", "19:57"])
-  }
   // A row Yahoo sent no time for measures no day it can name: the rest
   // still name theirs.
   {
@@ -2319,13 +2314,11 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect([M.newestStale(nbis, nbis.t + 20 * 60), M.newestStale(nbis, nbis.t + 20 * 60 + 1)]).toEqual([false, true])
   // An after-hours price never dims.
   expect(M.newestStale(sunday.newest.PSIX, sunday.newest.PSIX.t + DAY)).toBe(false)
-  // The pill's hover names the session of the price on top and its time; a
-  // row says the time after the name.
+  // The pill's hover names the session of the price on top and its time.
   expect(M.newestNote(sunday.quotes.NBIS, nbis, sunday.now, calendars)).toBe("Overnight 23:30")
   expect(M.newestNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("After hours Fri 19:00")
-  expect(M.newestTime(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("Fri 19:00")
   // A week on, its date: a weekday would read as this week's.
-  expect(M.newestTime(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, calendars)).toBe("23 Oct 19:00")
+  expect(M.newestNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, calendars)).toBe("After hours 23 Oct 19:00")
   // On 1W, 1M and 1Y too, NBIS's line ends on its newest price, the price
   // on top, as Robinhood's ranges did at 20:00 on 28 October: the move from
   // the range's start to it, named under it by the range, so the week's
