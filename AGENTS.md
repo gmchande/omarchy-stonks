@@ -7,8 +7,10 @@ change. This file says what a change is judged by, and why.
 ## Simplicity
 
 - Simple means untangled, not short: each piece does one job and can change
-  on its own. Leave the code simpler than you found it, and delete what
-  nothing uses.
+  on its own. Judge the code by reading it, not by counting lines: someone
+  who writes Omarchy's own plugins should feel at home here and find it a
+  pleasure to change. Leave the code simpler than you found it, and delete
+  what nothing uses.
 - Handle only what real data and real readers can produce. A guard for the
   impossible is code someone has to read forever.
 - Before designing around a limit you blame on the shell, find it in the
