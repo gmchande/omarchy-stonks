@@ -1119,10 +1119,6 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   expect(said(M.yearLine({ ...quote, price: 345.03 }, null, null, rates, [])).split(" · ")[1]).toBe("225.95–345.03+ @345.03")
   // A trade that reads as the mark, short of it by float noise, leaves it.
   expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime, p: 344.57 + 1e-9 }])).split(" · ")[1]).toBe("225.95–344.57 @325.13")
-  // On 1Y the line keeps the range's own low and high, whatever trade is shown.
-  const ends = { low: { p: 200, t: 0 }, high: { p: 350, t: 0 } }
-  expect(said(M.yearLine(quote, null, ends, rates, [{ t: quote.marketTime, p: 400 }, { t: quote.marketTime, p: 100 }])).split(" · ")[1])
-    .toBe(said(M.yearLine(quote, null, ends, rates)).split(" · ")[1])
 })
 
 // Yahoo's 52 weeks leave out the 1Y range's first day, so on 1Y the line is
@@ -1160,6 +1156,11 @@ test("on 1Y the 52-week line is the range's low and high", () => {
   capped[capped.length - 1].h = goog.q.dayHigh + 1e-9
   const googQ = { ...goog.q, fiftyTwoWeekHigh: goog.q.dayHigh }
   expect(ends(M.yearLine(googQ, null, M.rangeEnds({ ...goog.h, bars: capped }, null, googQ)))).toBe("241.18–355.25+")
+  // A trade Stonks shows past the chart's high, as tonight's, is the 1Y
+  // range's high and the 52-week line's, in the 52-week high's tone.
+  const night = [{ t: goog.q.marketTime + 4 * 3600, p: 410 }]
+  const lifted = M.rangeEnds(goog.h, null, goog.q, night)
+  expect([ends(M.rangeLine(goog.h, lifted, goog.q)), ends(M.yearLine(goog.q, null, lifted, null, night))]).toEqual(["241.18–410.00", "241.18–410.00+"])
 })
 
 test("each symbol is asked for on its own market's clock", () => {

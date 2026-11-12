@@ -861,7 +861,9 @@ Harness {
       } else if (root.stateName.indexOf("popup-history-all-") === 0) {
         root.shownRange = "All"
         root.shownHistoryEntry = { status: "ok", history: shortHistory, receivedAt: root.now }
-        var fab = Object.assign({}, aapl, { symbol: "FAB", name: "Fable", price: 23.20, prevClose: 23.20 })
+        // Fable's own day, one price, so AAPL's figures and trades never
+        // stand in Fable's range.
+        var fab = Object.assign({}, aapl, { symbol: "FAB", name: "Fable", price: 23.20, prevClose: 23.20, dayOpen: 23.20, dayHigh: 23.20, dayLow: 23.20, points: [] })
         stub.symbols = ["FAB", "AAPL"]
         stub.shown = ["FAB", "AAPL"]
         stub.quotes = { FAB: fab, AAPL: aapl }
