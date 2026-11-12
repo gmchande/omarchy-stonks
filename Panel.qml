@@ -196,6 +196,7 @@ Panel {
           surfaceOpen: root.opened
           screenOn: !root.service || !root.service.screens || root.service.screens.screenOn(panel.screen)
           switchesPanels: true
+          pill: root.hostWidget
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

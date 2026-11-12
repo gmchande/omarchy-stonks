@@ -39,6 +39,8 @@ Item {
   property string headerWhenMissing: "No data"
   // The panel's: Tab steps to the next widget's panel.
   property bool switchesPanels: false
+  // The panel's: the pill it opened from, whose form `b` changes.
+  property var pill: null
   property int margins: 0
 
   property int chartHeight: Style.space(190)
@@ -747,6 +749,7 @@ Item {
     else if (t === "O") reverseOrder()
     else if (t === "U") runOffered()
     else if (t === "w") openListMenu()
+    else if (t === "b" && pill) pill.cycleBarStyle()
     else return false
     return true
   }

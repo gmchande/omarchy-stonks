@@ -57,7 +57,8 @@ stock's first trade at night, it keeps the day's close and move until the
 new day's first prices arrive, soon after 04:00: point at it for tonight's
 price and move. It can show
 a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
-a bear on a down one. Middle-click it to switch. It keeps your choice after
+a bear on a down one. Middle-click it to switch, or press `b` in the
+panel. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
 between the icon and the symbol over its change. Counting since the open,
 it says so when you point at it.
@@ -315,6 +316,7 @@ screenshot editor.
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
 | `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
+| `b` | Change how the pill looks, as a middle-click on it does (panel only) |
 | Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
 | `?` | Show the keys you'll use every day |
 | `Esc` | Close |
