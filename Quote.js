@@ -340,14 +340,18 @@ function headlineDay(days, quoted, timestamps, closes) {
   return chosen
 }
 
-// The day before the headline's in a two-day answer: its session and its
-// trades, read as the headline day's are.
+// The day before the headline's in a two-day answer: its session, its
+// trades and its open, read as the headline day's are.
 function dayBefore(timestamps, series, periods, until, tick, index) {
   var bars = answerBars(timestamps, series, periodsStart(periods)).filter(function(b) { return b.t < until })
+  var kept = filterStrayCloses(bars, periods, tick).bars
   var regular = periodOf(periods.regular)
+  var firstRegular = regular ? firstRegularBar(kept, regular) : null
   return {
     session: { pre: index ? null : periodOf(periods.pre), regular: regular, post: index ? null : periodOf(periods.post) },
-    points: dayPoints(filterStrayCloses(bars, periods, tick).bars, null, regular, index)
+    points: dayPoints(kept, null, regular, index),
+    dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
+    openSession: firstRegular ? regular.start : null
   }
 }
 

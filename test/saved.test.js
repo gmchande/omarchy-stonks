@@ -3069,6 +3069,14 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(sinceOpen).toEqual(["1855 \u22121.19%", "1855 row \u22121.19%", "1903 \u22121.19%", "1903 row \u22121.19%",
     "1910 \u22121.19%", "1910 row \u22121.19%", "1915 \u2014", "1915 row \u2014", "1920 \u22121.26%", "1920 row \u22121.23%",
     "1921 \u22121.17%", "1921 row \u22121.17%"])
+  // Pointed at on the 1D chart, which holds Friday through those minutes,
+  // Monday's newest trade reads since Monday's open, as at rest, and a
+  // moment of Friday since Friday's, as before the open.
+  const heldAt1920 = M.carryClose(open("1855", "7203.t.json"), open("1920", "2d/7203.t.json"), calendars, nyAt("1920"))
+  const heldChart = M.viewChart("7203.T", "1D", { "7203.T": heldAt1920 }, {}, {}, {}, {}, calendars).day
+  const sinceOpenAt = t => `${M.rowModel(heldChart, t, "open").changeText} ${M.scrubLegend(heldChart, t, M.exchangeDay(heldChart, nyAt("1920")), calendars, "open", null)}`
+  expect([M.rowModel(heldAt1920, 0, "open").changeText, sinceOpenAt(heldAt1920.points.at(-1).t), sinceOpenAt(Date.UTC(2026, 9, 30, 3, 30) / 1000)])
+    .toEqual(["\u22121.26%", "\u22121.26% OPEN 3,090.00", "\u22121.51% OPEN 3,107.00"])
   // A shell started in those minutes holds no close of Friday's, and no
   // field of Yahoo's answers names it at every open: Tokyo's two-day answer
   // counted from Friday's close, London's below from the close before its

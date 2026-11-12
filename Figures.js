@@ -236,14 +236,16 @@ function rowModel(quote, scrubT, mode, newest) {
 // reads what the hero does. Once tonight has traded, a moment past the bell
 // counts from the close just gone, where the dashed line steps: the day
 // drawn says so (`Day.nightBell`), and a row's quote by its newest
-// price (`newest.joined`).
+// price (`newest.joined`). A day abroad just opened, joined to the day
+// before it, has its own open already (`CarriedClose.heldDay`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
+  var nextOpen = Format.isFiniteNumber(quote.nextOpen) ? quote.nextOpen : null
   if (bell === null && newest && newest.joined && reg) bell = reg.end
-  if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
-  if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 

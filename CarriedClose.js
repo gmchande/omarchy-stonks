@@ -99,10 +99,10 @@ function firstTrade(quote, head) {
 // days meanwhile (`Asks.twoDays`), as it was drawn before the open, with the
 // new day's trades joined after it as a pre-market joins a day
 // (`Quote.tailDay`). Its dashed line is the one Stonks drew before the open
-// (`heldBase`); the new day's trades count from its close, the one the move
-// counts from, where the dashed line steps at the bell, as it does for
-// tonight's trades (`Day.nightBell`). Each is left out where unknown
-// (`held`).
+// (`heldBase`), and its open its own; the new day's trades count from its
+// close, the one the move counts from, where the dashed line steps at the
+// bell, as it does for tonight's trades (`Day.nightBell`), or since the new
+// day's open (`nextOpen`). Each is left out where unknown (`held`).
 function heldDay(quote) {
   if (!quote.before || !firstMinutes(quote)) return null
   var close = quote.prevClose
@@ -117,8 +117,9 @@ function heldDay(quote) {
     prevClose: Format.isFiniteNumber(quote.before.base) ? quote.before.base : null,
     price: close,
     marketTime: known ? quote.before.session.regular.end : null,
-    dayOpen: null,
-    openSession: null
+    dayOpen: quote.before.dayOpen,
+    openSession: quote.before.openSession,
+    nextOpen: quote.dayOpen
   })
 }
 
