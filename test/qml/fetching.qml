@@ -440,6 +440,23 @@ Harness {
       hyprlandStandIn.toplevels = { values: [] }
       hyprlandStandIn.monitors = { values: [] }
 
+      // Robinhood gone in the night, nothing open: the pill marks its price
+      // with a "!" from the trades' failed ask, says the refresh failed, and
+      // drops the "!" once Robinhood answers again.
+      touch("ROBINHOOD.offline")
+      var markedAt = 0, hover = ""
+      tick(600, 5, function() {
+        if (!markedAt && pill.warns) {
+          markedAt = service.now
+          hover = pill.warningText
+        }
+      })
+      remove("ROBINHOOD.offline")
+      var clearedAt = 0
+      tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
+      harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",
+        markedAt > 0 && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, hover, clearedAt].join(" | "))
+
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
       // turns a screen on asks at once for the pill's, with the clock still.

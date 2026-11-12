@@ -64,7 +64,7 @@ BarWidget {
   // Judged without a quote too: a first fetch that failed is "! No data".
   readonly property var freshness: service && featuredSymbol
     ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      service.newestTrades[featuredSymbol] || null) : null
+      service.newestTrades[featuredSymbol] || null, !!service.nightFailed[featuredSymbol]) : null
   readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.

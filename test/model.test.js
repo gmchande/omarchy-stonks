@@ -1597,6 +1597,11 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("ok"), featured: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
     .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  // A first check that failed leaves it unknown, and is asked again 5
+  // minutes on, with only the pill by day too.
+  const failedFirst = at => ({ allDay: { AAPL: M.allDayEntry(null, "AAPL", undefined, at) } })
+  expect([asks({ now: noon, ...failedFirst(noon - 60) }), asks({ now: noon, ...failedFirst(noon - 5 * 60) })])
+    .toEqual([null, { tradability: ["AAPL"], trades: [] }])
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
   // surface to open, asked or not.

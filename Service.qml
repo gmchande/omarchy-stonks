@@ -621,6 +621,14 @@ Item {
   }
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
+  // Whether the night trades now, and the listings whose newest price may
+  // be a trade Robinhood failed to send meanwhile: their "!".
+  readonly property bool nightTrading: {
+    var cal = Overnight.overnightMarket(calendars)
+    var night = cal ? Overnight.nightAt(cal, now) : null
+    return !!night && night.open
+  }
+  readonly property var nightFailed: Overnight.nightFailures(allDayFeed.entries, overnightFeed.entries, nightTrading)
   // The feeds themselves, for whoever waits until no run is out.
   readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether

@@ -33,6 +33,7 @@ Flickable {
   property var owed: ({})
   // Symbols asked to refresh under 2 s ago: freshness gives them grace.
   property var asking: ({})
+  property var nightFailed: ({})
   property Look look
   property var calendars: null
   property int rowHeight: Style.space(40)
@@ -212,7 +213,8 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestTrades[symbol] || null)
+    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestTrades[symbol] || null,
+      !!nightFailed[symbol])
   }
 
   function moveCursor(delta) {

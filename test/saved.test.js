@@ -1325,6 +1325,16 @@ test("outside trading an old close is normal, but a failed refresh still shows",
   expect(M.freshnessText(M.freshness(ok, closeQuote, night, 0), q)).toBe("")
   const failed = { status: "failed", receivedAt: night - 60 }
   expect(M.freshness(failed, closeQuote, night, 0).state).toBe("failed")
+  // So does Robinhood's while a night trades: a first check that failed,
+  // leaving unknown whether the night trades the listing, or the trades of
+  // one it trades all day. A failed check after an answer keeps that
+  // answer. By day Yahoo's price is the newest, and nothing is said.
+  const firstCheck = M.allDayEntry(null, "AAPL", undefined, night - 60)
+  const allDay = { AAPL: firstCheck, MSFT: { status: "ok", allDay: true, at: 0 }, JNJ: M.allDayEntry(null, "JNJ", { status: "ok", allDay: false, at: 0 }, night - 60) }
+  const nights = { MSFT: { status: "failed", bars: [], through: null, at: night - 60 } }
+  expect([firstCheck.allDay, M.nightFailures(allDay, nights, true), M.nightFailures(allDay, nights, false)]).toEqual([null, { AAPL: true, MSFT: true }, {}])
+  const robinhoodFailed = M.freshness(ok, closeQuote, night, 0, false, null, true)
+  expect([robinhoodFailed.state, M.freshnessWarns(robinhoodFailed), M.freshnessText(robinhoodFailed, q)]).toEqual(["failed", true, "REFRESH FAILED · AS OF 16:00"])
 })
 
 test("parseSearch keeps tradable results with names and readable exchanges", () => {

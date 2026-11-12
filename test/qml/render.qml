@@ -378,6 +378,7 @@ Harness {
     // each listing has Yahoo's own day (`Chart.dayDrawn`).
     property var nights: ({})
     property var allDay: null
+    property var nightFailed: ({})
     // Each listing's newest price since its close, as the service reads it.
     readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
@@ -1425,6 +1426,7 @@ Harness {
                 property var newestTrades: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
+                property var nightFailed: ({})
                 property var calendars: night ? stub.calendars : null
               }
               QtObject {

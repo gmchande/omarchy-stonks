@@ -39,8 +39,10 @@ var ASKED_GRACE = 2
 // quote Stonks let go old keeps its age unsaid while asked: a source that
 // sends late, as London's 15 minutes, is answered every minute and says
 // "As of" throughout. The time is the newest price's, as a Robinhood trade
-// stays on top while Yahoo fails.
-function freshness(entry, quote, now, owedSince, inGrace, newest) {
+// stays on top while Yahoo fails. `nightFailed`: Robinhood failed to say
+// whether the night trades this listing, or its trades
+// (`Service.nightFailed`), a refresh failed as Yahoo's is.
+function freshness(entry, quote, now, owedSince, inGrace, newest, nightFailed) {
   var head = quote ? Quote.headlineQuote(quote) : null
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
   var asOf = head ? head.t : null
@@ -50,6 +52,7 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
     : !quote || !head ? "unavailable"
+    : nightFailed ? "failed"
     : entry && entry.status === "saved" ? "saved"
     : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"

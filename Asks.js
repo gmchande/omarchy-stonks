@@ -287,8 +287,11 @@ function overnightAsks(s) {
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : featured
   var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [featured]
+  // By day with nothing open, once each stock the pill shows, and again
+  // while no check has said whether it trades all day.
   var tradability = listings.filter(function(x) {
-    return kept ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
+    var entry = s.allDay[x]
+    return Overnight.allDayDue(entry, s.now) && (kept || !entry || entry.allDay === null)
   })
   var drawn = listings.filter(function(x) { return !s.allDay[x] || s.allDay[x].allDay })
   // Listings asked together share `entry.at`, so each ask is judged once.

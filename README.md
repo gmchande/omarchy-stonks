@@ -332,7 +332,9 @@ again.
   nothing for the symbol, or sent a broken answer three times in a row.
   Stonks keeps retrying on its own. After a merger or a rename, search for
   the company to find what Yahoo calls it now. A delisted company may be
-  gone for good.
+  gone for good. At night it can also mean Robinhood didn't answer for a
+  stock that may trade overnight, so a newer trade may be missing. Stonks
+  asks again within 5 minutes.
 - **"As of" while the market is open.** Yahoo sends some prices late. When
   we measured, London, São Paulo, and the VIX came 15 minutes late, and
   Mexico 20. Nasdaq, NYSE, Toronto, and crypto came within a minute.
@@ -447,9 +449,10 @@ time, when Yahoo's charts are empty.
   answered since you opened search aren't asked again.
 - `api.robinhood.com` for overnight prices, and for the trades that fill a
   stretch Yahoo left empty: once a day for which stocks trade overnight, at
-  most once for each stock the pill shows, and every 5 minutes through the
-  night for the pill's stock, and for every row that trades overnight while
-  the panel or the window is open; and once more on a morning Yahoo sends no
+  most once for each stock the pill shows, and again 5 minutes after a
+  first check that failed; every 5 minutes through the night for the
+  pill's stock, and for every row that trades overnight while the panel or
+  the window is open; and once more on a morning Yahoo sends no
   prices for half an hour or more of the pre-market. It asks the same for
   a US stock or ETF you pause on in search and haven't added.
 - `raw.githubusercontent.com` for the newest version number, as the shell

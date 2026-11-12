@@ -49,9 +49,10 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // The day the chart, a row's line and the pill's draw, so all three show one.
 // For a US stock or ETF Robinhood trades all day, the newest trade's trading
 // day with its night (`Day.dayChart`), its start slid by `slideAt`, the
-// shell's clock five minutes at a time; for one it doesn't, Yahoo's own
-// (`Day.sessionDay`); `waiting` until Robinhood says which. Without
-// `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
+// shell's clock five minutes at a time; for one it doesn't, or while a
+// failed check leaves that unknown, Yahoo's own (`Day.sessionDay`);
+// `waiting` until Robinhood says which. Without `allDay`, as in a harness
+// that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a trade
 // (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar.
 function dayDrawn(symbol, quote, nights, allDay, calendars, slideAt) {
