@@ -25,7 +25,7 @@ var HISTORY_FRESH = 15 * 60
 function historyUrl(symbol, range) {
   var spec = HISTORY_RANGES[range]
   if (!spec) return null
-  return Quote.CHART_URL + encodeURIComponent(symbol) + "?range=" + spec.range + "&interval=" + spec.interval + "&events=div%2Csplits&includeAdjustedClose=true"
+  return Quote.CHART_URL + encodeURIComponent(symbol) + "?range=" + spec.range + "&interval=" + spec.interval
 }
 
 function historyRanges() {

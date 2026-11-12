@@ -327,6 +327,38 @@ Harness {
       startAt(at(harness.wed7, 10, 45))()
       tick(60)
 
+      // Nothing open: no other listing has its day judged on a chart.
+      var judgedAway = harness.yahoo(harness.requests()).filter(function(l) { return /^chart /.test(l) && l.split(" ")[1] !== "NEST" })
+      harness.check("nothing open: no listing but the pill's is asked a chart", judgedAway.length === 0, judgedAway.join(", "))
+
+      // The window open with a few rows in sight: their days are judged, and
+      // Robinhood is asked the night's trades for them and the stock on show
+      // alone. A row scrolled into sight has its trades asked at once.
+      var nightsFrom = harness.requests().length
+      app.floatingWindow.implicitHeight = 600
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      settle()
+      var inSight = function() { return [].concat.apply([], service.sights.map(function(s) { return s.symbols })) }
+      var traded = function(from) {
+        return [].concat.apply([], harness.requests().slice(from).filter(function(l) { return /^overnight /.test(l) })
+          .map(function(l) { return l.split(" ")[1].split(",") }))
+      }
+      var judged = within(10000, function() {
+        return inSight().length > 0 && inSight().every(function(s) { return service.feeds.quotes.toJudge.indexOf(s) < 0 })
+      })
+      within(3000, function() { return traded(nightsFrom).length > 0 })
+      var seen = inSight()
+      var tradedUnseen = traded(nightsFrom).filter(function(s) { return s !== "NEST" && seen.indexOf(s) < 0 })
+      var scrollFrom = harness.requests().length
+      app.body.watchlist.scrollToRow(app.body.watchlist.displayedSymbols.indexOf("SPY"))
+      var scrolledIn = within(3000, function() { return traded(scrollFrom).indexOf("SPY") >= 0 })
+      harness.check("the window open: the rows in sight have their days judged, Robinhood is asked trades for no row out of sight, and a row scrolled into sight has them at once",
+        judged && seen.indexOf("SPY") < 0 && tradedUnseen.length === 0 && scrolledIn,
+        [judged, "in sight " + seen.join(","), "asked out of sight " + tradedUnseen.join(","), scrolledIn].join(" | "))
+      settle()
+      closeWindow()
+
       // By day: no row is kept fresh for a surface no screen shows.
       countsOver("11:00, nothing open: the pill's stock alone, every minute, though every market but Tokyo trades",
         900, counts([15, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 11, 0)))
@@ -382,6 +414,41 @@ Harness {
       day()
       harness.check("a range's history is asked once, kept a quarter hour, and asked again after it",
         once && kept && again, [once, kept, again, asked() - historyFrom].join(" "))
+
+      // The rows' charts fetched ahead on a range stay theirs: back on it
+      // from another, none is downloaded again inside its quarter hour.
+      var rows = harness.listed.filter(function(s) { return s !== "NEST" })
+      var aheadDone = function(range) {
+        return rows.every(function(s) { var key = s + "|" + range; return !!service.histories[key] || !!service.aheadMissed[key] })
+      }
+      var onRange = function(range) { return body.historyShown && body.chartRange === range }
+      body.selectRange("3M")
+      var aheadIn = within(20000, function() { return onRange("3M") && aheadDone("3M") })
+      // A row whose chart failed is tried again on a return.
+      var held = rows.filter(function(s) { return !!service.histories[s + "|3M"] })
+      var rowCalls = function() { return held.map(function(s) { return s + " " + harness.calls(s.replace("^", "%5E") + ".history") }).join(", ") }
+      var rowsBefore = rowCalls()
+      body.selectRange("6M")
+      var sixIn = within(3000, function() { return onRange("6M") })
+      body.selectRange("3M")
+      var backIn = within(3000, function() { return onRange("3M") })
+      // Time for a download that must not go.
+      var rowsAgain = within(2000, function() { return rowCalls() !== rowsBefore })
+      harness.check("back on a range inside its quarter hour, no row's chart fetched ahead is downloaded again",
+        aheadIn && sixIn && backIn && !rowsAgain, [aheadIn, sixIn, backIn, rowsBefore + " -> " + rowCalls()].join(" | "))
+
+      // r once the chart is over 10 s old, its chart in, then r again 3 s
+      // later: the chart is downloaded once, as the quotes are asked once.
+      tick(15)
+      var heroFrom = asked()
+      app.refresh()
+      var heroIn = within(5000, function() { return asked() === heroFrom + 1 && !service.refreshing })
+      tick(3, 1)
+      app.refresh()
+      var heroAgain = within(1000, function() { return asked() !== heroFrom + 1 })
+      harness.check("r again 3 s after r's chart came downloads the chart no more", heroIn && !heroAgain, [heroIn, asked() - heroFrom].join(" "))
+      settle()
+      day()
 
       // Yahoo refuses: the run that meets it stops at that refusal, and is
       // the last for a pause of about a minute, then one request goes

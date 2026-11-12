@@ -73,12 +73,6 @@ Item {
     if (charts.length > 0) root.want({ range: range, ahead: true, charts: charts })
   }
 
-  function drop(keys) {
-    var next = {}
-    Object.keys(entries).forEach(function(k) { if (keys.indexOf(k) < 0) next[k] = entries[k] })
-    if (Object.keys(next).length !== Object.keys(entries).length) root.entries = next
-  }
-
   // The day needs no history.
   function clear() {
     root.want(null)

@@ -91,15 +91,15 @@ kind_of() {
     *"api.robinhood.com/"*) echo overnight ;;
     *"/v8/finance/chart/"*"%3DX?"*) echo rate ;;
     *"/fundamentals-timeseries/"*|*"interval=1d&period1="*) echo fundamentals ;;
-    *"includeAdjustedClose=true"*) echo history ;;
     *"/v7/finance/spark"*) echo spark ;;
-    *) echo chart ;;
+    *"includePrePost=true"*) echo chart ;;
+    *) echo history ;;
   esac
 }
 name_of() {
   case "$2" in
-    search|instruments|overnight|manifest) echo "$2" ;;
-    spark) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
+    search|instruments|manifest) echo "$2" ;;
+    spark|overnight) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
     fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
     rate) local s="${1##*/chart/}"; echo "${s%%%3DX*}" ;;
     *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
@@ -214,16 +214,19 @@ serve() {
   [[ "$url" == *"range=2d&"* && -e "$saved_days" ]] && saved_day=$saved_days
   saved_month="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-1m.json")"
   saved_quarter="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-3m.json")"
-  if [ -n "$set_name" ] && [ -e "$saved_day" ] && [[ "$url" != *"includeAdjustedClose=true"* ]]; then
+  # A range's history asks no pre- and after-hours trades; a day does.
+  ranged=""
+  [[ "$url" == *"includePrePost=true"* ]] || ranged=1
+  if [ -n "$set_name" ] && [ -e "$saved_day" ] && [ -z "$ranged" ]; then
     cat "$saved_day"
     exit
   fi
-  if [ -n "$set_name" ] && [ -e "$saved_month" ] && [[ "$url" == *"range=1mo&"*"includeAdjustedClose=true"* ]]; then
+  if [ -n "$set_name" ] && [ -e "$saved_month" ] && [ -n "$ranged" ] && [[ "$url" == *"range=1mo&"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
     cat "$saved_month"
     exit
   fi
-  if [ -n "$set_name" ] && [ -e "$saved_quarter" ] && [[ "$url" == *"range=3mo&"*"includeAdjustedClose=true"* ]]; then
+  if [ -n "$set_name" ] && [ -e "$saved_quarter" ] && [ -n "$ranged" ] && [[ "$url" == *"range=3mo&"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
     cat "$saved_quarter"
     exit
@@ -240,7 +243,7 @@ serve() {
   # top.
   answer() { if [ -e "$state/after-hours" ]; then stamp < "$fixtures/aapl.json"; else stamp < "$fixtures/aapl.json" | closed; fi; }
   history() { stamp < "$fixtures/history/aapl-1y.json"; }
-  if [[ "$url" == *"includeAdjustedClose=true"* ]]; then
+  if [ -n "$ranged" ]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
     case "$symbol" in
       AAPL|MSFT|TALL*) history ;;

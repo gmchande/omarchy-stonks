@@ -271,10 +271,8 @@ Item {
     root.previewSurface = s ? surface : null
     root.previewSymbol = s
     root.previewResult = s && result && String(result.symbol || "").toUpperCase() === s ? result : null
-    if (s) {
-      root.shownOnChart(s)
-      previewRest.restart()
-    } else previewRest.stop()
+    if (s) previewRest.restart()
+    else previewRest.stop()
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
@@ -754,6 +752,7 @@ Item {
       quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
       allSymbols: root.allSymbols,
+      inSight: root.rowsInSight(),
       preview: previewed,
       previewShown: root.previewShown,
       // By search's result before its quote, so Robinhood is asked as Yahoo is.
@@ -776,13 +775,9 @@ Item {
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
     if (root.featuredTaken && view.featured !== root.featuredTaken.symbol) root.featuredTaken = null
-    if (rangeLeft) {
-      // A turn later: the view's change is still being told.
-      var left = Object.keys(root.aheadAsked)
-      root.aheadAsked = ({})
-      root.aheadMissed = ({})
-      if (left.length) Qt.callLater(function() { historyFeed.drop(left) })
-    } else root.shownOnChart(view.featured)
+    // Their keys name the range, so missed charts on the last are tried
+    // again on a return; charts fetched ahead stay, for the cache to let go.
+    if (rangeLeft) root.aheadMissed = ({})
     showHistory(false)
     askDue()
     askOvernight()
@@ -884,7 +879,7 @@ Item {
       return
     }
     var range = root.view.range
-    if (force) root.historyOwed = Asks.historyOwing(charts, range, historyFeed.entries)
+    if (force) root.historyOwed = Asks.historyOwing(charts, range, historyFeed.entries, root.wallSecond())
     var next = Asks.nextHistory(charts, range, historyFeed.entries, root.historyOwed)
       || { symbol: charts[charts.length - 1], force: false }
     historyFeed.request(next.symbol, range, next.force)
@@ -911,18 +906,23 @@ Item {
   }
 
   // Each open surface's rows in sight, top first: an open asks for their
-  // quotes first, and on a range their charts are fetched ahead of a click.
+  // quotes first, Robinhood's trades only for them, and on a range their
+  // charts are fetched ahead of a click.
   property var sights: []
-  // Charts fetched ahead on this range and not shown since, which a new
-  // range drops; and those with no good answer, not asked ahead again.
-  property var aheadAsked: ({})
+  // Charts with no good answer, not asked ahead again on this range.
   property var aheadMissed: ({})
   function rowsSeen(surface, symbols) {
     var others = root.sights.filter(function(s) { return s.surface !== surface })
     var next = symbols.length ? others.concat([{ surface: surface, symbols: symbols }]) : others
     if (next.length === 0 && root.sights.length === 0) return
     root.sights = next
+    root.askOvernight()
     root.fetchAhead()
+  }
+  function rowsInSight() {
+    var rows = []
+    root.sights.forEach(function(sight) { rows = rows.concat(sight.symbols) })
+    return rows
   }
 
   function aheadRows() {
@@ -940,20 +940,7 @@ Item {
     var range = root.view.range
     var charts = Asks.aheadCharts(root.aheadRows(), range, historyFeed.entries, root.aheadMissed)
     if (charts.length === 0 || !root.screensClear()) return
-    var asked = Object.assign({}, root.aheadAsked)
-    charts.forEach(function(s) { asked[historyFeed.keyFor(s, range)] = true })
-    root.aheadAsked = asked
     historyFeed.requestAhead(charts, range)
-  }
-
-  // A chart fetched ahead and now on show is no longer one fetched ahead: a
-  // new range keeps it.
-  function shownOnChart(symbol) {
-    var key = historyFeed.keyFor(symbol, root.view.range)
-    if (!(key in root.aheadAsked)) return
-    var asked = Object.assign({}, root.aheadAsked)
-    delete asked[key]
-    root.aheadAsked = asked
   }
 
   // ---- The saved prices

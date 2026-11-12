@@ -1838,7 +1838,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
     return M.overnightAsks({ open: false, pill: true, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
-      quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
+      quotes, overnightSymbols: names, allSymbols: names, inSight: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
   // left no stretch of its own, but is asked with them on such a day.
@@ -1847,7 +1847,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const twice = { ...quotes.NBIS, points: quotes.NBIS.points.filter(p => p.t < at("2026-11-02", "06:00") || p.t >= at("2026-11-02", "06:40")) }
   expect(M.yahooHole(twice)).toBe(at("2026-11-02", "09:25"))
   // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
-  // nothing open, every row with a surface open, the pill on SHOP too.
+  // nothing open, every row in sight with a surface open, the pill on SHOP too.
   expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { featured: "SHOP" })]).toEqual([null,
     { tradability: [], trades: ["NBIS"] }, { tradability: [], trades: names }, { tradability: [], trades: ["SHOP"] }])
   // Once an answer from then on is in, nothing asks again, whether it

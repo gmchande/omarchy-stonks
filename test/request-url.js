@@ -11,7 +11,7 @@ export function requestUrl(raw) {
     for (const [k,v] of Object.entries(values)) if (q[k] !== v) throw new Error('wrong ' + k)
     for (const [k,valid] of Object.entries(variable)) if (!valid(q[k])) throw new Error('invalid ' + k)
     // The serving shell reads canonical parameter order, after validation.
-    const order = ['q','symbols','range','interval','includePrePost','quotesCount','newsCount','events','includeAdjustedClose','span','bounds','type','period1','period2']
+    const order = ['q','symbols','range','interval','includePrePost','quotesCount','newsCount','span','bounds','type','period1','period2']
     u.search = new URLSearchParams(Object.fromEntries(order.filter(k => k in q).map(k => [k,q[k]]))).toString()
   }
   const symbol = s => !!s && !/[\s/?&#%]/u.test(s)
@@ -37,10 +37,10 @@ export function requestUrl(raw) {
       if ('period1' in q) {
         parameters({interval:'1d'}, {period1:epoch,period2:epoch})
         if (+q.period2 <= +q.period1) throw new Error('reversed dates')
-      } else if ('includeAdjustedClose' in q) {
+      } else if (!('includePrePost' in q)) {
         const intervals = {'5d':'15m','1mo':'1h','3mo':'1d','6mo':'1d',ytd:'1d','1y':'1d','2y':'1d','5y':'1wk','10y':'1wk',max:'1mo'}
         if (!(q.range in intervals)) throw new Error('unknown history range')
-        parameters({range:q.range,interval:intervals[q.range],events:'div,splits',includeAdjustedClose:'true'})
+        parameters({range:q.range,interval:intervals[q.range]})
       } else parameters({interval:'5m',includePrePost:'true'}, {range:days})
     } else if (u.pathname === '/v7/finance/spark') parameters({interval:'5m',includePrePost:'true'}, {symbols,range:days})
     else if (/^\/ws\/fundamentals-timeseries\/v1\/finance\/timeseries\/[^/]+$/.test(u.pathname)) {
