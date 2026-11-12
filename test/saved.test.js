@@ -3062,11 +3062,39 @@ test("at the open the chart moves to the new session, and a listing abroad shows
     "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
   // With no calendar for Tokyo, the close held, Monday's, is from before a
-  // weekday with no session seen, so it names no close either: the move is
-  // left out, never −0.62% from Friday's close.
+  // weekday with no session seen, and Yahoo still counts from the close
+  // before it: the move is left out, never −0.62% from Friday's close.
   const noTokyo = { ...calendars, calendars: Object.fromEntries(Object.entries(calendars.calendars).filter(([id]) => id !== "JPX")) }
   expect(opening("tokyo", "7203.t", tokyoTimes, "pct", noTokyo)).toEqual(["1855 3,051.00 \u22120.62%",
     "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+  // Saudi's exchange trades Sunday to Thursday, 10:00 to 15:00 at UTC+3,
+  // with no calendar here. No saved answer is from it, so Toyota's day is
+  // moved to Thursday 22 October, closing at 2,856 from 2,900, and to Sunday
+  // 25 October at 10:05, priced 2,880. By the weekdays Sunday's open skips
+  // Friday, but Yahoo counts from Thursday's close, the one held: the move
+  // shows from the first bar. Had Yahoo still counted from Wednesday's, it
+  // would be left out.
+  const saudiDay = (day, through, price, prevClose) => {
+    const json = structuredClone(fixture("7203-t-day.json"))
+    const r = json.chart.result[0]
+    const start = day + 7 * 3600, end = day + 12 * 3600
+    const shift = start - r.meta.currentTradingPeriod.regular.start
+    r.timestamp = r.timestamp.map(t => t + shift).filter(t => t <= through)
+    for (const k of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][k] = r.indicators.quote[0][k].slice(0, r.timestamp.length)
+    const p = { timezone: "AST", gmtoffset: 10800 }
+    const periods = { pre: { ...p, start, end: start }, regular: { ...p, start, end }, post: { ...p, start: end, end } }
+    Object.assign(r.meta, { symbol: "2222.SR", exchangeName: "SAU", timezone: "AST", exchangeTimezoneName: "Asia/Riyadh", gmtoffset: 10800,
+      currency: "SAR", regularMarketPrice: price, regularMarketTime: Math.min(through, end), previousClose: prevClose, chartPreviousClose: prevClose,
+      currentTradingPeriod: periods, tradingPeriods: { pre: [[periods.pre]], regular: [[periods.regular]], post: [[periods.post]] } })
+    return M.parseChart(json, cents, through)
+  }
+  const saudiThursday = Date.UTC(2026, 9, 22) / 1000, saudiSunday = Date.UTC(2026, 9, 25) / 1000
+  const thursdayClosed = saudiDay(saudiThursday, saudiThursday + 13 * 3600, 2856, 2900)
+  const sundayMove = prevClose => {
+    const now = saudiSunday + 7 * 3600 + 300
+    return M.rowModel(M.carryClose(thursdayClosed, saudiDay(saudiSunday, now, 2880, prevClose), calendars, now), 0, "pct").changeText
+  }
+  expect([sundayMove(2856), sundayMove(2900)]).toEqual(["+0.84%", "\u2014"])
   // Nor does either know the day's open: the only bars of Wednesday are
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
