@@ -240,10 +240,28 @@ Harness {
       var unsaved = within(2000, function() { return footer().indexOf("aren't saved") >= 0 })
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
       var untouched = !within(1000, function() { return harness.readFile(harness.file) !== good || !listed() || footer().indexOf("aren't saved") < 0 })
+      // The file made unreadable, then put back as Stonks last saved it: it
+      // reads again, and the change stays, unsaved.
+      sh(big)
+      var refusedNow = within(3000, function() { return service.listsUnreadable })
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+      var repaired = within(3000, function() { return !service.listsUnreadable && listed() && footer().indexOf("aren't saved") >= 0 })
       service.deleteList(huge)
       var fits = within(3000, function() { return footer().indexOf("aren't saved") < 0 }) && harness.readFile(harness.file) === good
+      // An edit from elsewhere replaces the change, and Stonks' last save,
+      // put back after it, is read as the file again.
+      var other = JSON.parse(good)
+      other.range = other.range === "5Y" ? "2Y" : "5Y"
+      service.createList(huge)
+      var over = within(2000, function() { return footer().indexOf("aren't saved") >= 0 })
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', JSON.stringify(other, null, 2) + "\n")
+      var elsewhere = within(3000, function() { return !listed() && service.range === other.range && footer().indexOf("aren't saved") < 0 })
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+      var restored = within(3000, function() { return service.range === JSON.parse(good).range })
       harness.check("a change that would make the lists file larger than Stonks reads leaves the file as it was and stays in memory, and the footer says the changes aren't saved until they fit",
-        saved && made && unsaved && untouched && fits, [saved, made, unsaved, untouched, listed(), fits, footer()].join(" | "))
+        saved && made && unsaved && untouched && refusedNow && repaired && fits, [saved, made, unsaved, untouched, refusedNow, repaired, listed(), fits, footer()].join(" | "))
+      harness.check("an edit from elsewhere replaces a change too large to save, and the file Stonks last saved, put back, is read again",
+        over && elsewhere && restored, [over, elsewhere, restored, service.range, footer()].join(" | "))
 
       // The file gone, then back: what comes back is read.
       sh('rm -f "$1"')
