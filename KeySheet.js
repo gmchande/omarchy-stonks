@@ -15,7 +15,8 @@ function sheet() {
       ]},
       { title: "Chart", rows: [
         { key: "← →", does: "Move along the chart" },
-        { key: "[ ]", does: "Change the range" }
+        { key: "[ ]", does: "Change the range" },
+        { key: "s", does: "Switch smooth and retro" }
       ]},
       { title: "Lists", rows: [
         { key: "w", does: "Open the list menu" },
