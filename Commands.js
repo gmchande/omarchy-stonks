@@ -327,10 +327,11 @@ function primaryCopy() {
 
 // The silence that holds the output awake for the chimes (`Sounds`): pw-cat
 // reading zeros for `seconds`, saying "-> streaming" once it reaches the
-// output. What it says is cut at 64 KB at most, by a dd that hands each
-// line on as it comes: `head -c` would hold every line until the stream
-// ends.
+// output. What it says is cut at 64 KB, by a dd that reads and hands on a
+// byte at a time: `head -c` would hold every line until the stream ends,
+// and a dd of larger blocks counts each short read as a block, so a few
+// short lines would end the silence. pw-cat says a few hundred bytes.
 function silenceStream(seconds) {
   return ["timeout", "-k", "1", String(seconds), "sh", "-c", "pw-cat -v --playback --raw --rate 24000 --channels 1 --format s16"
-    + " --media-role Notification --latency 30ms /dev/zero 2>&1 > /dev/null | dd bs=4096 iflag=count_bytes count=65536 status=none"]
+    + " --media-role Notification --latency 30ms /dev/zero 2>&1 > /dev/null | dd bs=1 count=65536 status=none"]
 }

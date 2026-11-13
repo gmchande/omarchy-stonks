@@ -241,11 +241,13 @@ test("the silence's word that it reached the output comes while it plays, and wh
     expect(quiet.playing).toBe(true)
     expect(quiet.heard).toBeGreaterThanOrEqual(0)
     expect(quiet.heard).toBeLessThan(500)
-    // dd counts each read toward its 16 blocks, so a chatty stream stops a
-    // little short of 64 KB, never past it.
+    // As pw-cat says its stream's properties, line by line, before it plays.
+    const prelude = await said("for i in $(seq 24); do echo \"property $i\" >&2; sleep 0.02; done\n"
+      + "echo 'stream state changed paused -> streaming' >&2\nwhile :; do sleep 0.1; done\n")
+    expect(prelude.playing).toBe(true)
+    expect(prelude.heard).toBeGreaterThanOrEqual(0)
     const chatty = await said("yes 'stream state changed paused -> streaming' >&2\n")
-    expect(chatty.bytes).toBeLessThanOrEqual(65536)
-    expect(chatty.bytes).toBeGreaterThan(32768)
+    expect(chatty.bytes).toBe(65536)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
