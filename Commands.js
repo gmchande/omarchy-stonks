@@ -58,6 +58,26 @@ function createPrivately(path) {
     + "exit $code", "sh", path]
 }
 
+// The file reader's (`FileRead`): a file Stonks keeps, or a setting it
+// reads, only if it is a regular file, cut a byte past `cap`, so one over
+// the cap shows itself. dd opens it without waiting, so a FIFO put there
+// since the test can't hold the read, and the read has 5 s. It exits 3
+// where nothing is there, and 4 where what is there is no regular file.
+function readSaved(path, cap) {
+  return ["timeout", "-k", "1", "5", "sh", "-c", "[ -e \"$1\" ] || exit 3\n"
+    + "[ -f \"$1\" ] || exit 4\n"
+    + "exec dd if=\"$1\" iflag=nonblock,count_bytes bs=65536 count=\"$2\" status=none", "sh", path, String(cap + 1)]
+}
+
+// What a read found: { text }, { missing: true } where nothing is there, or
+// { refused: true } for anything else: no regular file, one over `cap`
+// bytes, one that couldn't be read, or a read that didn't end.
+function readSavedFile(code, bytes, text, cap) {
+  if (code === 0 && bytes <= cap) return { text: String(text) }
+  if (code === 3) return { missing: true }
+  return { refused: true }
+}
+
 // The sounds': once a run, the md5s of what the sounds are made from, each
 // look's stamp, and the files no newer than it. A newer one was written by
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is

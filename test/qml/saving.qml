@@ -22,6 +22,12 @@ Harness {
   // A fresh start on the same file.
   Component { id: restart; Stonks.Service { pluginId: "grvc.stonks" } }
   Item { id: started }
+  // Each read-back of a save, as the service says it: landed or lost.
+  property var checks: []
+  Connections {
+    target: service
+    function onSaveChecked(saved) { harness.checks = harness.checks.concat([saved]) }
+  }
 
   // One command, run to its end.
   Process {
@@ -149,6 +155,86 @@ Harness {
         readOdd && savedOdd && held === "Tech:MSFT,NVDA tech 2:AAPL All 2:NVDA List:JNJ" && file.lists[1].note === "mine"
           && file.symbols.indexOf("JNJ") >= 0,
         [readOdd, savedOdd, held, JSON.stringify(file.lists[1]), file.symbols.join(",")].join(" | "))
+
+      // A save is read back, and found as it was written.
+      good = harness.readFile(harness.file)
+      harness.checks = []
+      service.setRange("6M")
+      var backed = landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
+      harness.check("a save is read back and found as it was written",
+        backed && harness.checks.indexOf(false) < 0 && !service.saveFailed, [backed, JSON.stringify(harness.checks), service.saveFailed].join(" | "))
+
+      // A read still out as a save lands holds the text from before the
+      // save; it goes unheard, and the save is read back as it landed.
+      good = harness.readFile(harness.file)
+      sh('touch "$STONKS_FAKE_STATE/dd.hold" && cp "$1" "$1.new" && mv "$1.new" "$1"')
+      // Time for the watch to start the read, and for it to read the file.
+      wait(500)
+      harness.checks = []
+      service.setRange("1M")
+      wait(300)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var through = landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
+      wait(500)
+      harness.check("a read still out as a save lands goes unheard, and the save is read back as it landed",
+        through && harness.checks.indexOf(false) < 0 && !service.saveFailed && footer().indexOf("aren't saved") < 0 && service.range === "1M"
+          && JSON.parse(harness.readFile(harness.file)).range === "1M",
+        [through, service.saveFailed, footer(), service.range, JSON.stringify(harness.checks)].join(" | "))
+
+      // A file larger than 128 KiB, and where the file was a folder, a FIFO
+      // or a link to a device: each can't be read, the footer says so, and
+      // none is written over. The FIFO holds nothing up.
+      good = harness.readFile(harness.file)
+      // Each kind: how it's made, and how it's seen, the same after a save
+      // asked of it. The large one is the file with a 128 KiB note added,
+      // made in the shell: a command takes no argument that long.
+      var refused = function(kind) {
+        sh(kind[1])
+        var made = sh(kind[2])
+        var noticed = within(3000, function() { return service.listsUnreadable && footer().indexOf("Couldn't load your lists") >= 0 })
+        var was = service.range
+        service.setRange(was === "1Y" ? "3M" : "1Y")
+        wait(700)
+        var kept = sh(kind[2]) === made
+        sh('rm -rf "$1" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+        var back = kind[3] || within(3000, function() { return !service.listsUnreadable })
+        return noticed && kept && back ? "" : kind[0] + ": " + [noticed, kept, back, made].join(" ")
+      }
+      var refusals = [
+        ["over 128 KiB", 'sed "\\$d" "$1" > "$1.new" && { printf \',"note": "\'; head -c 131072 /dev/zero | tr "\\0" x; printf \'"\\n}\\n\'; } >> "$1.new" && mv "$1.new" "$1"', 'md5sum < "$1"'],
+        ["a folder", 'rm -f "$1" && mkdir "$1"', 'stat -c %F "$1" && ls -A "$1" | wc -l'],
+        ["a FIFO", 'rm -f "$1" && mkfifo "$1"', 'stat -c %F "$1"']
+      ].map(refused).filter(function(s) { return s !== "" })
+
+      // The file gone, then back: what comes back is read.
+      sh('rm -f "$1"')
+      var gone = within(3000, function() { return !service.listsUnreadable && service.lists.length === 1 })
+      var back = JSON.parse(good)
+      back.range = "5Y"
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', JSON.stringify(back, null, 2) + "\n")
+      var appeared = within(3000, function() { return service.range === "5Y" && service.lists.length > 1 })
+      // A hand edit in place.
+      back.range = "1W"
+      sh('printf %s "$3" > "$1"', JSON.stringify(back, null, 2) + "\n")
+      var edited = within(3000, function() { return service.range === "1W" })
+      harness.check("a file that appears where none was is read, and so is an edit made in place by hand",
+        gone && appeared && edited, [gone, appeared, edited, service.range].join(" | "))
+
+      // Every older release's file reads to the lists and settings it holds.
+      var wrong = Quickshell.env("STONKS_DATA_FILES").split(" ").filter(function(path) { return path !== "" }).filter(function(path) {
+        var text = harness.readFile(path)
+        sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', text)
+        return !within(3000, function() { return Settings.settingsEqual(service.fileSettings, Settings.readListsFile(text)) })
+      })
+      harness.check("every older release's lists file reads to the lists and settings it holds",
+        Quickshell.env("STONKS_DATA_FILES") !== "" && wrong.length === 0, wrong.join(" "))
+
+      // Last, a link to a device: Quickshell's watch follows a link to what
+      // it names, so it says no more of the file's place, mended or not.
+      var link = refused(["a link to a device", 'rm -f "$1" && ln -s /dev/zero "$1"', 'readlink "$1"', true])
+      if (link !== "") refusals.push(link)
+      harness.check("a file over 128 KiB, a folder, a FIFO or a link to a device in the file's place can't be read, the footer says so, and none is written over",
+        refusals.length === 0, refusals.join(" | "))
 
       app.close()
       harness.finish()

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# A stand-in for dd, first on PATH inside the walks: the real one, but while
+# STONKS_FAKE_STATE/dd.hold exists, what it read waits until that file goes,
+# as a read held up by a busy disk, so a step can land a save while a read
+# is out.
+real=$(PATH=${PATH#*:} command -v dd)
+[ -e "$STONKS_FAKE_STATE/dd.hold" ] || exec "$real" "$@"
+read=$(mktemp)
+trap 'rm -f "$read"' EXIT
+trap 'exit 143' TERM
+"$real" "$@" > "$read"
+code=$?
+while [ -e "$STONKS_FAKE_STATE/dd.hold" ]; do sleep 0.05; done
+cat "$read"
+exit "$code"

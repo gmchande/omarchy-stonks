@@ -77,6 +77,42 @@ test("a file made for Stonks is its owner's alone from the start, holds the text
   expect(Bun.spawnSync(["ls", "-A", dir]).stdout.toString().trim().split("\n")).toEqual(["grvc.stonks.json"])
 }))
 
+test("a saved file is read only when it is a regular file of at most its cap, at once, and a missing one is told apart from one that can't be read", () => scratch(dir => {
+  const read = (path, cap = 16) => {
+    const began = Date.now()
+    const r = Bun.spawnSync(C.readSaved(path, cap), { stdout: "pipe", stderr: "pipe" })
+    expect(Date.now() - began).toBeLessThan(2000)
+    return C.readSavedFile(r.exitCode, r.stdout.length, r.stdout.toString(), cap)
+  }
+  const file = join(dir, "lists.json")
+  writeFileSync(file, "x".repeat(16))
+  expect(read(file)).toEqual({ text: "x".repeat(16) })
+  writeFileSync(file, "x".repeat(17))
+  expect(read(file)).toEqual({ refused: true })
+  writeFileSync(file, "")
+  expect(read(file)).toEqual({ text: "" })
+  // Through a link to a regular file, as a hand-made setup may have it.
+  writeFileSync(file, "{}")
+  symlinkSync(file, join(dir, "linked"))
+  expect(read(join(dir, "linked"))).toEqual({ text: "{}" })
+  expect(read(join(dir, "none"))).toEqual({ missing: true })
+  symlinkSync(join(dir, "gone"), join(dir, "dangling"))
+  expect(read(join(dir, "dangling"))).toEqual({ missing: true })
+  // A folder, a FIFO no one writes, and a device that never ends: refused,
+  // the FIFO at once.
+  mkdirSync(join(dir, "folder"))
+  expect(read(join(dir, "folder"))).toEqual({ refused: true })
+  expect(Bun.spawnSync(["mkfifo", join(dir, "fifo")]).exitCode).toBe(0)
+  expect(read(join(dir, "fifo"))).toEqual({ refused: true })
+  symlinkSync("/dev/zero", join(dir, "zero"))
+  expect(read(join(dir, "zero"))).toEqual({ refused: true })
+  // One its owner can't read.
+  if (process.getuid() !== 0) {
+    chmodSync(file, 0)
+    expect(read(file)).toEqual({ refused: true })
+  }
+}))
+
 test("the sounds made in an earlier run are used again only while what they're made from is unchanged and they are no newer than its stamp", () => scratch(dir => {
   const cache = join(dir, "cache")
   mkdirSync(cache)

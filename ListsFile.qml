@@ -4,7 +4,9 @@ import Quickshell.Io
 import "Settings.js" as Settings
 // The lists file, ~/.config/omarchy/<id>.json: read as the shell starts and
 // whenever it changes, written on each change, and read back to be sure the
-// write landed. A file that can't be read is never written over.
+// write landed. A file that can't be read is never written over. It is read
+// outside the shell's thread, and only a regular file of at most `cap`
+// bytes is read (`FileRead`): one larger, or anything else there, can't be.
 Item {
   id: root
 
@@ -20,6 +22,10 @@ Item {
   signal started()
 
   readonly property string path: pluginId ? Quickshell.env("HOME") + "/" + Settings.listsFile(pluginId) : ""
+  // 128 KiB. A lists file of 150 stocks in 12 lists is 8 KB, and a new
+  // file's text rides in one environment string, which Linux holds to 128
+  // KiB (`OwnerOnly.create`).
+  readonly property int cap: 131072
   property bool ready: false
   property bool unreadable: false
   // A change made while the file can't be read: only memory holds it.
@@ -71,61 +77,68 @@ Item {
   }
   Component.onDestruction: if (settleWrite.running) root.writeSettled()
 
+  // Says when the file changes, and reads nothing.
   FileView {
-    id: file
     path: root.path
     watchChanges: true
+    preload: false
+    printErrors: false
+    onFileChanged: root.readFile()
+  }
+
+  // Writes the file.
+  FileView {
+    id: file
+    preload: false
     atomicWrites: true
     // Quickshell 0.3.1's async write, cancelled by the next, compares a
     // third against the cancelled text: a change back to it is never
     // written, and the watch reads the second back over it.
     blockWrites: true
     printErrors: false
-    onFileChanged: root.readFile()
-    onLoaded: {
-      root.missing = false
-      root.readEnded(root.takesRead(file.text()) ? root.takeLoadedSettings : null)
-    }
-    // Only a file not there is missing: one that can't be read is never
-    // written over.
-    onLoadFailed: function(error) {
-      root.missing = error === FileViewError.FileNotFound
-      if (!root.takesRead(null)) root.readEnded(null)
-      else root.readEnded(root.missing ? root.takeMissingFile : root.takeUnreadableFile)
-    }
-    // A write drops a read in flight unheard.
-    onSaved: {
-      root.files.keep([root.path])
-      root.readEnded(null)
-    }
+    onSaved: root.files.keep([root.path])
     onSaveFailed: function(error) {
       console.warn("stonks: failed to write " + root.path + ": " + error)
-      root.readEnded(null)
     }
   }
-  // Quickshell 0.3.1 ignores reload() while a read is in flight, so a
-  // change meanwhile is held and read once that read ends.
-  property bool reading: true
-  property bool changedMeanwhile: false
+  // The text the file held at the last read or write.
+  property string known: ""
+  // Quickshell skips a write of the text it last wrote or read, and this
+  // view reads nothing, so it forgets each write before the next: after a
+  // lost save, the same text is written again. A write drops a read still
+  // out, which may hold the text before it.
+  function writeText(text) {
+    reader.drop()
+    root.known = text
+    file.path = ""
+    file.path = root.path
+    file.setText(text)
+  }
+
+  FileRead {
+    id: reader
+    onDone: function(answer) { root.take(answer) }
+  }
+  Component.onCompleted: root.readFile()
+  onPathChanged: root.readFile()
   function readFile() {
-    if (root.reading) {
-      root.changedMeanwhile = true
+    if (root.path !== "") reader.read(root.path, root.cap)
+  }
+
+  // Only a file not there is missing: one that can't be read is never
+  // written over.
+  function take(answer) {
+    if (answer.text !== undefined) {
+      root.missing = false
+      root.known = answer.text
+      if (root.takesRead(answer.text)) root.takeLoadedSettings(answer.text)
       return
     }
-    root.startRead()
-  }
-  function startRead() {
-    root.reading = true
-    file.reload()
-  }
-  // Quickshell lets go of a read only after its handlers have run, so a
-  // held read starts a turn later.
-  function readEnded(take) {
-    var again = root.changedMeanwhile
-    root.reading = again
-    root.changedMeanwhile = false
-    if (take) take()
-    if (again) Qt.callLater(root.startRead)
+    root.missing = !!answer.missing
+    root.known = ""
+    if (!root.takesRead(null)) return
+    if (root.missing) root.takeMissingFile()
+    else root.takeUnreadableFile()
   }
 
   // While a save awaits its read-back: each text the file may still hold
@@ -156,8 +169,8 @@ Item {
     }
   }
 
-  function takeLoadedSettings() {
-    var parsed = Settings.readListsFile(file.text())
+  function takeLoadedSettings(text) {
+    var parsed = Settings.readListsFile(text)
     if (!parsed) {
       root.takeUnreadableFile()
       return
@@ -200,21 +213,18 @@ Item {
     try { return JSON.parse(shellFile.text()) } catch (e) { return null }
   }
 
-  // Read back once written (`takesRead`). The read also hands Quickshell
-  // the text it compares a write with: after a lost save it would skip the
-  // same text. It starts a turn later: Quickshell 0.3.2 forgets a read
-  // started inside a read's handlers (fileview.cpp, operationFinished).
+  // Read back once written (`takesRead`).
   function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    var before = file.text()
+    var before = root.known
     if (body === before && root.staleTexts === null) return
     if (root.staleTexts === null) root.staleTexts = {}
     else root.staleTexts[root.written] = true
     root.staleTexts[before] = true
     root.written = body
     if (root.missing) return root.makeFile()
-    file.setText(body)
-    Qt.callLater(root.readFile)
+    root.writeText(body)
+    root.readFile()
   }
 
   // A missing lists file is made, not written: Quickshell writes a new file
@@ -235,8 +245,8 @@ Item {
       var owed = root.makeOwed
       root.makeOwed = false
       if (owed && !made) return root.makeFile()
-      if (owed) file.setText(root.written)
-      Qt.callLater(root.readFile)
+      if (owed) root.writeText(root.written)
+      root.readFile()
     })
   }
 }
