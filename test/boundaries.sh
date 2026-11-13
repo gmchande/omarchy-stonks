@@ -93,16 +93,30 @@ while read -r host; do
   [ -z "$host" ] || grep -qxF -- "$host" <<< "$sites" || fail "$host: a site the README's \"What it runs\" doesn't name"
 done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # The programs Stonks runs, and the README's "Commands" names them all and
-# no others. A program the code starts, at a command's head or after its
-# `timeout`, must be here; each here must be in the code and the README;
-# and each the README names must be here.
+# no others. A program the code starts must be here: at a command's head,
+# after its `timeout`, or at a command's place in a shell script it hands
+# `sh -c`, `bash -c` or Omarchy's terminal. Each here must be in the code
+# and the README, and each the README names must be here.
 programs="curl timeout sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
   omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
 programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
 named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)
+# A script's words at a command's place: its string pieces joined, each
+# script on its own line, then split where a command can start. The shell's
+# own words are no programs.
+scripted() {
+  rg -U -o --no-filename -P '(?m)(?:"-c"|"presentation"),[\s\S]*?(?:,\s*"(?:ba)?sh"\s*,|"\s*\]\s*$)' -- *.qml *.js \
+    | sed -E 's/^("-c"|"presentation"),/"\\n",/' \
+    | rg -o -P '"(?:\\.|[^"\\])*"' | sed -E 's/^"//; s/"$//' | tr '\n' ' ' \
+    | sed -E 's/\$\{[^}]*\}//g; s/\$\(\(([^)]*)\)\)//g; s/\\n/\n/g; s/\\"/"/g; s/\$\(/\n/g; s/(&&|\|\||[;|{(!`])/\n/g; s/\b(then|do|else|exec)\b/\n/g' \
+    | sed -E 's/^[[:space:]]+//; s/^timeout( +-[a-z-]+( +[0-9]+)?)* +[0-9.]+ +//' \
+    | rg -o -P '^[a-z][a-z0-9-]*(?![=a-z0-9-])' \
+    | rg -vx 'case|cd|command|continue|done|echo|esac|exit|false|fi|for|if|printf|read|return|set|test|true|umask|while'
+}
 started=$( { rg -o --no-filename -P '(?:command:\s*|return\s+|\.exec\s*\()\["([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
   rg -o --no-filename -P '"timeout", (?:"-[a-z-]+", (?:"\d+", )?)?"[0-9.]+"\s*\)?,\s*"([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
-  rg -o --no-filename -P '"timeout", "-k", "1", String\([^)]*\)\)?, "([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js; } | sort -u)
+  rg -o --no-filename -P '"timeout", "-k", "1", String\([^)]*\)\)?, "([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  scripted; } | sort -u)
 while read -r program; do
   [ -z "$program" ] || grep -qxF -- "$program" <<< "$programs" || fail "$program: a program the code starts that boundaries.sh's list doesn't name"
 done <<< "$started"
