@@ -348,7 +348,7 @@ empty.
   and the settings it reads from Omarchy and Omasnap: only an ordinary
   file, and only up to a size cap far above what a real one holds.
 - `timeout`, to stop every command that should end, if it hangs.
-- When you paste into search or a list's name: `sh` with `wl-paste` and
+- When you paste into search or a list's name: `bash` with `wl-paste` and
   `head`, to read what you copied. A paste over 4 KB, or one that takes
   over 2 seconds, pastes nothing. When you select text there with the
   pointer, `wl-copy`, so a middle-click elsewhere pastes it.

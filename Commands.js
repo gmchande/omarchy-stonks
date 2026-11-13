@@ -307,7 +307,7 @@ function updateAndRestart(pluginId) {
 // a middle-click pastes it, cut a byte past `cap`, so an answer over the cap
 // shows itself. An owner that never answers, or never stops, has 2 s.
 function pastedText(primary, cap) {
-  return ["timeout", "-k", "1", "2", "sh", "-c", "set -o pipefail; wl-paste " + (primary ? "--primary " : "")
+  return ["timeout", "-k", "1", "2", "bash", "-c", "set -o pipefail; wl-paste " + (primary ? "--primary " : "")
     + "--no-newline --type text | head -c " + (cap + 1)]
 }
 
