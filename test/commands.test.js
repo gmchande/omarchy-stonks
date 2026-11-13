@@ -8,6 +8,7 @@ import { load } from "./load.js"
 // shell runs them, each in a scratch folder. A tool that would reach the
 // desktop, such as pw-dump or omarchy, is a stand-in first on PATH.
 const C = load("Commands.js")
+const F = load("Fetch.js")
 const root = join(import.meta.dir, "..")
 
 function scratch(body) {
@@ -67,6 +68,23 @@ test("a screenshot is named for its stock and the moment, in the folder and for 
   expect([C.readScreenshotName("tensaku-edit\nrelative.png\n"), C.readScreenshotName("/only-a-file.png\n"), C.readScreenshotName("")]).toEqual([null, null, null])
 }))
 
+// Omasnap reads omasnap.conf with Qt's QSettings; these read as Qt reads
+// them, checked against Qt's own Settings when this rule was written.
+test("Omasnap's folder is read from omasnap.conf as Qt's QSettings reads it", () => {
+  const read = text => C.omasnapFolder(text)
+  expect(read("[colors]\ndirectory = /colors\n\n  [output]\n# Where saved screenshots go.\ndirectory = ~/Captures ; a folder of their own\n\n[later]\ndirectory = /later\n")).toBe("~/Captures")
+  expect(read('[output]\ndirectory = "  /a b  "\n')).toBe("/a b")
+  expect(read('[output]\ndirectory = "/semi;quoted"\n')).toBe("/semi;quoted")
+  expect(read("[output]\ndirectory = /tab\\there\n")).toBe("/tab\there")
+  expect(read("[output]\ndirectory = @String(/str)\n")).toBe("/str")
+  expect(read("[output]\ndirectory = /first\ndirectory = /second\n")).toBe("/second")
+  expect(read("[out%70ut]\ndir%65ctory = /escaped\n")).toBe("/escaped")
+  expect(read("\ufeff[output]\r\ndirectory = /crlf\r\n")).toBe("/crlf")
+  // A list, another type, a commented line, another section's, or none.
+  expect([read("[output]\ndirectory = /a,/b\n"), read("[output]\ndirectory = @ByteArray(/b)\n"),
+    read("[output]\n; directory = /no\n"), read("[Output]\ndirectory = /no\n"), read("")]).toEqual(["", "", "", "", ""])
+})
+
 test("a file made for Stonks is its owner's alone from the start, holds the text whole, and is never made over a file there", () => scratch(dir => {
   const path = join(dir, "grvc.stonks.json")
   const made = run(C.createPrivately(path), { PATH: process.env.PATH, STONKS_TEXT: '{"symbols":["AAPL"]}\n' })
@@ -75,6 +93,42 @@ test("a file made for Stonks is its owner's alone from the start, holds the text
   expect([again.code !== 0, readFileSync(path, "utf8")]).toEqual([true, '{"symbols":["AAPL"]}\n'])
   // Nothing is left behind beside it.
   expect(Bun.spawnSync(["ls", "-A", dir]).stdout.toString().trim().split("\n")).toEqual(["grvc.stonks.json"])
+}))
+
+test("a saved file is read only when it is a regular file of at most its cap, at once, and a missing one is told apart from one that can't be read", () => scratch(dir => {
+  const read = (path, cap = 16) => {
+    const began = Date.now()
+    const r = Bun.spawnSync(C.readSaved(path, cap), { stdout: "pipe", stderr: "pipe" })
+    expect(Date.now() - began).toBeLessThan(2000)
+    return C.readSavedFile(r.exitCode, r.stdout.length, r.stdout.toString(), cap)
+  }
+  const file = join(dir, "lists.json")
+  writeFileSync(file, "x".repeat(16))
+  expect(read(file)).toEqual({ text: "x".repeat(16) })
+  writeFileSync(file, "x".repeat(17))
+  expect(read(file)).toEqual({ refused: true })
+  writeFileSync(file, "")
+  expect(read(file)).toEqual({ text: "" })
+  // Through a link to a regular file, as a hand-made setup may have it.
+  writeFileSync(file, "{}")
+  symlinkSync(file, join(dir, "linked"))
+  expect(read(join(dir, "linked"))).toEqual({ text: "{}" })
+  expect(read(join(dir, "none"))).toEqual({ missing: true })
+  symlinkSync(join(dir, "gone"), join(dir, "dangling"))
+  expect(read(join(dir, "dangling"))).toEqual({ missing: true })
+  // A folder, a FIFO no one writes, and a device that never ends: refused,
+  // the FIFO at once.
+  mkdirSync(join(dir, "folder"))
+  expect(read(join(dir, "folder"))).toEqual({ refused: true })
+  expect(Bun.spawnSync(["mkfifo", join(dir, "fifo")]).exitCode).toBe(0)
+  expect(read(join(dir, "fifo"))).toEqual({ refused: true })
+  symlinkSync("/dev/zero", join(dir, "zero"))
+  expect(read(join(dir, "zero"))).toEqual({ refused: true })
+  // One its owner can't read.
+  if (process.getuid() !== 0) {
+    chmodSync(file, 0)
+    expect(read(file)).toEqual({ refused: true })
+  }
 }))
 
 test("the sounds made in an earlier run are used again only while what they're made from is unchanged and they are no newer than its stamp", () => scratch(dir => {
@@ -120,6 +174,32 @@ test("the bell keeps quiet under Do Not Disturb and while an app records, and ri
   expect(ask("off", "not json")).toBe(false)
 }))
 
+// The shell stops a command as QProcess::terminate does, with a TERM to the
+// one it started: what that started ends with it. Each stand-in hangs, its
+// PID kept.
+test("a request or a bell's check stopped by the shell ends with everything it started", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
+  try {
+    const bin = join(dir, "bin")
+    for (const name of ["curl", "pw-dump"]) standIn(bin, name, `echo $$ > "${dir}/${name}.pid"\nsleep 3600 &\necho $! > "${dir}/${name}.child"\nwait\n`)
+    standIn(bin, "omarchy-shell", "echo off\n")
+    for (const [name, argv] of [["curl", F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000)], ["pw-dump", C.bellCheck()]]) {
+      const proc = Bun.spawn(argv, { env: { PATH: bin + ":" + process.env.PATH }, stdout: "ignore", stderr: "ignore" })
+      const pids = () => ["pid", "child"].map(kind => { try { return readFileSync(join(dir, `${name}.${kind}`), "utf8").trim() } catch (e) { return "" } })
+      for (let t = 0; t < 100 && pids().includes(""); t++) await Bun.sleep(20)
+      expect(pids().includes("")).toBe(false)
+      proc.kill("SIGTERM")
+      await proc.exited
+      await Bun.sleep(1500)
+      // A process gone, or a zombie no one has reaped yet, has ended.
+      const live = pid => { try { return !/^\d+ \(.*\) Z /.test(readFileSync(`/proc/${pid}/stat`, "utf8")) } catch (e) { return false } }
+      expect(pids().filter(live)).toEqual([])
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 10000)
+
 test("the chimes' player plays each chime it's sent that its names allow, and nothing else", () => scratch(dir => {
   const bin = join(dir, "bin")
   const log = join(dir, "played")
@@ -129,6 +209,49 @@ test("the chimes' player plays each chime it's sent that its names allow, and no
   Bun.sleepSync(300)
   expect(readFileSync(log, "utf8").trim().split("\n").sort()).toEqual(["/sounds/chime-smooth-10.wav", "/sounds/chime-smooth-3.wav"])
 }))
+
+// pw-cat -v says "-> streaming" as its silence reaches the output, and
+// Stonks waits for that to know the chimes play at once.
+test("the silence's word that it reached the output comes while it plays, and what it says stops at 64 KB", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
+  try {
+    const bin = join(dir, "bin")
+    const said = async script => {
+      standIn(bin, "pw-cat", script)
+      const proc = Bun.spawn(C.silenceStream(5), { env: { PATH: bin + ":" + process.env.PATH }, stdout: "pipe", stderr: "ignore" })
+      const reader = proc.stdout.getReader()
+      let text = "", heard = -1
+      const started = Date.now()
+      const reading = (async () => {
+        for (;;) {
+          const { value, done } = await reader.read()
+          if (done) return
+          text += new TextDecoder().decode(value)
+          if (heard < 0 && text.includes("-> streaming")) heard = Date.now() - started
+        }
+      })()
+      await Bun.sleep(1000)
+      const playing = proc.exitCode === null
+      proc.kill("SIGTERM")
+      await proc.exited
+      await reading
+      return { heard, playing, bytes: Buffer.byteLength(text) }
+    }
+    const quiet = await said("echo 'stream state changed paused -> streaming' >&2\nwhile :; do sleep 0.1; done\n")
+    expect(quiet.playing).toBe(true)
+    expect(quiet.heard).toBeGreaterThanOrEqual(0)
+    expect(quiet.heard).toBeLessThan(500)
+    // As pw-cat says its stream's properties, line by line, before it plays.
+    const prelude = await said("for i in $(seq 24); do echo \"property $i\" >&2; sleep 0.02; done\n"
+      + "echo 'stream state changed paused -> streaming' >&2\nwhile :; do sleep 0.1; done\n")
+    expect(prelude.playing).toBe(true)
+    expect(prelude.heard).toBeGreaterThanOrEqual(0)
+    const chatty = await said("yes 'stream state changed paused -> streaming' >&2\n")
+    expect(chatty.bytes).toBe(65536)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 10000)
 
 test("an update that restarts the shell restarts it only when the plugin's folder moved", () => scratch(dir => {
   const home = join(dir, "home")
@@ -152,6 +275,49 @@ esac
   }
   expect(update(false)).toEqual(["plugin update grvc.stonks"])
   expect(update(true)).toEqual(["plugin update grvc.stonks", "restart shell"])
+}))
+
+// The clipboard's owner is the stand-in wl-paste beside the stand-in curl
+// (test/qml/bin/wl-paste), as the walks have it.
+test("a paste takes the clipboard's text up to 4096 bytes, and nothing from one past it, from one that never stops, or from one that never answers", () => scratch(dir => {
+  const state = join(dir, "state")
+  mkdirSync(state)
+  const env = { PATH: join(root, "test/qml/bin") + ":" + process.env.PATH, STONKS_FAKE_STATE: state }
+  const owner = (kind, text, file = "wl-paste.text") => {
+    writeFileSync(join(state, "wl-paste.owner"), kind)
+    if (text !== undefined) writeFileSync(join(state, file), text)
+  }
+  const paste = primary => {
+    const began = Date.now()
+    const r = Bun.spawnSync(C.pastedText(primary, 4096), { env, stdout: "pipe", stderr: "pipe" })
+    return { text: C.readPastedText(r.exitCode, r.stdout.length, r.stdout.toString(), 4096), ms: Date.now() - began }
+  }
+  // 4096 bytes of a two-byte character: the cap is counted in bytes.
+  const whole = "é".repeat(2048)
+  owner("text", whole)
+  expect(paste(false).text).toBe(whole)
+  owner("text", whole + "x")
+  expect(paste(false).text).toBe(null)
+  // A field is one line.
+  owner("text", "AAPL\nMSFT\r\nNVDA")
+  expect(paste(false).text).toBe("AAPL MSFT NVDA")
+  // The middle button's is the primary selection.
+  owner("text", "TSLA", "wl-paste.primary")
+  expect(paste(true).text).toBe("TSLA")
+  owner("none")
+  expect(paste(false).text).toBe(null)
+  // One that never stops is cut at once.
+  owner("endless")
+  const endless = paste(false)
+  expect(endless.text).toBe(null)
+  expect(endless.ms).toBeLessThan(1000)
+  // One that never answers is stopped at 2 s, and gone.
+  owner("silent")
+  const silent = paste(false)
+  expect(silent.text).toBe(null)
+  expect(silent.ms).toBeGreaterThanOrEqual(1900)
+  expect(silent.ms).toBeLessThan(3500)
+  expect(existsSync("/proc/" + readFileSync(join(state, "wl-paste.pid"), "utf8").trim())).toBe(false)
 }))
 
 // ---------------------------------------------------------------- waking the sound output

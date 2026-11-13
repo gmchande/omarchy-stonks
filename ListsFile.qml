@@ -4,7 +4,9 @@ import Quickshell.Io
 import "Settings.js" as Settings
 // The lists file, ~/.config/omarchy/<id>.json: read as the shell starts and
 // whenever it changes, written on each change, and read back to be sure the
-// write landed. A file that can't be read is never written over.
+// write landed. A file that can't be read is never written over. It is read
+// outside the shell's thread, and only a regular file of at most `cap`
+// bytes is read (`FileRead`): one larger, or anything else there, can't be.
 Item {
   id: root
 
@@ -20,6 +22,10 @@ Item {
   signal started()
 
   readonly property string path: pluginId ? Quickshell.env("HOME") + "/" + Settings.listsFile(pluginId) : ""
+  // 128 KiB. A lists file of 150 stocks in 12 lists is 8 KB, and a new
+  // file's text rides in one environment string, which Linux holds to 128
+  // KiB (`OwnerOnly.create`).
+  readonly property int cap: 131072
   property bool ready: false
   property bool unreadable: false
   // A change made while the file can't be read: only memory holds it.
@@ -71,75 +77,102 @@ Item {
   }
   Component.onDestruction: if (settleWrite.running) root.writeSettled()
 
+  // Says when the file changes, and reads nothing.
   FileView {
-    id: file
     path: root.path
     watchChanges: true
+    preload: false
+    printErrors: false
+    onFileChanged: root.readFile()
+  }
+
+  // Writes the file.
+  FileView {
+    id: file
+    preload: false
     atomicWrites: true
     // Quickshell 0.3.1's async write, cancelled by the next, compares a
     // third against the cancelled text: a change back to it is never
     // written, and the watch reads the second back over it.
     blockWrites: true
     printErrors: false
-    onFileChanged: root.readFile()
-    onLoaded: {
-      root.missing = false
-      root.readEnded(root.takesRead(file.text()) ? root.takeLoadedSettings : null)
-    }
-    // Only a file not there is missing: one that can't be read is never
-    // written over.
-    onLoadFailed: function(error) {
-      root.missing = error === FileViewError.FileNotFound
-      if (!root.takesRead(null)) root.readEnded(null)
-      else root.readEnded(root.missing ? root.takeMissingFile : root.takeUnreadableFile)
-    }
-    // A write drops a read in flight unheard.
-    onSaved: {
-      root.files.keep([root.path])
-      root.readEnded(null)
-    }
+    onSaved: root.files.keep([root.path])
     onSaveFailed: function(error) {
       console.warn("stonks: failed to write " + root.path + ": " + error)
-      root.readEnded(null)
     }
   }
-  // Quickshell 0.3.1 ignores reload() while a read is in flight, so a
-  // change meanwhile is held and read once that read ends.
-  property bool reading: true
-  property bool changedMeanwhile: false
+  // The text the file held at the last read or write.
+  property string known: ""
+  // Quickshell skips a write of the text it last wrote or read, and this
+  // view reads nothing, so it forgets each write before the next: after a
+  // lost save, the same text is written again. A write drops a read still
+  // out, which may hold the text before it.
+  function writeText(text) {
+    reader.drop()
+    root.known = text
+    file.path = ""
+    file.path = root.path
+    file.setText(text)
+  }
+
+  FileRead {
+    id: reader
+    onDone: function(answer) { root.take(answer) }
+  }
+  Component.onCompleted: root.readFile()
+  onPathChanged: root.readFile()
   function readFile() {
-    if (root.reading) {
-      root.changedMeanwhile = true
+    if (root.path !== "") reader.read(root.path, root.cap)
+  }
+
+  // Only a file not there is missing: one that can't be read is never
+  // written over, a save still awaiting its read-back included. What is
+  // there now is no text of Stonks', so that wait ends, as for a save from
+  // elsewhere.
+  function take(answer) {
+    if (answer.text !== undefined) {
+      root.missing = false
+      root.known = answer.text
+      // Stonks' own last save, read back while memory holds a change too
+      // large to save: the file is readable and the save landed, and the
+      // change stays, unsaved.
+      if (root.written !== "" && answer.text === root.written && root.tooLarge(root.fileSettings)) {
+        root.staleTexts = null
+        root.unreadable = false
+        root.saveFailed = true
+        return
+      }
+      if (root.takesRead(answer.text)) root.takeLoadedSettings(answer.text)
       return
     }
-    root.startRead()
-  }
-  function startRead() {
-    root.reading = true
-    file.reload()
-  }
-  // Quickshell lets go of a read only after its handlers have run, so a
-  // held read starts a turn later.
-  function readEnded(take) {
-    var again = root.changedMeanwhile
-    root.reading = again
-    root.changedMeanwhile = false
-    if (take) take()
-    if (again) Qt.callLater(root.startRead)
+    root.missing = !!answer.missing
+    root.known = ""
+    if (root.missing) {
+      if (root.takesRead(null)) root.takeMissingFile()
+      return
+    }
+    if (root.making) return
+    root.staleTexts = null
+    root.saveFailed = false
+    root.takeUnreadableFile()
   }
 
   // While a save awaits its read-back: each text the file may still hold
-  // if Stonks' last write was lost, as keys. Quickshell 0.3.2 reports a
+  // if Stonks' last write was lost, by its md5. Quickshell 0.3.2 reports a
   // write done when a full disk fails its commit (fileview.cpp,
-  // FileViewWriter::write), so only a read tells.
+  // FileViewWriter::write), so only a read tells. At most 1024, the first
+  // kept: the text the file held before the saves began to fail.
   property var staleTexts: null
   property string written: ""
   // A read of an earlier text, or none, says the last save was lost, and
   // isn't taken. Any other text ends the wait: a save from elsewhere wins.
   function takesRead(text) {
     if (root.making) return false
-    if (root.staleTexts === null) return true
-    var lost = text === null || (text !== root.written && root.staleTexts[text] === true)
+    if (root.staleTexts === null) {
+      root.saveFailed = false
+      return true
+    }
+    var lost = text === null || (text !== root.written && root.staleTexts["m" + Qt.md5(text)] === true)
     if (lost && !root.saveFailed)
       console.warn("stonks: " + root.path + " didn't take the save; keeping the changes until one lands")
     root.saveFailed = lost
@@ -156,8 +189,8 @@ Item {
     }
   }
 
-  function takeLoadedSettings() {
-    var parsed = Settings.readListsFile(file.text())
+  function takeLoadedSettings(text) {
+    var parsed = Settings.readListsFile(text)
     if (!parsed) {
       root.takeUnreadableFile()
       return
@@ -175,46 +208,63 @@ Item {
     if (!root.ready) root.adopt(root.fileSettings)
   }
 
+  // On a first start with no lists file, the bar's own entry in the shell's
+  // shell.json, where an older Stonks kept its symbols, starts it
+  // (`FileRead`, at most 1 MiB: Omarchy's own is a few KB).
   function takeMissingFile() {
     root.unreadable = false
-    if (!root.ready) {
-      var fromBar = Settings.settingsFromBar(root.parseShell(), root.pluginId)
-      if (fromBar) {
-        root.adopt(fromBar)
-        root.writeFile(fromBar)
-        return
-      }
-    }
+    if (root.ready) return root.takeDefaults()
+    shellReader.read(Quickshell.env("HOME") + "/.config/omarchy/shell.json", 1048576)
+  }
+  FileRead {
+    id: shellReader
+    onDone: function(answer) { root.takeShell(answer.text) }
+  }
+  // A lists file read meanwhile wins.
+  function takeShell(text) {
+    if (root.ready || !root.missing) return
+    var shell = null
+    try { shell = JSON.parse(text) } catch (e) {}
+    var fromBar = Settings.settingsFromBar(shell, root.pluginId)
+    if (!fromBar) return root.takeDefaults()
+    root.adopt(fromBar)
+    root.writeFile(fromBar)
+  }
+  function takeDefaults() {
     console.warn("stonks: lists file missing; using defaults")
     root.adopt(Settings.fileSettings(null))
   }
 
-  FileView {
-    id: shellFile
-    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
-    blockLoading: true
-    printErrors: false
+  // Read back once written (`takesRead`). A text over the cap is never
+  // written, since Stonks couldn't read it back: the file keeps what it
+  // held, and the footer says the changes aren't saved until they fit.
+  function tooLarge(settings) {
+    return Settings.fileBytes(JSON.stringify(settings, null, 2) + "\n") > root.cap
   }
-
-  function parseShell() {
-    try { return JSON.parse(shellFile.text()) } catch (e) { return null }
-  }
-
-  // Read back once written (`takesRead`). The read also hands Quickshell
-  // the text it compares a write with: after a lost save it would skip the
-  // same text. It starts a turn later: Quickshell 0.3.2 forgets a read
-  // started inside a read's handlers (fileview.cpp, operationFinished).
   function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    var before = file.text()
-    if (body === before && root.staleTexts === null) return
+    if (Settings.fileBytes(body) > root.cap) {
+      root.saveFailed = true
+      return
+    }
+    var before = root.known
+    if (body === before && root.staleTexts === null) {
+      root.saveFailed = false
+      return
+    }
     if (root.staleTexts === null) root.staleTexts = {}
-    else root.staleTexts[root.written] = true
-    root.staleTexts[before] = true
+    else root.stale(root.written)
+    root.stale(before)
     root.written = body
     if (root.missing) return root.makeFile()
-    file.setText(body)
-    Qt.callLater(root.readFile)
+    root.writeText(body)
+    root.readFile()
+  }
+  // Keys never read as numbers, so they keep the order they came in.
+  function stale(text) {
+    var keys = Object.keys(root.staleTexts)
+    if (keys.length >= 1024) delete root.staleTexts[keys[1]]
+    root.staleTexts["m" + Qt.md5(text)] = true
   }
 
   // A missing lists file is made, not written: Quickshell writes a new file
@@ -235,8 +285,8 @@ Item {
       var owed = root.makeOwed
       root.makeOwed = false
       if (owed && !made) return root.makeFile()
-      if (owed) file.setText(root.written)
-      Qt.callLater(root.readFile)
+      if (owed) root.writeText(root.written)
+      root.readFile()
     })
   }
 }

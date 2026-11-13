@@ -298,26 +298,31 @@ Item {
   // The silence: pw-cat reading zeros holds the output open as a sound does,
   // and says "-> streaming" once it reaches it. The output counts as awake
   // while it runs and 4 s after it stops, but not after it ends on its own, as
-  // when PipeWire restarts: then it starts again 2 s later. Each ends after
-  // `streamSeconds`, so none outlives a shell that dies, and starts again at
-  // once if still wanted.
+  // when PipeWire restarts, or fails to start: then it starts again 2 s
+  // later. Each ends after `streamSeconds`, so none outlives a shell that
+  // dies, and starts again at once if still wanted. What it says is cut at
+  // 64 KB, each line handed on as it comes (`Commands.silenceStream`).
   property int streamSeconds: 60
   Timer { id: afterScrub; interval: 1000; onTriggered: root.scrubHeld = false }
   onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
-    command: ["timeout", "-k", "1", String(root.streamSeconds), "pw-cat", "-v", "--playback", "--raw", "--rate", "24000",
-      "--channels", "1", "--format", "s16", "--media-role", "Notification", "--latency", "30ms", "/dev/zero"]
-    stderr: SplitParser {
+    property int code: -1
+    command: Commands.silenceStream(root.streamSeconds)
+    stdout: SplitParser {
       onRead: function(line) { if (root.awakeAt < 0 && line.indexOf("-> streaming") >= 0) root.awakeAt = Date.now() }
     }
+    onExited: function(exitCode) { silence.code = exitCode }
+    // Read as `running` falls, since a command that fails to start never
+    // exits.
     onRunningChanged: {
-      if (!running) return
-      root.starting()
-      root.asleepAfter = Infinity
-    }
-    onExited: function(exitCode) {
-      var renewed = exitCode === 124 && root.keepingAwake
+      if (running) {
+        root.starting()
+        root.asleepAfter = Infinity
+        return
+      }
+      var renewed = silence.code === 124 && root.keepingAwake
+      silence.code = -1
       root.asleepAfter = Date.now() + (root.keepingAwake && !renewed ? 0 : 4000)
       if (renewed) Qt.callLater(function() { silence.running = root.keepingAwake })
       else if (root.keepingAwake) silenceAgain.restart()

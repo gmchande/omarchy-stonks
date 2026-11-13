@@ -6,8 +6,8 @@ import "Commands.js" as Commands
 // grab. With Omasnap, as on Omarchy 4.5, the folder is OMASNAP_SCREENSHOT_DIR,
 // else OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` passes on as
 // it, else omasnap.conf's [output] directory, else Screenshots in the pictures
-// folder, read through Qt as Omasnap reads them, so from XDG_CONFIG_HOME, and
-// never written; the editor is `omasnap`. Without it, as on Omarchy 4.0, the
+// folder, read as Omasnap reads them, so from XDG_CONFIG_HOME, and never
+// written; the editor is `omasnap`. Without it, as on Omarchy 4.0, the
 // folder is OMARCHY_SCREENSHOT_DIR, else XDG_PICTURES_DIR from user-dirs.dirs,
 // read as text and never run, else ~/Pictures; the editor is
 // OMARCHY_SCREENSHOT_EDITOR, else Tensaku. The picture is saved there and
@@ -27,9 +27,17 @@ Item {
   property var shotDone: null
   readonly property bool busy: shotDone !== null
 
-  Settings {
-    id: omasnapSettings
-    location: StandardPaths.writableLocation(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf"
+  // omasnap.conf, at most 64 KiB: Omasnap writes a few lines.
+  FileRead {
+    id: omasnapConf
+    onDone: function(answer) {
+      if (!root.shotDone) return
+      root.shotOmasnapFolder = Commands.omasnapFolder(answer.text || "")
+      naming.running = true
+    }
+  }
+  function localPath(location) {
+    return decodeURIComponent(String(StandardPaths.writableLocation(location)).replace(/^file:\/\//, ""))
   }
 
   // `taken()` hears the picture taken, before it is saved; then `item` may go.
@@ -39,16 +47,13 @@ Item {
     if (busy) return false
     shotSymbol = symbol
     shotItem = item
-    // As Omasnap reads it: a list (a value with a comma) is no folder.
-    omasnapSettings.sync()
-    var configured = omasnapSettings.value("output/directory", "")
-    shotOmasnapFolder = typeof configured === "string" ? configured.trim() : ""
-    shotPictures = decodeURIComponent(String(StandardPaths.writableLocation(StandardPaths.PicturesLocation)).replace(/^file:\/\//, ""))
+    shotOmasnapFolder = ""
+    shotPictures = localPath(StandardPaths.PicturesLocation)
     shotFile = ""
     shotEditor = ""
     shotTaken = taken
     shotDone = done
-    naming.running = true
+    omasnapConf.read(localPath(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf", 65536)
     return true
   }
 
@@ -81,18 +86,26 @@ Item {
           root.shotTaken = null
           root.shotItem = null
           if (taken) taken()
-          if (result.saveToFile(root.shotFile)) copying.running = true
-          else root.finish(1)
+          if (!result.saveToFile(root.shotFile)) return root.finish(1)
+          copying.code = -1
+          copying.running = true
         })) root.finish(1)
       }
     }
+    // A command that fails to start ends with no stream's end.
+    onRunningChanged: if (!running && root.shotDone && root.shotFile === "") root.finish(1)
   }
 
+  // Read as `running` falls, since a command that fails to start never
+  // exits.
   Process {
     id: copying
-    command: ["timeout", "5", "sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile]
-    onExited: function(code) {
-      if (code === 0) announcing.running = true
+    property int code: -1
+    command: ["timeout", "-k", "1", "5", "sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile]
+    onExited: function(code) { copying.code = code }
+    onRunningChanged: {
+      if (running) return
+      if (copying.code === 0) announcing.running = true
       else root.finish(2)
     }
   }
@@ -101,8 +114,8 @@ Item {
   // then.
   Process {
     id: announcing
-    command: ["timeout", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
+    command: ["timeout", "-k", "1", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
       "Click to edit", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
-    onExited: root.finish(0)
+    onRunningChanged: if (!running) root.finish(0)
   }
 }

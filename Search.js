@@ -32,10 +32,13 @@ function keptAnswer(kept, words) {
 }
 
 // Only an answer read is kept: words whose lookup failed are asked again.
+// The last 64 answers are kept: a person types a few dozen words in a search.
 function withAnswer(kept, words, found) {
   if (!found) return kept
   var next = new Map(kept)
+  next.delete(words)
   next.set(words, found)
+  while (next.size > 64) next.delete(next.keys().next().value)
   return next
 }
 

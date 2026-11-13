@@ -1,4 +1,7 @@
 import QtQuick
+import QtQuick.Controls
+import Quickshell
+import Quickshell.Io
 import qs.Commons
 import "plugin" as Stonks
 
@@ -16,6 +19,8 @@ Harness {
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
+  // The clipboard's owner, as the stand-in wl-paste reads it (bin/wl-paste).
+  Process { id: owning }
 
   Steps {
     name: "Mouse"
@@ -180,6 +185,8 @@ Harness {
       harness.check("the pointer over the chart reads that moment, and a click goes back to now",
         scrubbed && within(1500, function() { return body.scrubT === 0 }), scrubbed + " " + body.scrubT)
 
+      fields()
+
       var before = service.symbols.join(",")
       var over = list.mapToItem(body, list.width / 2, list.height / 2)
       mouseMove(body, over.x, over.y)
@@ -190,6 +197,75 @@ Harness {
 
       app.close()
       harness.finish()
+    }
+
+    // A text field under the pointer, as Omarchy's own: a click puts the
+    // cursor where it lands, in the field's paddings too, a drag selects, a
+    // double-click takes a word, and the middle button and the right-click
+    // menu's Paste paste, through the stand-in wl-paste: the middle button's
+    // where it lands, the menu's at the cursor.
+    function fields() {
+      body.closeViews()
+      click("footerText")
+      var field = null
+      var searching = within(1500, function() { field = harness.find(body, "searchField"); return body.adding && !!field && field.activeFocus })
+      "abc def".split("").forEach(function(c) { keyClick(c) })
+      // The middle of position `i`, in the field; `y` in it if given.
+      var text = field.children.filter(function(child) { return !!child.positionToRectangle })[0]
+      var place = function(i, y) {
+        var r = text.positionToRectangle(i)
+        return { x: text.x + r.x + 1, y: y === undefined ? field.height / 2 : y }
+      }
+      var seen = function() { return [field.text, field.cursorPosition, field.selectionStart, field.selectionEnd].join(" ") }
+      var p = place(2)
+      mouseClick(field, p.x, p.y)
+      var clicked = seen()
+      p = place(5, 1)
+      mouseClick(field, p.x, p.y)
+      var padded = seen()
+      var a = place(1), z = place(5)
+      mousePress(field, a.x, a.y)
+      mouseMove(field, (a.x + z.x) / 2, a.y)
+      mouseMove(field, z.x, z.y)
+      mouseRelease(field, z.x, z.y)
+      // What a pointer selection put in the primary selection, through the
+      // stand-in wl-copy (bin/wl-copy): the arguments of its last call and
+      // what it was given.
+      var primary = function() {
+        var calls = harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/wl-copy.calls").split("\n").filter(function(l) { return l !== "" })
+        return calls.length ? calls[calls.length - 1] + ":" + harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/wl-copy." + calls.length) : ""
+      }
+      var dragged = seen()
+      var draggedPrimary = within(2000, function() { return primary() === "--primary:bc d" })
+      p = place(5)
+      mouseDoubleClickSequence(field, p.x, p.y)
+      var word = seen()
+      var wordPrimary = within(2000, function() { return primary() === "--primary:def" })
+      harness.check("in a text field a click puts the cursor where it lands, in its paddings too, a drag selects, a double-click takes a word, and each selection is the primary selection",
+        clicked === "abc def 2 2 2" && padded === "abc def 5 5 5" && dragged === "abc def 5 1 5" && word === "abc def 7 4 7" && draggedPrimary && wordPrimary,
+        [clicked, padded, dragged, word, draggedPrimary, wordPrimary, primary()].join(" | "))
+
+      var state = Quickshell.env("STONKS_FAKE_STATE")
+      owning.command = ["sh", "-c", 'printf text > "$1/wl-paste.owner" && printf MSFT > "$1/wl-paste.text" && printf TSLA > "$1/wl-paste.primary"', "sh", state]
+      owning.running = true
+      tryVerify(function() { return !owning.running }, 2000)
+      p = place(4)
+      mouseClick(field, p.x, p.y, Qt.MiddleButton)
+      var middle = within(2000, function() { return field.text === "abc TSLAdef" })
+      p = place(0)
+      mouseClick(field, p.x, p.y, Qt.RightButton)
+      // The field's right-click menu, and its Paste.
+      var paste = null
+      within(1500, function() {
+        var menu = text.ContextMenu.menu
+        for (var i = 0; menu && menu.opened && i < menu.count; i++) if (menu.itemAt(i).text === "Paste") paste = menu.itemAt(i)
+        return !!paste
+      })
+      if (paste) click(paste)
+      var menu = within(2000, function() { return field.text === "abc TSLAMSFTdef" })
+      harness.check("the middle button pastes the primary selection where it lands, and the right-click menu's Paste the clipboard at the cursor",
+        searching && middle && menu, [searching, middle, !!paste, menu, field.text].join(" | "))
+      body.closeViews()
     }
   }
 }

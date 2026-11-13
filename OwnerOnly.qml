@@ -30,6 +30,7 @@ Item {
   function write(path, data) {
     if (!root.made) {
       root.held[path] = data
+      root.makeFolder()
       return false
     }
     file.path = path
@@ -76,30 +77,40 @@ Item {
   }
 
   // The id comes once: as the service is made, or just after (`Plugin`).
-  // The make starts a turn later, once its command names the folder.
+  // The make starts a turn later, once its command names the folder. A make
+  // that fails drops what waits, and the next write asks again.
   Component.onCompleted: if (root.folder !== "") Qt.callLater(root.makeFolder)
   onFolderChanged: if (root.folder !== "") Qt.callLater(root.makeFolder)
-  function makeFolder() { if (!make.running && !root.made) make.running = true }
+  function makeFolder() {
+    if (root.folder === "" || make.running || root.made) return
+    make.code = -1
+    make.running = true
+  }
 
+  // Each read as `running` falls, since a command that fails to start
+  // never exits.
   Process {
     id: make
-    command: ["timeout", "5", "sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
-    onExited: function(code) {
-      root.made = code === 0
+    property int code: -1
+    command: ["timeout", "-k", "1", "5", "sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
+    onExited: function(code) { make.code = code }
+    onRunningChanged: {
+      if (running) return
+      root.made = make.code === 0
+      var waiting = root.held
+      root.held = ({})
       if (!root.made) {
         console.warn("stonks: can't make " + root.folder + " yours alone; writing nothing there")
         return
       }
-      var waiting = root.held
-      root.held = ({})
       for (var path in waiting) root.write(path, waiting[path])
     }
   }
 
   Process {
     id: chmod
-    command: ["timeout", "5", "chmod", "go=", "--"].concat(root.changing)
-    onExited: root.next()
+    command: ["timeout", "-k", "1", "5", "chmod", "go=", "--"].concat(root.changing)
+    onRunningChanged: if (!running) root.next()
   }
 
   Process {

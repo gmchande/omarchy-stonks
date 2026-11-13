@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# A stand-in for wl-paste, first on PATH inside the harnesses and the
+# commands' tests, so none reads the desktop's clipboard. It appends its
+# arguments as one line to STONKS_FAKE_STATE/wl-paste.calls, then answers
+# as STONKS_FAKE_STATE/wl-paste.owner says, the clipboard's owner:
+#   text      what STONKS_FAKE_STATE/wl-paste.text holds, or with --primary
+#             what wl-paste.primary holds
+#   late      what wl-paste.text holds, a second late
+#   endless   an owner that never stops sending
+#   silent    an owner that never answers, its PID in wl-paste.pid
+# and with no owner, nothing copied, as the real one says it.
+echo "$*" >> "$STONKS_FAKE_STATE/wl-paste.calls"
+case $(cat "$STONKS_FAKE_STATE/wl-paste.owner" 2> /dev/null) in
+  text)
+    if [[ " $* " == *" --primary "* ]]; then cat "$STONKS_FAKE_STATE/wl-paste.primary"
+    else cat "$STONKS_FAKE_STATE/wl-paste.text"; fi ;;
+  late) sleep 1; cat "$STONKS_FAKE_STATE/wl-paste.text" ;;
+  endless) while :; do printf 'AAPL '; done ;;
+  silent) echo $$ > "$STONKS_FAKE_STATE/wl-paste.pid"; exec sleep 3600 ;;
+  *) echo "Nothing is copied" >&2; exit 1 ;;
+esac

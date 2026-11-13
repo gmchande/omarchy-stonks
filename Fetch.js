@@ -27,9 +27,11 @@ function instrumentsCap(count) {
   return 16000 + 8000 * count
 }
 
-// `--max-time` is per URL, so no URL holds a run more than 10 s.
+// `--max-time` is per URL, so no URL holds a run more than 10 s, and the
+// URLs go one after another: `timeout` ends the whole run 5 s after the
+// last could, curl and all, and so does a stop.
 function curlCommand(urls, maxBytes) {
-  return ["curl", "-sS", "--compressed", "--max-filesize", String(maxBytes),
+  return ["timeout", "-k", "1", String(10 * urls.length + 5), "curl", "-sS", "--compressed", "--max-filesize", String(maxBytes),
     "--connect-timeout", "5", "--max-time", "10", "-A", USER_AGENT,
     "-w", "\\n" + ANSWER_MARK + " %{urlnum} %{http_code} %{exitcode} %header{retry-after}\\n"].concat(urls)
 }

@@ -52,6 +52,7 @@ Item {
     if (JSON.stringify(root.fileSettings.symbols) !== JSON.stringify(root.allSymbols)) root.allSymbols = root.fileSettings.symbols
     root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
+    root.forgetListKeys()
   }
 
   // Each list's identity for the session, for what is kept by list and not
@@ -64,6 +65,15 @@ Item {
     var next = Object.assign({}, root.listKeys)
     next[name] = key
     root.listKeys = next
+  }
+  // A freed name's key is kept only while a list still holds the key that
+  // name would get without it, so the two can't meet.
+  function forgetListKeys() {
+    var names = root.fileSettings.lists.map(function(list) { return list.name })
+    var used = names.map(root.listKey)
+    var kept = {}
+    for (var name in root.listKeys) if (names.indexOf(name) >= 0 || used.indexOf("=" + name) >= 0) kept[name] = root.listKeys[name]
+    if (Object.keys(kept).length < Object.keys(root.listKeys).length) root.listKeys = kept
   }
   // Added symbols with no first answer yet, quote or failure: saved and
   // fetched, but no list shows them until it comes.
@@ -451,12 +461,7 @@ Item {
     id: listsFile
     pluginId: root.pluginId
     files: ownerOnly
-    onStarted: {
-      feed.seed(root.parseSavedQuotes())
-      // What the seed put in is what the file holds.
-      root.quotesUnsaved = false
-      root.askDue()
-    }
+    onStarted: root.seedSaved()
     onSaveChecked: function(saved) { root.saveChecked(saved) }
   }
   // Bindings, not aliases: an alias reads nothing until the file's own
@@ -831,6 +836,18 @@ Item {
     var keep = function(s) { return root.allSymbols.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
     for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
+    // A fill is said once while it's on a chart.
+    for (var said in root.saidFills) {
+      var part = said.split(" ")
+      var filled = root.fills[part[0]]
+      if (!filled || !filled.stretches.some(function(s) { return String(s.from) === part[1] && String(s.to) === part[2] })) delete root.saidFills[said]
+    }
+    var missed = Object.keys(root.aheadMissed).filter(function(key) { return keep(key.split("|")[0]) })
+    if (missed.length < Object.keys(root.aheadMissed).length) {
+      var still = {}
+      missed.forEach(function(key) { still[key] = true })
+      root.aheadMissed = still
+    }
     var prune = function(cache, fresh) {
       var next = {}
       var dropped = false
@@ -962,17 +979,34 @@ Item {
   OwnerOnly { id: ownerOnly; pluginId: root.pluginId }
   readonly property alias files: ownerOnly
 
-  FileView {
-    id: quotesFile
-    path: root.quotesPath
-    blockLoading: true
-    printErrors: false
+  // Read as the service starts, beside the lists file, and handed to the
+  // feed once both are in (`FileRead`). 16 MiB: a stock's saved price is 8
+  // KB, 12 KB at the most seen, so 150 stocks' are about 1.2 MB.
+  readonly property int quotesCap: 16777216
+  property var savedAnswer: null
+  property bool seeded: false
+  FileRead {
+    id: quotesReader
+    onDone: function(answer) {
+      root.savedAnswer = answer
+      root.seedSaved()
+    }
+  }
+  onQuotesPathChanged: if (root.quotesPath !== "" && !root.seeded) quotesReader.read(root.quotesPath, root.quotesCap)
+  function seedSaved() {
+    if (!root.ready || root.savedAnswer === null || root.seeded) return
+    root.seeded = true
+    feed.seed(root.parseSavedQuotes(root.savedAnswer.text || ""))
+    root.savedAnswer = null
+    // What the seed put in is what the file holds.
+    root.quotesUnsaved = false
+    root.askDue()
   }
 
   // { symbol: { quote, receivedAt } }
-  function parseSavedQuotes() {
+  function parseSavedQuotes(text) {
     try {
-      var parsed = JSON.parse(quotesFile.text())
+      var parsed = JSON.parse(text)
       return parsed && parsed.version === 1 && parsed.quotes ? Quote.keptQuotes(parsed.quotes) : {}
     } catch (e) {
       return {}
@@ -1137,5 +1171,8 @@ Item {
   }
   onScreensOffChanged: slideClock()
   onOpenSurfacesChanged: slideClock()
-  Component.onCompleted: slideClock()
+  Component.onCompleted: {
+    slideClock()
+    if (root.quotesPath !== "") quotesReader.read(root.quotesPath, root.quotesCap)
+  }
 }

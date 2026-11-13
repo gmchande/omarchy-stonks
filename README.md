@@ -344,7 +344,14 @@ empty.
 - `curl` for every request, with a time limit and a size cap.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln` and `rm`, to make its files and
   keep them readable only by you.
-- `timeout`, to stop its file, sound and screenshot commands if they hang.
+- `sh` with `dd`, to read your lists, the last prices, your theme's colours
+  and the settings it reads from Omarchy and Omasnap: only an ordinary
+  file, and only up to a size cap far above what a real one holds.
+- `timeout`, to stop every command that should end, if it hangs.
+- When you paste into search or a list's name: `sh` with `wl-paste` and
+  `head`, to read what you copied. A paste over 4 KB, or one that takes
+  over 2 seconds, pastes nothing. When you select text there with the
+  pointer, `wl-copy`, so a middle-click elsewhere pastes it.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
   you move along the chart, so each chime plays at once; as the bell is
   due, `bash` with `omarchy-shell notifications isDnd` and `pw-dump`, to

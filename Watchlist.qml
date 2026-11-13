@@ -524,8 +524,13 @@ Flickable {
     forgetGoneCursor()
   }
 
-  // Each list's scroll, by its key, for the session.
+  // Each list's scroll, by its key, for the session: only lists that are
+  // there keep one.
   property var places: ({})
+  property var listKeys: []
+  onListKeysChanged: {
+    for (var key in places) if (listKeys.indexOf(key) < 0) delete places[key]
+  }
 
   ListModel { id: rowsModel }
   onViewChanged: {

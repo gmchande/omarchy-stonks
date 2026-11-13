@@ -346,6 +346,22 @@ Harness {
       harness.check("by keys alone, a, the words and Enter add the stock Yahoo finds",
         searching && added, searching + " " + service.symbols.join(",") + " adding " + b.adding)
 
+      // With words typed in search since, Delete and Ctrl+Z still take the
+      // row and put it back: the field's own undo is only the field's.
+      var row = b.watchlist.cursorRow
+      press("Delete")
+      var gone = within(2000, function() { return service.symbols.indexOf(row) < 0 })
+      press("Ctrl+Z")
+      var back = within(2000, function() { return service.symbols.indexOf(row) >= 0 })
+      harness.check("by keys alone, after words typed in search, Delete takes a row and Ctrl+Z puts it back",
+        !!row && gone && back, [row, gone, back, service.symbols.join(",")].join(" | "))
+
+      press("a")
+      var undoneSearch = typing("searchField") ? undoSteps(harness.find(b, "searchField")) : "search took no keys"
+      press("Esc")
+      harness.check("in search, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneSearch === undoWanted && !b.adding, undoneSearch + " | adding " + b.adding)
+
       // Yahoo's search down: the words say so beside RETRY, and Enter asks
       // again, once. Words that name none of the list's own, which Enter
       // would take at once.
@@ -451,12 +467,240 @@ Harness {
       press("↓")
       press("⏎")
       var managing = within(1500, function() { return b.managingLists })
+      // Enter renames the list; Esc leaves its name as it was.
+      press("⏎")
+      var undoneRename = typing("renameField") ? undoSteps(harness.find(b, "renameField")) : "rename took no keys"
+      press("Esc")
+      harness.check("in a list's rename, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneRename === undoWanted && b.managingLists, undoneRename + " | managing " + b.managingLists)
       press("Delete")
       press("⏎")
       var gone = within(2000, function() { return service.lists.length === 1 && service.listName === "" })
       press("Esc")
       harness.check("by keys alone, Manage lists deletes a list, and All keeps its stock",
         managing && gone && service.symbols.indexOf("SHOP") >= 0, [managing, service.lists.length, service.listName, service.symbols.join(",")].join(" "))
+    }
+
+    // Undo as Omarchy's field undoes, in the focused field `f`: a paste is a
+    // step of its own, so Ctrl+Z after typing "ab" and pasting "cd" leaves
+    // "ab", and redo brings "ab" back first; a cut, or a paste over a
+    // selection, undone brings the text back selected, the cursor where it
+    // was; a run of Backspace is a step; typing straight after a selection
+    // is taken joins that step; each paste over a selection is one step; and
+    // an edit made after an undo is its own. Each case starts from a text
+    // set afresh, which starts the undo afresh. The clipboard holds what the
+    // stand-in owner gives (bin/wl-paste), for a field that reads it either
+    // way. Each step's text, cursor and selection, as `undoWanted` holds
+    // them.
+    readonly property string undoWanted: "abcd 4 4 4 | ab 2 2 2 |  0 0 0 | ab 2 2 2 | abcd 4 4 4 | msft 4 0 4 | abc def 4 4 7"
+      + " | abc 3 3 3 |  0 0 0 | tech 4 0 4 | aXYcd 4 3 4 | abcd 2 1 2 | abcd 2 1 2 | acd 1 1 1"
+    function undoSteps(f) {
+      var C = Qt.ControlModifier, S = Qt.ShiftModifier
+      var at = function() { return [f.text, f.cursorPosition, f.selectionStart, f.selectionEnd].join(" ") }
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var give = function(text) {
+        flag.command = ["sh", "-c", 'printf text > "$1/wl-paste.owner" && printf %s "$2" > "$1/wl-paste.text"', "sh", Quickshell.env("STONKS_FAKE_STATE"), text]
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+        Quickshell.clipboardText = text
+      }
+      var paste = function(text, then) {
+        give(text)
+        keyClick(Qt.Key_V, C)
+        within(2000, function() { return f.text === then })
+      }
+      var undo = function() { keyClick(Qt.Key_Z, C) }
+      var got = []
+      f.text = ""
+      type("ab")
+      paste("cd", "abcd")
+      got.push(at())
+      undo()
+      got.push(at())
+      undo()
+      got.push(at())
+      keyClick(Qt.Key_Z, C | S)
+      got.push(at())
+      keyClick(Qt.Key_Z, C | S)
+      got.push(at())
+      f.text = ""
+      type("msft")
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_X, C)
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abc def")
+      for (var i = 0; i < 3; i++) keyClick(Qt.Key_Left, S)
+      paste("XY", "abc XY")
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abc")
+      keyClick(Qt.Key_Backspace)
+      keyClick(Qt.Key_Backspace)
+      undo()
+      got.push(at())
+      undo()
+      got.push(at())
+      f.text = ""
+      type("tech")
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_Backspace)
+      type("zz")
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abcd")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Right, S)
+      paste("XY", "aXYcd")
+      keyClick(Qt.Key_Right, S)
+      paste("Z", "aXYZd")
+      undo()
+      got.push(at())
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abcd")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Right, S)
+      paste("XY", "aXYcd")
+      undo()
+      got.push(at())
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Delete)
+      type("XY")
+      undo()
+      got.push(at())
+      f.text = ""
+      return got.join(" | ")
+    }
+
+    // A text field's keys, as Omarchy's own field takes them, in a new
+    // list's name: each edits as it did there, and Tab, ↑, ↓ and Ctrl+Home
+    // type and move nothing. A paste by keys is read outside the shell's
+    // thread, through the stand-in wl-paste (bin/wl-paste): it lands where
+    // the cursor is, over the selection, up to 4096 bytes, and nothing comes
+    // of one past that, one that never stops or never answers, or one the
+    // reader has typed past; the field takes keys all the while.
+    function fields(s) {
+      base(s)
+      var b = s.body
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var state = Quickshell.env("STONKS_FAKE_STATE")
+      var owner = function(kind, text) {
+        flag.command = ["sh", "-c", 'printf %s "$2" > "$1/wl-paste.owner" && printf %s "$3" > "$1/wl-paste.text"', "sh", state, kind, text || ""]
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+      }
+      var asked = function() { return harness.logged("wl-paste.calls").length }
+      press("w")
+      press("↓")
+      press("⏎")
+      var field = null
+      var naming = within(1500, function() { field = harness.find(b, "listNameField"); return !!field && field.activeFocus })
+      // The field holding "abc def", its cursor at the end.
+      var fresh = function() {
+        keyClick(Qt.Key_A, Qt.ControlModifier)
+        keyClick(Qt.Key_Backspace)
+        type("abc def")
+      }
+      var seen = function() { return [field.text, field.cursorPosition, field.selectionStart, field.selectionEnd, field.activeFocus].join(" ") }
+      var C = Qt.ControlModifier, S = Qt.ShiftModifier
+      var edits = [
+        [[[Qt.Key_Left]], "abc def 6 6 6 true"],
+        [[[Qt.Key_Home], [Qt.Key_Right]], "abc def 1 1 1 true"],
+        [[[Qt.Key_Left, S]], "abc def 6 6 7 true"],
+        [[[Qt.Key_Home, S]], "abc def 0 0 7 true"],
+        [[[Qt.Key_Home], [Qt.Key_End, S]], "abc def 7 0 7 true"],
+        [[[Qt.Key_Left, C]], "abc def 4 4 4 true"],
+        [[[Qt.Key_Home], [Qt.Key_Right, C]], "abc def 4 4 4 true"],
+        [[[Qt.Key_A, C]], "abc def 7 0 7 true"],
+        [[[Qt.Key_A, C], [Qt.Key_X]], "x 1 1 1 true"],
+        [[[Qt.Key_Backspace]], "abc de 6 6 6 true"],
+        [[[Qt.Key_Home], [Qt.Key_Delete]], "bc def 0 0 0 true"],
+        [[[Qt.Key_Backspace, C]], "abc  4 4 4 true"],
+        [[[Qt.Key_Home], [Qt.Key_Delete, C]], "def 0 0 0 true"],
+        [[[Qt.Key_Home], [Qt.Key_X, C]], "bc def 0 0 0 true"],
+        [[[Qt.Key_A, C], [Qt.Key_X, C]], " 0 0 0 true"],
+        [[[Qt.Key_Tab]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Backtab, S]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Up]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Home], [Qt.Key_Down]], "abc def 0 0 0 true"],
+        [[[Qt.Key_Home], [Qt.Key_Down, S]], "abc def 0 0 0 true"],
+        [[[Qt.Key_Home, C]], "abc def 7 7 7 true"]
+      ]
+      var wrong = edits.filter(function(edit) {
+        fresh()
+        edit[0].forEach(function(k) { if (k[0] === Qt.Key_X && !k[1]) keyClick("x"); else keyClick(k[0], k[1] || Qt.NoModifier) })
+        return seen() !== edit[1]
+      }).map(function(edit) { return JSON.stringify(edit[0]) + " gave " + seen() })
+      fresh()
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_C, C)
+      var copied = Quickshell.clipboardText === "abc def" && field.text === "abc def"
+      harness.check("by keys alone, a text field edits as Omarchy's own: moves, selections, deletes, cut and copy, and Tab, ↑ and ↓ type nothing",
+        naming && wrong.length === 0 && copied, [naming, copied].concat(wrong).join(" | "))
+
+      // Ctrl+V over a selection, and Shift+Insert at the start.
+      fresh()
+      owner("text", "MSFT")
+      for (var i = 0; i < 3; i++) keyClick(Qt.Key_Left, S)
+      keyClick(Qt.Key_V, C)
+      var over = within(2000, function() { return seen() === "abc MSFT 8 8 8 true" })
+      fresh()
+      owner("text", "NVDA")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Insert, S)
+      var atStart = within(2000, function() { return seen() === "NVDAabc def 4 4 4 true" })
+      harness.check("Ctrl+V pastes over the selection and Shift+Insert at the cursor",
+        over && atStart, [over, atStart, seen()].join(" | "))
+
+      var undoneName = undoSteps(field)
+      harness.check("in a new list's name, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneName === undoWanted, undoneName)
+      fresh()
+
+      // 4096 bytes land; one more, and nothing does.
+      var full = new Array(4097).join("x")
+      fresh()
+      owner("text", full)
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_V, C)
+      var whole = within(2000, function() { return field.text === full })
+      fresh()
+      owner("text", full + "x")
+      var before = asked()
+      keyClick(Qt.Key_V, C)
+      var read = within(2000, function() { return asked() === before + 1 })
+      var refused = read && !within(500, function() { return field.text !== "abc def" })
+      harness.check("a paste of 4096 bytes lands, and one of 4097 is read and refused",
+        whole && refused, [whole, read, field.text.length].join(" | "))
+
+      // Owners that never stop and never answer: the field types on, and
+      // neither lands. One that answers late lands, unless typed past.
+      var holds = function(kind, ms) {
+        fresh()
+        owner(kind, "LATE")
+        keyClick(Qt.Key_V, C)
+        keyClick("z")
+        var typed = within(300, function() { return field.text === "abc defz" })
+        var kept = typed && !within(ms, function() { return field.text !== "abc defz" })
+        return kept ? "" : kind + ": " + field.text.slice(0, 40)
+      }
+      var held = [holds("endless", 1200), holds("silent", 2600), holds("late", 1600)].filter(function(s) { return s !== "" })
+      fresh()
+      owner("late", "LATE")
+      keyClick(Qt.Key_V, C)
+      var late = within(2500, function() { return field.text === "abc defLATE" })
+      owner("none")
+      harness.check("a paste whose owner never stops or never answers keeps nothing from the field's keys and lands nothing, and a late one lands unless typed past",
+        held.length === 0 && late, held.concat([late]).join(" | "))
+      press("Esc")
     }
 
     function test_keys() {
@@ -495,6 +739,7 @@ Harness {
       harness.check("in the window, after Tab a key still does its action",
         within(1500, function() { return service.order === "symbol" }), service.order)
       flows(harness.window)
+      fields(harness.window)
       app.close()
       harness.finish()
     }

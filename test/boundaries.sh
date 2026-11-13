@@ -40,17 +40,21 @@ none() {
 # External commands run only in the feeds' one runner, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the bell's
 # omarchy-shell and pw-dump, the silence's pw-cat, the camera's screenshot
-# hand-off, and the sh and chmod that keep Stonks' files its owner's
-# (OwnerOnly). Files are read and written only by the service and its lists
-# file, the version watch (the manifest), the trend colours (the theme's
-# colours), the sounds (their own), OwnerOnly (the cache), and the camera,
-# which writes its screenshot and reads Omasnap's settings.
-only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
+# hand-off, the text field's paste, the file reader's dd, and the sh and
+# chmod that keep Stonks' files its owner's (OwnerOnly). Files are read and
+# written only by the service and its lists file, the version watch (the
+# manifest), the trend colours (the theme's colours), the sounds (their
+# own), OwnerOnly (the cache), and the camera, which writes its screenshot
+# and reads Omasnap's settings.
+only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml Field.qml FileRead.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
-# sends a notification.
-only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
+# sends a notification; only the text field reads the clipboard, by its
+# bounded paste, and puts a selection in the primary selection; only the
+# file reader reads a file by a command.
+only 'grabToImage|saveToFile|wl-copy|omarchy-notification-send|notify-send' Camera.qml
+only 'wl-paste|Commands\.(pastedText|primaryCopy)' Field.qml
 # A command started by exec is a sound's, and only there; it is pw-play
 # under its time limit, and nothing else. A chime's pw-play has its own 2 s,
 # so a stalled PipeWire piles none up. Only the sounds ask PipeWire
@@ -59,12 +63,16 @@ only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-s
 only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' Sounds.qml
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
-# Every command the camera and the file keeper run is under `timeout`, and
-# so is the sounds' survey: those written there, and those in Commands.js.
-none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-for made in screenshotName createPrivately soundSurvey; do
-  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", " Commands.js || fail "Commands.js: $made does not start with timeout"
+# Every finite command runs under `timeout` with a kill after it: those the
+# camera, the file keeper and the sounds write out, and those Commands.js
+# and Fetch.js make. The chimes' one shell runs while sounds are on, each
+# chime under its own; the update's are a terminal and a restart, started
+# apart from the shell.
+none 'command:\s*\[(?!"timeout", "-k", "1",)' Camera.qml OwnerOnly.qml Sounds.qml
+for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved silenceStream; do
+  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", \"-k\", \"1\", " Commands.js || fail "Commands.js: $made does not start with timeout -k 1"
 done
+rg -qUP 'function curlCommand\([^)]*\) \{\n  return \["timeout", "-k", "1", ' Fetch.js || fail "Fetch.js: curlCommand does not start with timeout -k 1"
 # Hyprland's dispatcher can start a program too: only the plugin's entry
 # reaches Hyprland, to hand it on, and the one dispatch is the window
 # host's, which focuses the window.
@@ -84,6 +92,41 @@ sites=$(awk '/^\*\*Sites\*\*/,/^\*\*Files/' README.md | rg -o '^- `([^`]+)`' -r 
 while read -r host; do
   [ -z "$host" ] || grep -qxF -- "$host" <<< "$sites" || fail "$host: a site the README's \"What it runs\" doesn't name"
 done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
+# The programs Stonks runs, and the README's "Commands" names them all and
+# no others. A program the code starts must be here: at a command's head,
+# after its `timeout`, or at a command's place in a shell script it hands
+# `sh -c`, `bash -c` or Omarchy's terminal. Each here must be in the code
+# and the README, and each the README names must be here.
+programs="curl timeout sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
+  omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
+programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
+named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)
+# A script's words at a command's place: its string pieces joined, each
+# script on its own line, then split where a command can start. The shell's
+# own words are no programs.
+scripted() {
+  rg -U -o --no-filename -P '(?m)(?:"-c"|"presentation"),[\s\S]*?(?:,\s*"(?:ba)?sh"\s*,|"\s*\]\s*$)' -- *.qml *.js \
+    | sed -E 's/^("-c"|"presentation"),/"\\n",/' \
+    | rg -o -P '"(?:\\.|[^"\\])*"' | sed -E 's/^"//; s/"$//' | tr '\n' ' ' \
+    | sed -E 's/\$\{[^}]*\}//g; s/\$\(\(([^)]*)\)\)//g; s/\\n/\n/g; s/\\"/"/g; s/\$\(/\n/g; s/(&&|\|\||[;|{(!`])/\n/g; s/\b(then|do|else|exec)\b/\n/g' \
+    | sed -E 's/^[[:space:]]+//; s/^timeout( +-[a-z-]+( +[0-9]+)?)* +[0-9.]+ +//' \
+    | rg -o -P '^[a-z][a-z0-9-]*(?![=a-z0-9-])' \
+    | rg -vx 'case|cd|command|continue|done|echo|esac|exit|false|fi|for|if|printf|read|return|set|test|true|umask|while'
+}
+started=$( { rg -o --no-filename -P '(?:command:\s*|return\s+|\.exec\s*\()\["([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  rg -o --no-filename -P '"timeout", (?:"-[a-z-]+", (?:"\d+", )?)?"[0-9.]+"\s*\)?,\s*"([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  rg -o --no-filename -P '"timeout", "-k", "1", String\([^)]*\)\)?, "([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  scripted; } | sort -u)
+while read -r program; do
+  [ -z "$program" ] || grep -qxF -- "$program" <<< "$programs" || fail "$program: a program the code starts that boundaries.sh's list doesn't name"
+done <<< "$started"
+while read -r program; do
+  grep -qxF -- "$program" <<< "$named" || fail "$program: a program Stonks runs that the README's \"Commands\" doesn't name"
+  rg -qw -- "$program" *.qml *.js || fail "$program: a program the README names that no code runs"
+done <<< "$programs"
+while read -r program; do
+  [ -z "$program" ] || grep -qxF -- "$program" <<< "$programs" || fail "$program: a program the README's \"Commands\" names that Stonks doesn't run"
+done <<< "$named"
 # Every request goes through Fetch.curlCommand, which compresses and caps
 # it.
 while read -r hit; do

@@ -85,6 +85,19 @@ function readListsFile(text) {
   }
 }
 
+// How many bytes `text` takes in the file, as UTF-8.
+function fileBytes(text) {
+  var bytes = 0
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charCodeAt(i)
+    if (c < 0x80) bytes += 1
+    else if (c < 0x800) bytes += 2
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < text.length) { bytes += 4; i++ }
+    else bytes += 3
+  }
+  return bytes
+}
+
 // `symbols`, `order` and `reversed` are All's, as version 1 wrote them; a
 // named list is a subset of All.
 function fileSettings(src) {
