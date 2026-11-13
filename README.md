@@ -344,7 +344,11 @@ empty.
 - `curl` for every request, with a time limit and a size cap.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln` and `rm`, to make its files and
   keep them readable only by you.
-- `timeout`, to stop its file, sound and screenshot commands if they hang.
+- `timeout`, to stop its file, sound, screenshot and paste commands if
+  they hang.
+- When you paste into search or a list's name: `sh` with `wl-paste` and
+  `head`, to read what you copied. A paste over 4 KB, or one that takes
+  over 2 seconds, pastes nothing.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
   you move along the chart, so each chime plays at once; as the bell is
   due, `bash` with `omarchy-shell notifications isDnd` and `pw-dump`, to

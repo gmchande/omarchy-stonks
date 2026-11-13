@@ -134,3 +134,18 @@ function updateAndRestart(pluginId) {
     + " omarchy plugin update " + pluginId + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
     + " && echo 'Restarting the shell…' && omarchy restart shell"]
 }
+
+// A paste's (`Field`): the clipboard's text, or the primary selection's, as
+// a middle-click pastes it, cut a byte past `cap`, so an answer over the cap
+// shows itself. An owner that never answers, or never stops, has 2 s.
+function pastedText(primary, cap) {
+  return ["timeout", "-k", "1", "2", "sh", "-c", "set -o pipefail; wl-paste " + (primary ? "--primary " : "")
+    + "--no-newline --type text | head -c " + (cap + 1)]
+}
+
+// The text a paste puts in, or null for an answer over `cap` bytes, or one
+// that failed. A field is one line, so each line break is a space.
+function readPastedText(code, bytes, text, cap) {
+  if (code !== 0 || bytes > cap) return null
+  return String(text).replace(/\r\n|[\r\n\u2028\u2029]/g, " ")
+}

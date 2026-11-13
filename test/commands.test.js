@@ -154,6 +154,49 @@ esac
   expect(update(true)).toEqual(["plugin update grvc.stonks", "restart shell"])
 }))
 
+// The clipboard's owner is the stand-in wl-paste beside the stand-in curl
+// (test/qml/bin/wl-paste), as the walks have it.
+test("a paste takes the clipboard's text up to 4096 bytes, and nothing from one past it, from one that never stops, or from one that never answers", () => scratch(dir => {
+  const state = join(dir, "state")
+  mkdirSync(state)
+  const env = { PATH: join(root, "test/qml/bin") + ":" + process.env.PATH, STONKS_FAKE_STATE: state }
+  const owner = (kind, text, file = "wl-paste.text") => {
+    writeFileSync(join(state, "wl-paste.owner"), kind)
+    if (text !== undefined) writeFileSync(join(state, file), text)
+  }
+  const paste = primary => {
+    const began = Date.now()
+    const r = Bun.spawnSync(C.pastedText(primary, 4096), { env, stdout: "pipe", stderr: "pipe" })
+    return { text: C.readPastedText(r.exitCode, r.stdout.length, r.stdout.toString(), 4096), ms: Date.now() - began }
+  }
+  // 4096 bytes of a two-byte character: the cap is counted in bytes.
+  const whole = "é".repeat(2048)
+  owner("text", whole)
+  expect(paste(false).text).toBe(whole)
+  owner("text", whole + "x")
+  expect(paste(false).text).toBe(null)
+  // A field is one line.
+  owner("text", "AAPL\nMSFT\r\nNVDA")
+  expect(paste(false).text).toBe("AAPL MSFT NVDA")
+  // The middle button's is the primary selection.
+  owner("text", "TSLA", "wl-paste.primary")
+  expect(paste(true).text).toBe("TSLA")
+  owner("none")
+  expect(paste(false).text).toBe(null)
+  // One that never stops is cut at once.
+  owner("endless")
+  const endless = paste(false)
+  expect(endless.text).toBe(null)
+  expect(endless.ms).toBeLessThan(1000)
+  // One that never answers is stopped at 2 s, and gone.
+  owner("silent")
+  const silent = paste(false)
+  expect(silent.text).toBe(null)
+  expect(silent.ms).toBeGreaterThanOrEqual(1900)
+  expect(silent.ms).toBeLessThan(3500)
+  expect(existsSync("/proc/" + readFileSync(join(state, "wl-paste.pid"), "utf8").trim())).toBe(false)
+}))
+
 // ---------------------------------------------------------------- waking the sound output
 
 const W = load("Waking.js")

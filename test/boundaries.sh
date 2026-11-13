@@ -40,17 +40,20 @@ none() {
 # External commands run only in the feeds' one runner, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the bell's
 # omarchy-shell and pw-dump, the silence's pw-cat, the camera's screenshot
-# hand-off, and the sh and chmod that keep Stonks' files its owner's
-# (OwnerOnly). Files are read and written only by the service and its lists
-# file, the version watch (the manifest), the trend colours (the theme's
-# colours), the sounds (their own), OwnerOnly (the cache), and the camera,
-# which writes its screenshot and reads Omasnap's settings.
-only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
+# hand-off, the text field's paste, and the sh and chmod that keep Stonks'
+# files its owner's (OwnerOnly). Files are read and written only by the
+# service and its lists file, the version watch (the manifest), the trend
+# colours (the theme's colours), the sounds (their own), OwnerOnly (the
+# cache), and the camera, which writes its screenshot and reads Omasnap's
+# settings.
+only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml Field.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
-# sends a notification.
-only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
+# sends a notification; only the text field reads the clipboard, by its
+# bounded paste.
+only 'grabToImage|saveToFile|wl-copy|omarchy-notification-send|notify-send' Camera.qml
+only 'wl-paste|Commands\.pastedText' Field.qml
 # A command started by exec is a sound's, and only there; it is pw-play
 # under its time limit, and nothing else. A chime's pw-play has its own 2 s,
 # so a stalled PipeWire piles none up. Only the sounds ask PipeWire
@@ -60,9 +63,10 @@ only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' So
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
 # Every command the camera and the file keeper run is under `timeout`, and
-# so is the sounds' survey: those written there, and those in Commands.js.
+# so are the sounds' survey and the text field's paste: those written there,
+# and those in Commands.js.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-for made in screenshotName createPrivately soundSurvey; do
+for made in screenshotName createPrivately soundSurvey pastedText; do
   rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", " Commands.js || fail "Commands.js: $made does not start with timeout"
 done
 # Hyprland's dispatcher can start a program too: only the plugin's entry

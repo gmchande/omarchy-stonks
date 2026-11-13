@@ -459,6 +459,125 @@ Harness {
         managing && gone && service.symbols.indexOf("SHOP") >= 0, [managing, service.lists.length, service.listName, service.symbols.join(",")].join(" "))
     }
 
+    // A text field's keys, as Omarchy's own field takes them, in a new
+    // list's name: each edits as it did there, and Tab, ↑, ↓ and Ctrl+Home
+    // type and move nothing. A paste by keys is read outside the shell's
+    // thread, through the stand-in wl-paste (bin/wl-paste): it lands where
+    // the cursor is, over the selection, up to 4096 bytes, and nothing comes
+    // of one past that, one that never stops or never answers, or one the
+    // reader has typed past; the field takes keys all the while.
+    function fields(s) {
+      base(s)
+      var b = s.body
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var state = Quickshell.env("STONKS_FAKE_STATE")
+      var owner = function(kind, text) {
+        flag.command = ["sh", "-c", 'printf %s "$2" > "$1/wl-paste.owner" && printf %s "$3" > "$1/wl-paste.text"', "sh", state, kind, text || ""]
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+      }
+      var asked = function() { return harness.logged("wl-paste.calls").length }
+      press("w")
+      press("↓")
+      press("⏎")
+      var field = null
+      var naming = within(1500, function() { field = harness.find(b, "listNameField"); return !!field && field.activeFocus })
+      // The field holding "abc def", its cursor at the end.
+      var fresh = function() {
+        keyClick(Qt.Key_A, Qt.ControlModifier)
+        keyClick(Qt.Key_Backspace)
+        type("abc def")
+      }
+      var seen = function() { return [field.text, field.cursorPosition, field.selectionStart, field.selectionEnd, field.activeFocus].join(" ") }
+      var C = Qt.ControlModifier, S = Qt.ShiftModifier
+      var edits = [
+        [[[Qt.Key_Left]], "abc def 6 6 6 true"],
+        [[[Qt.Key_Home], [Qt.Key_Right]], "abc def 1 1 1 true"],
+        [[[Qt.Key_Left, S]], "abc def 6 6 7 true"],
+        [[[Qt.Key_Home, S]], "abc def 0 0 7 true"],
+        [[[Qt.Key_Home], [Qt.Key_End, S]], "abc def 7 0 7 true"],
+        [[[Qt.Key_Left, C]], "abc def 4 4 4 true"],
+        [[[Qt.Key_Home], [Qt.Key_Right, C]], "abc def 4 4 4 true"],
+        [[[Qt.Key_A, C]], "abc def 7 0 7 true"],
+        [[[Qt.Key_A, C], [Qt.Key_X]], "x 1 1 1 true"],
+        [[[Qt.Key_Backspace]], "abc de 6 6 6 true"],
+        [[[Qt.Key_Home], [Qt.Key_Delete]], "bc def 0 0 0 true"],
+        [[[Qt.Key_Backspace, C]], "abc  4 4 4 true"],
+        [[[Qt.Key_Home], [Qt.Key_Delete, C]], "def 0 0 0 true"],
+        [[[Qt.Key_Home], [Qt.Key_X, C]], "bc def 0 0 0 true"],
+        [[[Qt.Key_A, C], [Qt.Key_X, C]], " 0 0 0 true"],
+        [[[Qt.Key_Tab]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Backtab, S]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Up]], "abc def 7 7 7 true"],
+        [[[Qt.Key_Home], [Qt.Key_Down]], "abc def 0 0 0 true"],
+        [[[Qt.Key_Home], [Qt.Key_Down, S]], "abc def 0 0 0 true"],
+        [[[Qt.Key_Home, C]], "abc def 7 7 7 true"]
+      ]
+      var wrong = edits.filter(function(edit) {
+        fresh()
+        edit[0].forEach(function(k) { if (k[0] === Qt.Key_X && !k[1]) keyClick("x"); else keyClick(k[0], k[1] || Qt.NoModifier) })
+        return seen() !== edit[1]
+      }).map(function(edit) { return JSON.stringify(edit[0]) + " gave " + seen() })
+      fresh()
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_C, C)
+      var copied = Quickshell.clipboardText === "abc def" && field.text === "abc def"
+      harness.check("by keys alone, a text field edits as Omarchy's own: moves, selections, deletes, cut and copy, and Tab, ↑ and ↓ type nothing",
+        naming && wrong.length === 0 && copied, [naming, copied].concat(wrong).join(" | "))
+
+      // Ctrl+V over a selection, and Shift+Insert at the start.
+      fresh()
+      owner("text", "MSFT")
+      for (var i = 0; i < 3; i++) keyClick(Qt.Key_Left, S)
+      keyClick(Qt.Key_V, C)
+      var over = within(2000, function() { return seen() === "abc MSFT 8 8 8 true" })
+      fresh()
+      owner("text", "NVDA")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Insert, S)
+      var atStart = within(2000, function() { return seen() === "NVDAabc def 4 4 4 true" })
+      harness.check("Ctrl+V pastes over the selection and Shift+Insert at the cursor",
+        over && atStart, [over, atStart, seen()].join(" | "))
+
+      // 4096 bytes land; one more, and nothing does.
+      var full = new Array(4097).join("x")
+      fresh()
+      owner("text", full)
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_V, C)
+      var whole = within(2000, function() { return field.text === full })
+      fresh()
+      owner("text", full + "x")
+      var before = asked()
+      keyClick(Qt.Key_V, C)
+      var read = within(2000, function() { return asked() === before + 1 })
+      wait(500)
+      var refused = read && field.text === "abc def"
+      harness.check("a paste of 4096 bytes lands, and one of 4097 is read and refused",
+        whole && refused, [whole, read, field.text.length].join(" | "))
+
+      // Owners that never stop and never answer: the field types on, and
+      // neither lands. One that answers late lands, unless typed past.
+      var holds = function(kind, ms) {
+        fresh()
+        owner(kind, "LATE")
+        keyClick(Qt.Key_V, C)
+        keyClick("z")
+        var typed = within(300, function() { return field.text === "abc defz" })
+        wait(ms)
+        return typed && field.text === "abc defz" ? "" : kind + ": " + field.text.slice(0, 40)
+      }
+      var held = [holds("endless", 1200), holds("silent", 2600), holds("late", 1600)].filter(function(s) { return s !== "" })
+      fresh()
+      owner("late", "LATE")
+      keyClick(Qt.Key_V, C)
+      var late = within(2500, function() { return field.text === "abc defLATE" })
+      owner("none")
+      harness.check("a paste whose owner never stops or never answers keeps nothing from the field's keys and lands nothing, and a late one lands unless typed past",
+        held.length === 0 && late, held.concat([late]).join(" | "))
+      press("Esc")
+    }
+
     function test_keys() {
       // Ten rows to move through.
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
@@ -495,6 +614,7 @@ Harness {
       harness.check("in the window, after Tab a key still does its action",
         within(1500, function() { return service.order === "symbol" }), service.order)
       flows(harness.window)
+      fields(harness.window)
       app.close()
       harness.finish()
     }
