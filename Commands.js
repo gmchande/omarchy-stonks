@@ -317,3 +317,10 @@ function readPastedText(code, bytes, text, cap) {
   if (code !== 0 || bytes > cap) return null
   return String(text).replace(/\r\n|[\r\n\u2028\u2029]/g, " ")
 }
+
+// Text selected with the pointer, put in the primary selection for a
+// middle-click elsewhere, as a TextField puts it (`Field`). The text comes
+// on wl-copy's input; wl-copy stays to hand it out, as it does for a copy.
+function primaryCopy() {
+  return ["timeout", "-k", "1", "5", "wl-copy", "--primary"]
+}

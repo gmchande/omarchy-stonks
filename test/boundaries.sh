@@ -51,10 +51,10 @@ only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml Own
 only '\bSettings\s*\{|^import QtCore' Camera.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification; only the text field reads the clipboard, by its
-# bounded paste; only the file reader reads a file by a command.
+# bounded paste, and puts a selection in the primary selection; only the
+# file reader reads a file by a command.
 only 'grabToImage|saveToFile|wl-copy|omarchy-notification-send|notify-send' Camera.qml
-only 'wl-paste|Commands\.pastedText' Field.qml
-only 'Commands\.readSaved\b' FileRead.qml
+only 'wl-paste|Commands\.(pastedText|primaryCopy)' Field.qml
 # A command started by exec is a sound's, and only there; it is pw-play
 # under its time limit, and nothing else. A chime's pw-play has its own 2 s,
 # so a stalled PipeWire piles none up. Only the sounds ask PipeWire
@@ -69,7 +69,7 @@ none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
 # chime under its own; the update's are a terminal and a restart, started
 # apart from the shell.
 none 'command:\s*\[(?!"timeout", "-k", "1",)' Camera.qml OwnerOnly.qml Sounds.qml
-for made in screenshotName createPrivately soundSurvey bellCheck pastedText readSaved; do
+for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved; do
   rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", \"-k\", \"1\", " Commands.js || fail "Commands.js: $made does not start with timeout -k 1"
 done
 rg -qUP 'function curlCommand\([^)]*\) \{\n  return \["timeout", "-k", "1", ' Fetch.js || fail "Fetch.js: curlCommand does not start with timeout -k 1"

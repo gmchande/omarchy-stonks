@@ -109,8 +109,10 @@ FocusScope {
       property bool pasteOwed: false
       // As Qt's on Wayland, where the shell runs, and in the walks too.
       popupType: Popup.Item
+      onAboutToShow: pasteOwed = false
+      // Not if the field went from sight or lost the keys meanwhile.
       onClosed: {
-        if (pasteOwed) root.pasteFrom(false)
+        if (pasteOwed && root.visible && root.activeFocus) root.pasteFrom(false)
         pasteOwed = false
       }
       Action {
@@ -241,6 +243,7 @@ FocusScope {
     onCursorPositionChanged: root.edited()
     onSelectionStartChanged: root.edited()
     onSelectionEndChanged: root.edited()
+    onPreeditTextChanged: root.edited()
   }
 
   function aligned(left, top, right, bottom) {
@@ -345,7 +348,10 @@ FocusScope {
     }
     onReleased: function(mouse) {
       selecting = false
-      if (mouse.button !== Qt.MiddleButton) return
+      if (mouse.button === Qt.LeftButton) {
+        if (area.selectedText !== "") root.copyPrimary(area.selectedText)
+        return
+      }
       area.deselect()
       root.pasteFrom(true)
     }
@@ -358,7 +364,7 @@ FocusScope {
   property int pasteAsked: 0
   property int pasteCode: -1
   function pasteFrom(primary) {
-    if (pasting.running) return
+    if (pasting.running || !root.visible) return
     pastePrimary = primary
     pasteAsked = edits
     pasteCode = -1
@@ -384,6 +390,24 @@ FocusScope {
       if (text === null) return
       area.remove(area.selectionStart, area.selectionEnd)
       area.insert(area.cursorPosition, text)
+    }
+  }
+
+  // Text selected with the pointer goes to the primary selection, as a
+  // TextField puts it there on the button's release (`Commands.primaryCopy`).
+  function copyPrimary(text) {
+    if (primaryCopy.running) primaryCopy.running = false
+    primaryCopy.text = text
+    primaryCopy.stdinEnabled = true
+    primaryCopy.running = true
+  }
+  Process {
+    id: primaryCopy
+    property string text: ""
+    command: Commands.primaryCopy()
+    onStarted: {
+      write(text)
+      stdinEnabled = false
     }
   }
 }

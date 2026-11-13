@@ -228,13 +228,22 @@ Harness {
       mouseMove(field, (a.x + z.x) / 2, a.y)
       mouseMove(field, z.x, z.y)
       mouseRelease(field, z.x, z.y)
+      // What a pointer selection put in the primary selection, through the
+      // stand-in wl-copy (bin/wl-copy): the arguments of its last call and
+      // what it was given.
+      var primary = function() {
+        var calls = harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/wl-copy.calls").split("\n").filter(function(l) { return l !== "" })
+        return calls.length ? calls[calls.length - 1] + ":" + harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/wl-copy." + calls.length) : ""
+      }
       var dragged = seen()
+      var draggedPrimary = within(2000, function() { return primary() === "--primary:bc d" })
       p = place(5)
       mouseDoubleClickSequence(field, p.x, p.y)
       var word = seen()
-      harness.check("in a text field a click puts the cursor where it lands, in its paddings too, a drag selects, and a double-click takes a word",
-        clicked === "abc def 2 2 2" && padded === "abc def 5 5 5" && dragged === "abc def 5 1 5" && word === "abc def 7 4 7",
-        [clicked, padded, dragged, word].join(" | "))
+      var wordPrimary = within(2000, function() { return primary() === "--primary:def" })
+      harness.check("in a text field a click puts the cursor where it lands, in its paddings too, a drag selects, a double-click takes a word, and each selection is the primary selection",
+        clicked === "abc def 2 2 2" && padded === "abc def 5 5 5" && dragged === "abc def 5 1 5" && word === "abc def 7 4 7" && draggedPrimary && wordPrimary,
+        [clicked, padded, dragged, word, draggedPrimary, wordPrimary, primary()].join(" | "))
 
       var state = Quickshell.env("STONKS_FAKE_STATE")
       owning.command = ["sh", "-c", 'printf text > "$1/wl-paste.owner" && printf MSFT > "$1/wl-paste.text" && printf TSLA > "$1/wl-paste.primary"', "sh", state]
