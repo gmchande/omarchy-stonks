@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release", "Undo"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -615,6 +615,36 @@ const library = (extra = {}) => M.fileSettings({
     { name: "Growth", symbols: ["BO", "IRIS"], order: "name" }
   ],
   ...extra
+})
+
+// Each edit in a text field, from the text, selection and cursor before it
+// and the cursor after, and the undo steps they make, as Omarchy's own
+// field makes them.
+test("a text field's edits fall into undo steps as in Omarchy's own field", () => {
+  const steps = edits => {
+    let run = "", count = 0
+    for (const [old, now, start, end, cursor, after, moved] of edits) {
+      if (moved) run = ""
+      const kind = M.editKind(old, now, start, end, cursor, after)
+      if (!M.joins(kind, run)) count++
+      run = M.runAfter(kind)
+    }
+    return count
+  }
+  expect(M.editKind("ab", "abc", 2, 2, 2, 3)).toBe("insert")
+  expect(M.editKind("ad", "abcd", 1, 1, 1, 3)).toBe("insert")
+  expect(M.editKind("abc", "ac", 2, 2, 2, 1)).toBe("back")
+  expect(M.editKind("abc", "ac", 1, 1, 1, 1)).toBe("del")
+  expect(M.editKind("aa", "a", 1, 1, 1, 1)).toBe("del")
+  expect(M.editKind("aa", "a", 1, 1, 1, 0)).toBe("back")
+  expect(M.editKind("abc def", "abc ", 7, 7, 7, 4)).toBe("other")
+  expect(M.editKind("abcd", "aXd", 1, 3, 3, 2)).toBe("selection")
+  // Typing, then Backspace: two steps; typing on after moving: a third.
+  expect(steps([["", "a", 0, 0, 0, 1], ["a", "ab", 1, 1, 1, 2], ["ab", "a", 2, 2, 2, 1], ["a", "ax", 1, 1, 1, 2, true]])).toBe(3)
+  // A selection taken, then typing and Backspace: the typing joins it.
+  expect(steps([["tech", "", 0, 4, 4, 0], ["", "z", 0, 0, 0, 1], ["z", "zz", 1, 1, 1, 2], ["zz", "z", 2, 2, 2, 1]])).toBe(2)
+  // A word taken by Ctrl+Backspace, then typing: one step.
+  expect(steps([["abc def", "abc ", 7, 7, 7, 4], ["abc ", "abc x", 4, 4, 4, 5]])).toBe(1)
 })
 
 test("the data file reads as written and repairs hand edits", () => {

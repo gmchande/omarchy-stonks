@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Commands.js" as Commands
+import "Undo.js" as Undo
 // The shell's text field (Ui/TextField), drawn and worked as it is, with
 // Stonks' dim placeholder: the shell's Qt.darker(foreground) is as dark as
 // typed text on a light theme.
@@ -42,11 +43,15 @@ FocusScope {
   property string text: ""
   onTextChanged: {
     if (area.text === text) return
+    undoing = true
     area.text = text
     area.cursorPosition = area.length
+    undoing = false
     // A text set here starts the undo afresh, as Qt's does.
-    removals = []
-    pastedOver = null
+    undone = []
+    redone = []
+    run = ""
+    shadow = snapshot()
   }
   property alias placeholderText: area.placeholderText
   property alias font: area.font
@@ -126,7 +131,7 @@ FocusScope {
         icon.name: "edit-undo"
         icon.width: 24
         icon.height: 24
-        enabled: area.canUndo
+        enabled: root.undone.length > 0
         onTriggered: root.undo()
       }
       Action {
@@ -134,7 +139,7 @@ FocusScope {
         icon.name: "edit-redo"
         icon.width: 24
         icon.height: 24
-        enabled: area.canRedo
+        enabled: root.redone.length > 0
         onTriggered: root.redo()
       }
       MenuSeparator {}
@@ -394,80 +399,77 @@ FocusScope {
       if (running || root.pasteAsked !== root.edits) return
       var text = Commands.readPastedText(root.pasteCode, pasted.data.byteLength, pasted.text, root.pasteCap)
       if (text === null) return
-      // A paste is a step of its own, apart from the typing on either side,
-      // as a TextField's is: Qt's document joins edits only while it counts
-      // itself modified (QTextDocumentPrivate::appendUndoItem).
-      area.textDocument.modified = false
-      var over = area.selectedText !== ""
-      var before = root.live()
+      // A paste is a step of its own, as a TextField's is.
+      root.pasteStep = true
       area.remove(area.selectionStart, area.selectionEnd)
-      var mid = root.live()
       area.insert(area.cursorPosition, text)
-      area.textDocument.modified = false
-      root.pastedOver = over ? { before: before, mid: mid, after: root.live() } : null
+      root.pasteStep = false
+      root.run = ""
     }
   }
 
-  // A TextField's undo where a TextEdit's differs (QQuickTextInputPrivate's
-  // paste and internalUndo). A paste over a selection is one step, though
-  // Qt keeps its removal and its insert as two. And an undo that puts back
-  // text taken while selected, by a cut, a delete, a paste or typing over
-  // it, selects it again, with the cursor where it was: Qt's puts it back
-  // unselected (QTextDocument::undo). Each removal of a selection is noted
-  // as it happens, from the text and selection just before it; the last 32
-  // are kept.
-  property string shadowText: ""
-  property int shadowStart: 0
-  property int shadowEnd: 0
-  property int shadowCursor: 0
-  property var removals: []
-  property var pastedOver: null
+  // The undo, Omarchy's field's and not Qt's TextEdit's, which joins a paste
+  // to the typing before it, keeps a paste over a selection as two steps,
+  // and puts back what a selection lost unselected (`Undo`). Each step keeps
+  // the field as it was before it: its text, cursor and selection, up to
+  // the last 100; what undo leaves, redo brings back.
+  property var undone: []
+  property var redone: []
+  // The run an edit may join, "" once something ended it (`Undo.joins`).
+  property string run: ""
+  property bool pasteStep: false
   property bool undoing: false
+  // The field as it was after the last edit, cursor move or selection.
+  property var shadow: ({ text: "", start: 0, end: 0, cursor: 0 })
   // The document's text now: `text` is cached, and a selection's signals
   // during an edit come before it catches up.
   function live() { return area.getText(0, area.length) }
+  function snapshot() {
+    return { text: live(), start: area.selectionStart, end: area.selectionEnd, cursor: area.cursorPosition }
+  }
+  // A move of the cursor or the selection ends the run.
   function noteSelection() {
-    if (live() !== shadowText) return
-    shadowStart = area.selectionStart
-    shadowEnd = area.selectionEnd
-    shadowCursor = area.cursorPosition
+    var now = snapshot()
+    if (now.text !== shadow.text) return
+    if (now.start !== shadow.start || now.end !== shadow.end || now.cursor !== shadow.cursor) run = ""
+    shadow = now
   }
   function noteText() {
-    var old = shadowText, now = live()
-    var head = old.slice(0, shadowStart), tail = old.slice(shadowEnd)
-    if (!undoing && shadowEnd > shadowStart && now.length >= head.length + tail.length
-        && now.slice(0, head.length) === head && now.slice(now.length - tail.length) === tail) {
-      removals.push({ pos: shadowStart, text: old.slice(shadowStart, shadowEnd), before: old, cursorAtStart: shadowCursor === shadowStart })
-      if (removals.length > 32) removals.shift()
+    var now = snapshot()
+    if (!undoing) {
+      var kind = Undo.editKind(shadow.text, now.text, shadow.start, shadow.end, shadow.cursor, now.cursor)
+      if (pasteStep || !Undo.joins(kind, run)) {
+        undone = undone.concat([shadow]).slice(-100)
+        redone = []
+      }
+      // A paste's insert, after the selection it took, joins its step.
+      run = pasteStep ? "open" : Undo.runAfter(kind)
+      pasteStep = false
     }
-    shadowText = now
-    shadowStart = area.selectionStart
-    shadowEnd = area.selectionEnd
-    shadowCursor = area.cursorPosition
+    shadow = now
+  }
+  function restore(s) {
+    undoing = true
+    area.text = s.text
+    if (s.end > s.start) area.select(s.cursor === s.start ? s.end : s.start, s.cursor)
+    else area.cursorPosition = s.cursor
+    undoing = false
+    run = ""
+    shadow = snapshot()
   }
   function undo() {
-    if (!area.canUndo) return
-    var from = live()
-    undoing = true
-    area.undo()
-    if (pastedOver && from === pastedOver.after && live() === pastedOver.mid && area.canUndo) area.undo()
-    undoing = false
-    var back = live()
-    for (var i = removals.length - 1; i >= 0; i--) {
-      var r = removals[i]
-      if (r.before !== back || back.substr(r.pos, r.text.length) !== r.text) continue
-      if (r.cursorAtStart) area.select(r.pos + r.text.length, r.pos)
-      else area.select(r.pos, r.pos + r.text.length)
-      break
-    }
+    if (undone.length === 0) return
+    redone = redone.concat([snapshot()])
+    var s = undone[undone.length - 1]
+    undone = undone.slice(0, -1)
+    restore(s)
   }
   function redo() {
-    if (!area.canRedo) return
-    var from = live()
-    undoing = true
-    area.redo()
-    if (pastedOver && from === pastedOver.before && live() === pastedOver.mid && area.canRedo) area.redo()
-    undoing = false
+    if (redone.length === 0) return
+    undone = undone.concat([snapshot()]).slice(-100)
+    var s = redone[redone.length - 1]
+    redone = redone.slice(0, -1)
+    restore(s)
   }
 
   // Text selected with the pointer goes to the primary selection, as a

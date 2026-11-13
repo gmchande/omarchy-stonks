@@ -485,10 +485,15 @@ Harness {
     // step of its own, so Ctrl+Z after typing "ab" and pasting "cd" leaves
     // "ab", and redo brings "ab" back first; a cut, or a paste over a
     // selection, undone brings the text back selected, the cursor where it
-    // was. The clipboard holds what the stand-in owner gives
-    // (bin/wl-paste), for a field that reads it either way. Each step's
-    // text, cursor and selection, as `undoWanted` holds them.
+    // was; a run of Backspace is a step; typing straight after a selection
+    // is taken joins that step; each paste over a selection is one step; and
+    // an edit made after an undo is its own. Each case starts from a text
+    // set afresh, which starts the undo afresh. The clipboard holds what the
+    // stand-in owner gives (bin/wl-paste), for a field that reads it either
+    // way. Each step's text, cursor and selection, as `undoWanted` holds
+    // them.
     readonly property string undoWanted: "abcd 4 4 4 | ab 2 2 2 |  0 0 0 | ab 2 2 2 | abcd 4 4 4 | msft 4 0 4 | abc def 4 4 7"
+      + " | abc 3 3 3 |  0 0 0 | tech 4 0 4 | aXYcd 4 3 4 | abcd 2 1 2 | abcd 2 1 2 | acd 1 1 1"
     function undoSteps(f) {
       var C = Qt.ControlModifier, S = Qt.ShiftModifier
       var at = function() { return [f.text, f.cursorPosition, f.selectionStart, f.selectionEnd].join(" ") }
@@ -499,37 +504,79 @@ Harness {
         tryVerify(function() { return !flag.running }, 2000)
         Quickshell.clipboardText = text
       }
-      var clear = function() { keyClick(Qt.Key_A, C); keyClick(Qt.Key_Backspace) }
+      var paste = function(text, then) {
+        give(text)
+        keyClick(Qt.Key_V, C)
+        within(2000, function() { return f.text === then })
+      }
+      var undo = function() { keyClick(Qt.Key_Z, C) }
       var got = []
-      clear()
+      f.text = ""
       type("ab")
-      give("cd")
-      keyClick(Qt.Key_V, C)
-      within(2000, function() { return f.text === "abcd" })
+      paste("cd", "abcd")
       got.push(at())
-      keyClick(Qt.Key_Z, C)
+      undo()
       got.push(at())
-      keyClick(Qt.Key_Z, C)
+      undo()
       got.push(at())
       keyClick(Qt.Key_Z, C | S)
       got.push(at())
       keyClick(Qt.Key_Z, C | S)
       got.push(at())
-      clear()
+      f.text = ""
       type("msft")
       keyClick(Qt.Key_A, C)
       keyClick(Qt.Key_X, C)
-      keyClick(Qt.Key_Z, C)
+      undo()
       got.push(at())
-      clear()
+      f.text = ""
       type("abc def")
       for (var i = 0; i < 3; i++) keyClick(Qt.Key_Left, S)
-      give("XY")
-      keyClick(Qt.Key_V, C)
-      within(2000, function() { return f.text === "abc XY" })
-      keyClick(Qt.Key_Z, C)
+      paste("XY", "abc XY")
+      undo()
       got.push(at())
-      clear()
+      f.text = ""
+      type("abc")
+      keyClick(Qt.Key_Backspace)
+      keyClick(Qt.Key_Backspace)
+      undo()
+      got.push(at())
+      undo()
+      got.push(at())
+      f.text = ""
+      type("tech")
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_Backspace)
+      type("zz")
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abcd")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Right, S)
+      paste("XY", "aXYcd")
+      keyClick(Qt.Key_Right, S)
+      paste("Z", "aXYZd")
+      undo()
+      got.push(at())
+      undo()
+      got.push(at())
+      f.text = ""
+      type("abcd")
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Right, S)
+      paste("XY", "aXYcd")
+      undo()
+      got.push(at())
+      keyClick(Qt.Key_Home)
+      keyClick(Qt.Key_Right)
+      keyClick(Qt.Key_Delete)
+      type("XY")
+      undo()
+      got.push(at())
+      f.text = ""
       return got.join(" | ")
     }
 
