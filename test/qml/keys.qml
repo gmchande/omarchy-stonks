@@ -551,8 +551,7 @@ Harness {
       var before = asked()
       keyClick(Qt.Key_V, C)
       var read = within(2000, function() { return asked() === before + 1 })
-      wait(500)
-      var refused = read && field.text === "abc def"
+      var refused = read && !within(500, function() { return field.text !== "abc def" })
       harness.check("a paste of 4096 bytes lands, and one of 4097 is read and refused",
         whole && refused, [whole, read, field.text.length].join(" | "))
 
@@ -564,8 +563,8 @@ Harness {
         keyClick(Qt.Key_V, C)
         keyClick("z")
         var typed = within(300, function() { return field.text === "abc defz" })
-        wait(ms)
-        return typed && field.text === "abc defz" ? "" : kind + ": " + field.text.slice(0, 40)
+        var kept = typed && !within(ms, function() { return field.text !== "abc defz" })
+        return kept ? "" : kind + ": " + field.text.slice(0, 40)
       }
       var held = [holds("endless", 1200), holds("silent", 2600), holds("late", 1600)].filter(function(s) { return s !== "" })
       fresh()

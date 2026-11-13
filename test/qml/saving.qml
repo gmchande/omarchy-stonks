@@ -167,15 +167,15 @@ Harness {
       // A read still out as a save lands holds the text from before the
       // save; it goes unheard, and the save is read back as it landed.
       good = harness.readFile(harness.file)
-      sh('touch "$STONKS_FAKE_STATE/dd.hold" && cp "$1" "$1.new" && mv "$1.new" "$1"')
-      // Time for the watch to start the read, and for it to read the file.
-      wait(500)
+      // The stand-in dd says when it has read the file (bin/dd).
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && cp "$1" "$1.new" && mv "$1.new" "$1"')
+      var held = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
       harness.checks = []
       service.setRange("1M")
-      wait(300)
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
-      var through = landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
-      wait(500)
+      var through = held && landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
+      // The held read comes in after the save's own: it must say nothing.
+      through = through && !within(500, function() { return harness.checks.indexOf(false) >= 0 })
       harness.check("a read still out as a save lands goes unheard, and the save is read back as it landed",
         through && harness.checks.indexOf(false) < 0 && !service.saveFailed && footer().indexOf("aren't saved") < 0 && service.range === "1M"
           && JSON.parse(harness.readFile(harness.file)).range === "1M",
@@ -194,8 +194,7 @@ Harness {
         var noticed = within(3000, function() { return service.listsUnreadable && footer().indexOf("Couldn't load your lists") >= 0 })
         var was = service.range
         service.setRange(was === "1Y" ? "3M" : "1Y")
-        wait(700)
-        var kept = sh(kind[2]) === made
+        var kept = !within(700, function() { return sh(kind[2]) !== made })
         sh('rm -rf "$1" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
         var back = kind[3] || within(3000, function() { return !service.listsUnreadable })
         return noticed && kept && back ? "" : kind[0] + ": " + [noticed, kept, back, made].join(" ")
@@ -219,8 +218,7 @@ Harness {
       var noticed = within(3000, function() { return service.listsUnreadable && footer().indexOf("Couldn't load your lists") >= 0 })
       clickFooter()
       service.setRange(service.range === "1Y" ? "3M" : "1Y")
-      wait(700)
-      var kept = sh('md5sum < "$1"') === made
+      var kept = !within(700, function() { return sh('md5sum < "$1"') !== made })
       sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
       var back = within(3000, function() { return !service.listsUnreadable && !service.saveFailed })
       harness.check("a file Stonks can't read, put in the file's place while a lost save awaits its read-back, is never written over",
