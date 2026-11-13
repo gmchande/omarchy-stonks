@@ -14,11 +14,11 @@ scratch_home v1-data.json grvc.stonks.json
 export STONKS_DATA_FILES="$(ls "$plugin"/test/data-files/*.json | tr '\n' ' ')"
 export QT_QPA_PLATFORM=offscreen
 run_qs 120
-# The one save the walk refuses warns as Quickshell does for any lost save.
+# The two saves the walk refuses warn as Quickshell does for any lost save.
 lost='WARN scene: QML FileView at @plugin/ListsFile.qml.*Write of .*grvc.stonks.json failed: Unknown error when opening file\.'
 count=$(rg -c "$lost" "$work/log" || true)
-if [ "${count:-0}" != 1 ]; then
-  echo "FAIL expected one warning of a lost save, got ${count:-0}"
+if [ "${count:-0}" != 2 ]; then
+  echo "FAIL expected two warnings of a lost save, got ${count:-0}"
   code=1
 fi
 sed -i "\\|$lost|d" "$work/log"

@@ -206,6 +206,26 @@ Harness {
         ["a FIFO", 'rm -f "$1" && mkfifo "$1"', 'stat -c %F "$1"']
       ].map(refused).filter(function(s) { return s !== "" })
 
+      // A save that didn't land still awaits its read-back when a file
+      // Stonks can't read takes the file's place: the footer says it can't
+      // load the lists, and neither its words nor the next change write
+      // over the file.
+      var big = 'sed "\\$d" "$1" > "$1.new" && { printf \',"note": "\'; head -c 131072 /dev/zero | tr "\\0" x; printf \'"\\n}\\n\'; } >> "$1.new" && mv "$1.new" "$1"'
+      sh('chmod 500 "$2"')
+      service.setRange(service.range === "6M" ? "3M" : "6M")
+      var pending = within(4000, function() { return service.saveFailed })
+      sh('chmod 700 "$2" && ' + big)
+      var made = sh('md5sum < "$1"')
+      var noticed = within(3000, function() { return service.listsUnreadable && footer().indexOf("Couldn't load your lists") >= 0 })
+      clickFooter()
+      service.setRange(service.range === "1Y" ? "3M" : "1Y")
+      wait(700)
+      var kept = sh('md5sum < "$1"') === made
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+      var back = within(3000, function() { return !service.listsUnreadable && !service.saveFailed })
+      harness.check("a file Stonks can't read, put in the file's place while a lost save awaits its read-back, is never written over",
+        pending && noticed && kept && back, [pending, noticed, kept, back, footer()].join(" | "))
+
       // The file gone, then back: what comes back is read.
       sh('rm -f "$1"')
       var gone = within(3000, function() { return !service.listsUnreadable && service.lists.length === 1 })

@@ -126,7 +126,9 @@ Item {
   }
 
   // Only a file not there is missing: one that can't be read is never
-  // written over.
+  // written over, a save still awaiting its read-back included. What is
+  // there now is no text of Stonks', so that wait ends, as for a save from
+  // elsewhere.
   function take(answer) {
     if (answer.text !== undefined) {
       root.missing = false
@@ -136,9 +138,14 @@ Item {
     }
     root.missing = !!answer.missing
     root.known = ""
-    if (!root.takesRead(null)) return
-    if (root.missing) root.takeMissingFile()
-    else root.takeUnreadableFile()
+    if (root.missing) {
+      if (root.takesRead(null)) root.takeMissingFile()
+      return
+    }
+    if (root.making) return
+    root.staleTexts = null
+    root.saveFailed = false
+    root.takeUnreadableFile()
   }
 
   // While a save awaits its read-back: each text the file may still hold
