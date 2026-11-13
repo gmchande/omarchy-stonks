@@ -133,6 +133,12 @@ Item {
     if (answer.text !== undefined) {
       root.missing = false
       root.known = answer.text
+      // Stonks' own last save, read back while a change too large to save
+      // waits in memory: the save landed, and the change stays.
+      if (root.overCap && root.written !== "" && answer.text === root.written) {
+        root.staleTexts = null
+        return
+      }
       if (root.takesRead(answer.text)) root.takeLoadedSettings(answer.text)
       return
     }
@@ -229,9 +235,11 @@ Item {
   // Read back once written (`takesRead`). A text over the cap is never
   // written, since Stonks couldn't read it back: the file keeps what it
   // held, and the footer says the changes aren't saved until they fit.
+  property bool overCap: false
   function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    if (Settings.fileBytes(body) > root.cap) {
+    root.overCap = Settings.fileBytes(body) > root.cap
+    if (root.overCap) {
       root.saveFailed = true
       return
     }

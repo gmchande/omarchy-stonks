@@ -226,16 +226,24 @@ Harness {
 
       // A change that would make the file larger than Stonks reads is never
       // written: the file keeps what it held, the footer says the changes
-      // aren't saved, and once they fit again that goes.
+      // aren't saved, and once they fit again that goes. The last save's
+      // read-back, held until then, takes nothing from memory.
+      var before = harness.readFile(harness.file)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold"')
+      service.setRange(service.range === "6M" ? "3M" : "6M")
+      var saved = within(3000, function() { return harness.readFile(harness.file) !== before })
+        && within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
       good = harness.readFile(harness.file)
       var huge = new Array(131073).join("x")
+      var listed = function() { return service.fileSettings.lists.some(function(l) { return l.name === huge }) }
       var made = service.createList(huge) === ""
       var unsaved = within(2000, function() { return footer().indexOf("aren't saved") >= 0 })
-      var untouched = !within(700, function() { return harness.readFile(harness.file) !== good })
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var untouched = !within(1000, function() { return harness.readFile(harness.file) !== good || !listed() || footer().indexOf("aren't saved") < 0 })
       service.deleteList(huge)
       var fits = within(3000, function() { return footer().indexOf("aren't saved") < 0 }) && harness.readFile(harness.file) === good
-      harness.check("a change that would make the lists file larger than Stonks reads leaves the file as it was, and the footer says the changes aren't saved until they fit",
-        made && unsaved && untouched && fits, [made, unsaved, untouched, fits, footer()].join(" | "))
+      harness.check("a change that would make the lists file larger than Stonks reads leaves the file as it was and stays in memory, and the footer says the changes aren't saved until they fit",
+        saved && made && unsaved && untouched && fits, [saved, made, unsaved, untouched, listed(), fits, footer()].join(" | "))
 
       // The file gone, then back: what comes back is read.
       sh('rm -f "$1"')
