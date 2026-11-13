@@ -45,6 +45,152 @@ function readScreenshotName(text) {
   return { editor: printed.slice(0, cut), file: file }
 }
 
+// Omasnap's folder for screenshots, as its omasnap.conf (read by `FileRead`)
+// holds it in [output] directory, trimmed, or "": Omasnap reads it with
+// Qt's QSettings, and a value QSettings reads as no string, such as a list
+// (a value with a comma), names no folder.
+function omasnapFolder(text) {
+  var folder = iniString(String(text), "output", "directory")
+  return folder === null ? "" : folder.trim()
+}
+
+// The string a QSettings INI file holds for `key` in `section`, read as Qt
+// reads it (qsettings.cpp: readIniLine, readIniFile, readIniSection,
+// iniUnescapedKey, iniUnescapedStringList, stringToVariant), or null where
+// Qt reads no string: no such key, a list, or another type.
+function iniString(text, section, key) {
+  var data = text.replace(/^\ufeff/, "")
+  var found = null
+  var current = ""
+  for (var line = iniLine(data, 0); line; line = iniLine(data, line.next)) {
+    var body = data.slice(line.start, line.start + line.length)
+    if (body.charAt(0) === "[") {
+      var close = body.indexOf("]")
+      var name = (close < 0 ? body.slice(1) : body.slice(1, close)).trim()
+      current = name.toLowerCase() === "general" ? "" : name.toLowerCase() === "%general" ? name.slice(1) : iniKey(name)
+    } else if (line.equals >= 0 && current === section && iniKey(body.slice(0, line.equals - line.start).trim()) === key) {
+      // The last one in the file wins.
+      found = iniValue(body.slice(line.equals - line.start + 1))
+    }
+  }
+  return found
+}
+
+// readIniLine: the line from `at`, by `start` and `length` in `data`, with
+// its first = outside quotes, or null at the end. A ; starting a line makes
+// it a comment, and one later outside quotes ends it.
+function iniLine(data, at) {
+  var space = " \t\n\r"
+  var start = at
+  while (start < data.length && space.indexOf(data.charAt(start)) >= 0) start++
+  var i = start
+  var quoted = false
+  var equals = -1
+  while (i < data.length) {
+    var ch = data.charAt(i)
+    if ("\n\r\";=\\".indexOf(ch) < 0) { i++; continue }
+    i++
+    if (ch === "=") {
+      if (!quoted && equals < 0) equals = i - 1
+    } else if (ch === "\n" || ch === "\r") {
+      if (i === start + 1) start++
+      else if (!quoted) { i--; break }
+    } else if (ch === "\\") {
+      if (i < data.length) {
+        var next = data.charAt(i++)
+        if (i < data.length) {
+          var after = data.charAt(i)
+          if ((next === "\n" && after === "\r") || (next === "\r" && after === "\n")) i++
+        }
+      }
+    } else if (ch === "\"") {
+      quoted = !quoted
+    } else if (i === start + 1) {
+      while (i < data.length && data.charAt(i) !== "\n" && data.charAt(i) !== "\r") i++
+      while (i < data.length && space.indexOf(data.charAt(i)) >= 0) i++
+      start = i
+    } else if (!quoted) {
+      i--
+      break
+    }
+  }
+  return i > start ? { start: start, length: i - start, equals: equals, next: i } : null
+}
+
+// iniUnescapedKey: \ is /, and %XX and %UXXXX are the characters they name.
+function iniKey(key) {
+  var out = ""
+  for (var i = 0; i < key.length; i++) {
+    var ch = key.charAt(i)
+    if (ch === "\\") { out += "/"; continue }
+    if (ch !== "%" || i === key.length - 1) { out += ch; continue }
+    var first = key.charAt(i + 1) === "U" ? i + 2 : i + 1
+    var digits = first === i + 2 ? 4 : 2
+    var hex = key.slice(first, first + digits)
+    if (hex.length < digits || !/^[0-9a-fA-F]+$/.test(hex)) { out += "%"; continue }
+    out += String.fromCharCode(parseInt(hex, 16))
+    i = first + digits - 1
+  }
+  return out
+}
+
+// iniUnescapedStringList, then stringToVariant: the string, or null for a
+// list or a value of another type.
+function iniValue(raw) {
+  var codes = { a: "\x07", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", "\"": "\"", "?": "?", "'": "'", "\\": "\\" }
+  var out = ""
+  var quoted = false
+  var wasQuoted = false
+  var i = 0
+  var chop = 0
+  var skipSpaces = function() { while (i < raw.length && (raw.charAt(i) === " " || raw.charAt(i) === "\t")) i++ }
+  skipSpaces()
+  while (i < raw.length) {
+    var ch = raw.charAt(i)
+    if (ch === "\\") {
+      i++
+      if (i >= raw.length) break
+      var code = raw.charAt(i++)
+      if (codes[code] !== undefined) out += codes[code]
+      else if ((code === "x" && i < raw.length && /[0-9a-fA-F]/.test(raw.charAt(i))) || /[0-7]/.test(code)) {
+        var radix = code === "x" ? 16 : 8
+        var digit = radix === 16 ? /[0-9a-fA-F]/ : /[0-7]/
+        var value = radix === 16 ? 0 : parseInt(code, 8)
+        while (i < raw.length && digit.test(raw.charAt(i))) value = (value * radix + parseInt(raw.charAt(i++), radix)) & 0xffff
+        out += String.fromCharCode(value)
+      } else if ((code === "\n" || code === "\r") && i < raw.length) {
+        var two = raw.charAt(i)
+        if ((two === "\n" || two === "\r") && two !== code) i++
+      }
+      chop = out.length
+    } else if (ch === "\"") {
+      i++
+      wasQuoted = true
+      quoted = !quoted
+      if (!quoted) {
+        skipSpaces()
+        chop = out.length
+      }
+    } else if (ch === "," && !quoted) {
+      return null
+    } else {
+      var j = i + 1
+      while (j < raw.length && "\\\",".indexOf(raw.charAt(j)) < 0) j++
+      out += raw.slice(i, j)
+      i = j
+    }
+  }
+  if (!wasQuoted) {
+    var end = out.length
+    while (end > chop && (out.charAt(end - 1) === " " || out.charAt(end - 1) === "\t")) end--
+    out = out.slice(0, end)
+  }
+  if (out.charAt(0) !== "@") return out
+  if (out.slice(-1) === ")" && out.indexOf("@String(") === 0) return out.slice(8, -1)
+  if (out.slice(-1) === ")" && (/^@(ByteArray|Variant|DateTime|Rect|Size|Point)\(/.test(out) || out === "@Invalid()")) return null
+  return out.indexOf("@@") === 0 ? out.slice(1) : out
+}
+
 // The file keeper's: mktemp makes the file 0600 and `ln` names it, never over
 // a file there, so no other account reads it and no reader sees it half
 // written. The text rides in the environment as STONKS_TEXT, whole as the

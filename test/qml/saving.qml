@@ -229,6 +229,20 @@ Harness {
       harness.check("every older release's lists file reads to the lists and settings it holds",
         Quickshell.env("STONKS_DATA_FILES") !== "" && wrong.length === 0, wrong.join(" "))
 
+      // A first start with no lists file takes the symbols an older Stonks
+      // kept in its bar entry in shell.json, and writes them to a new file.
+      sh('rm -f "$1" && printf %s "$3" > "$2/shell.json"',
+        JSON.stringify({ bar: { layout: { right: [{ id: "grvc.stonks", symbols: ["NVDA", "SPY"], order: "name" }] } } }))
+      var first = restart.createObject(started)
+      var fromBar = within(5000, function() { return first.ready && first.allSymbols.join(",") === "NVDA,SPY" })
+      var written = within(5000, function() {
+        try { return JSON.parse(harness.readFile(harness.file)).symbols.join(",") === "NVDA,SPY" } catch (e) { return false }
+      })
+      first.destroy()
+      sh('rm -f "$2/shell.json" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+      harness.check("a first start with no lists file takes the bar's symbols an older Stonks kept in shell.json, and writes them to a new file",
+        fromBar && written, [fromBar, written].join(" | "))
+
       // Last, a link to a device: Quickshell's watch follows a link to what
       // it names, so it says no more of the file's place, mended or not.
       var link = refused(["a link to a device", 'rm -f "$1" && ln -s /dev/zero "$1"', 'readlink "$1"', true])

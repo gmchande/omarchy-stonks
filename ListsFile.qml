@@ -188,29 +188,31 @@ Item {
     if (!root.ready) root.adopt(root.fileSettings)
   }
 
+  // On a first start with no lists file, the bar's own entry in the shell's
+  // shell.json, where an older Stonks kept its symbols, starts it
+  // (`FileRead`, at most 1 MiB: Omarchy's own is a few KB).
   function takeMissingFile() {
     root.unreadable = false
-    if (!root.ready) {
-      var fromBar = Settings.settingsFromBar(root.parseShell(), root.pluginId)
-      if (fromBar) {
-        root.adopt(fromBar)
-        root.writeFile(fromBar)
-        return
-      }
-    }
+    if (root.ready) return root.takeDefaults()
+    shellReader.read(Quickshell.env("HOME") + "/.config/omarchy/shell.json", 1048576)
+  }
+  FileRead {
+    id: shellReader
+    onDone: function(answer) { root.takeShell(answer.text) }
+  }
+  // A lists file read meanwhile wins.
+  function takeShell(text) {
+    if (root.ready || !root.missing) return
+    var shell = null
+    try { shell = JSON.parse(text) } catch (e) {}
+    var fromBar = Settings.settingsFromBar(shell, root.pluginId)
+    if (!fromBar) return root.takeDefaults()
+    root.adopt(fromBar)
+    root.writeFile(fromBar)
+  }
+  function takeDefaults() {
     console.warn("stonks: lists file missing; using defaults")
     root.adopt(Settings.fileSettings(null))
-  }
-
-  FileView {
-    id: shellFile
-    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
-    blockLoading: true
-    printErrors: false
-  }
-
-  function parseShell() {
-    try { return JSON.parse(shellFile.text()) } catch (e) { return null }
   }
 
   // Read back once written (`takesRead`).

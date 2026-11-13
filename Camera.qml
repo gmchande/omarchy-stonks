@@ -6,8 +6,8 @@ import "Commands.js" as Commands
 // grab. With Omasnap, as on Omarchy 4.5, the folder is OMASNAP_SCREENSHOT_DIR,
 // else OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` passes on as
 // it, else omasnap.conf's [output] directory, else Screenshots in the pictures
-// folder, read through Qt as Omasnap reads them, so from XDG_CONFIG_HOME, and
-// never written; the editor is `omasnap`. Without it, as on Omarchy 4.0, the
+// folder, read as Omasnap reads them, so from XDG_CONFIG_HOME, and never
+// written; the editor is `omasnap`. Without it, as on Omarchy 4.0, the
 // folder is OMARCHY_SCREENSHOT_DIR, else XDG_PICTURES_DIR from user-dirs.dirs,
 // read as text and never run, else ~/Pictures; the editor is
 // OMARCHY_SCREENSHOT_EDITOR, else Tensaku. The picture is saved there and
@@ -27,9 +27,17 @@ Item {
   property var shotDone: null
   readonly property bool busy: shotDone !== null
 
-  Settings {
-    id: omasnapSettings
-    location: StandardPaths.writableLocation(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf"
+  // omasnap.conf, at most 64 KiB: Omasnap writes a few lines.
+  FileRead {
+    id: omasnapConf
+    onDone: function(answer) {
+      if (!root.shotDone) return
+      root.shotOmasnapFolder = Commands.omasnapFolder(answer.text || "")
+      naming.running = true
+    }
+  }
+  function localPath(location) {
+    return decodeURIComponent(String(StandardPaths.writableLocation(location)).replace(/^file:\/\//, ""))
   }
 
   // `taken()` hears the picture taken, before it is saved; then `item` may go.
@@ -39,16 +47,13 @@ Item {
     if (busy) return false
     shotSymbol = symbol
     shotItem = item
-    // As Omasnap reads it: a list (a value with a comma) is no folder.
-    omasnapSettings.sync()
-    var configured = omasnapSettings.value("output/directory", "")
-    shotOmasnapFolder = typeof configured === "string" ? configured.trim() : ""
-    shotPictures = decodeURIComponent(String(StandardPaths.writableLocation(StandardPaths.PicturesLocation)).replace(/^file:\/\//, ""))
+    shotOmasnapFolder = ""
+    shotPictures = localPath(StandardPaths.PicturesLocation)
     shotFile = ""
     shotEditor = ""
     shotTaken = taken
     shotDone = done
-    naming.running = true
+    omasnapConf.read(localPath(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf", 65536)
     return true
   }
 

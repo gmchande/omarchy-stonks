@@ -67,6 +67,23 @@ test("a screenshot is named for its stock and the moment, in the folder and for 
   expect([C.readScreenshotName("tensaku-edit\nrelative.png\n"), C.readScreenshotName("/only-a-file.png\n"), C.readScreenshotName("")]).toEqual([null, null, null])
 }))
 
+// Omasnap reads omasnap.conf with Qt's QSettings; these read as Qt reads
+// them, checked against Qt's own Settings when this rule was written.
+test("Omasnap's folder is read from omasnap.conf as Qt's QSettings reads it", () => {
+  const read = text => C.omasnapFolder(text)
+  expect(read("[colors]\ndirectory = /colors\n\n  [output]\n# Where saved screenshots go.\ndirectory = ~/Captures ; a folder of their own\n\n[later]\ndirectory = /later\n")).toBe("~/Captures")
+  expect(read('[output]\ndirectory = "  /a b  "\n')).toBe("/a b")
+  expect(read('[output]\ndirectory = "/semi;quoted"\n')).toBe("/semi;quoted")
+  expect(read("[output]\ndirectory = /tab\\there\n")).toBe("/tab\there")
+  expect(read("[output]\ndirectory = @String(/str)\n")).toBe("/str")
+  expect(read("[output]\ndirectory = /first\ndirectory = /second\n")).toBe("/second")
+  expect(read("[out%70ut]\ndir%65ctory = /escaped\n")).toBe("/escaped")
+  expect(read("\ufeff[output]\r\ndirectory = /crlf\r\n")).toBe("/crlf")
+  // A list, another type, a commented line, another section's, or none.
+  expect([read("[output]\ndirectory = /a,/b\n"), read("[output]\ndirectory = @ByteArray(/b)\n"),
+    read("[output]\n; directory = /no\n"), read("[Output]\ndirectory = /no\n"), read("")]).toEqual(["", "", "", "", ""])
+})
+
 test("a file made for Stonks is its owner's alone from the start, holds the text whole, and is never made over a file there", () => scratch(dir => {
   const path = join(dir, "grvc.stonks.json")
   const made = run(C.createPrivately(path), { PATH: process.env.PATH, STONKS_TEXT: '{"symbols":["AAPL"]}\n' })

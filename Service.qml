@@ -451,12 +451,7 @@ Item {
     id: listsFile
     pluginId: root.pluginId
     files: ownerOnly
-    onStarted: {
-      feed.seed(root.parseSavedQuotes())
-      // What the seed put in is what the file holds.
-      root.quotesUnsaved = false
-      root.askDue()
-    }
+    onStarted: root.seedSaved()
     onSaveChecked: function(saved) { root.saveChecked(saved) }
   }
   // Bindings, not aliases: an alias reads nothing until the file's own
@@ -962,17 +957,34 @@ Item {
   OwnerOnly { id: ownerOnly; pluginId: root.pluginId }
   readonly property alias files: ownerOnly
 
-  FileView {
-    id: quotesFile
-    path: root.quotesPath
-    blockLoading: true
-    printErrors: false
+  // Read as the service starts, beside the lists file, and handed to the
+  // feed once both are in (`FileRead`). 16 MiB: a stock's saved price is 8
+  // KB, 12 KB at the most seen, so 150 stocks' are about 1.2 MB.
+  readonly property int quotesCap: 16777216
+  property var savedAnswer: null
+  property bool seeded: false
+  FileRead {
+    id: quotesReader
+    onDone: function(answer) {
+      root.savedAnswer = answer
+      root.seedSaved()
+    }
+  }
+  onQuotesPathChanged: if (root.quotesPath !== "" && !root.seeded) quotesReader.read(root.quotesPath, root.quotesCap)
+  function seedSaved() {
+    if (!root.ready || root.savedAnswer === null || root.seeded) return
+    root.seeded = true
+    feed.seed(root.parseSavedQuotes(root.savedAnswer.text || ""))
+    root.savedAnswer = null
+    // What the seed put in is what the file holds.
+    root.quotesUnsaved = false
+    root.askDue()
   }
 
   // { symbol: { quote, receivedAt } }
-  function parseSavedQuotes() {
+  function parseSavedQuotes(text) {
     try {
-      var parsed = JSON.parse(quotesFile.text())
+      var parsed = JSON.parse(text)
       return parsed && parsed.version === 1 && parsed.quotes ? Quote.keptQuotes(parsed.quotes) : {}
     } catch (e) {
       return {}
@@ -1137,5 +1149,8 @@ Item {
   }
   onScreensOffChanged: slideClock()
   onOpenSurfacesChanged: slideClock()
-  Component.onCompleted: slideClock()
+  Component.onCompleted: {
+    slideClock()
+    if (root.quotesPath !== "") quotesReader.read(root.quotesPath, root.quotesCap)
+  }
 }
