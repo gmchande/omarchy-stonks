@@ -159,7 +159,10 @@ Item {
   // isn't taken. Any other text ends the wait: a save from elsewhere wins.
   function takesRead(text) {
     if (root.making) return false
-    if (root.staleTexts === null) return true
+    if (root.staleTexts === null) {
+      root.saveFailed = false
+      return true
+    }
     var lost = text === null || (text !== root.written && root.staleTexts["m" + Qt.md5(text)] === true)
     if (lost && !root.saveFailed)
       console.warn("stonks: " + root.path + " didn't take the save; keeping the changes until one lands")
@@ -223,11 +226,20 @@ Item {
     root.adopt(Settings.fileSettings(null))
   }
 
-  // Read back once written (`takesRead`).
+  // Read back once written (`takesRead`). A text over the cap is never
+  // written, since Stonks couldn't read it back: the file keeps what it
+  // held, and the footer says the changes aren't saved until they fit.
   function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
+    if (Settings.fileBytes(body) > root.cap) {
+      root.saveFailed = true
+      return
+    }
     var before = root.known
-    if (body === before && root.staleTexts === null) return
+    if (body === before && root.staleTexts === null) {
+      root.saveFailed = false
+      return
+    }
     if (root.staleTexts === null) root.staleTexts = {}
     else root.stale(root.written)
     root.stale(before)

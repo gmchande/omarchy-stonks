@@ -624,6 +624,10 @@ test("the data file reads as written and repairs hand edits", () => {
   // A file that holds anything but one object can't be read, and is never
   // written over.
   expect(["", "null", "[]", '["NEST"]', "7", '"NEST"', '{"symbols": ['].map(M.readListsFile)).toEqual([null, null, null, null, null, null, null])
+  // A save is weighed in the bytes the file holds, as Stonks reads it back:
+  // names in any script count as UTF-8 does.
+  for (const name of ["Tech", "Énergie", "日本株", "Rockets 🚀", "x".repeat(4096)])
+    expect(M.fileBytes(JSON.stringify({ name }))).toBe(Buffer.byteLength(JSON.stringify({ name })))
   // Sounds start off, in a new install and in a file from before them, and
   // only a saved true turns them on; the version check stays on unless a
   // saved false turns it off. Newer settings may add other defaults.

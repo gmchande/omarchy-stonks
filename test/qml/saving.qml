@@ -224,6 +224,19 @@ Harness {
       harness.check("a file Stonks can't read, put in the file's place while a lost save awaits its read-back, is never written over",
         pending && noticed && kept && back, [pending, noticed, kept, back, footer()].join(" | "))
 
+      // A change that would make the file larger than Stonks reads is never
+      // written: the file keeps what it held, the footer says the changes
+      // aren't saved, and once they fit again that goes.
+      good = harness.readFile(harness.file)
+      var huge = new Array(131073).join("x")
+      var made = service.createList(huge) === ""
+      var unsaved = within(2000, function() { return footer().indexOf("aren't saved") >= 0 })
+      var untouched = !within(700, function() { return harness.readFile(harness.file) !== good })
+      service.deleteList(huge)
+      var fits = within(3000, function() { return footer().indexOf("aren't saved") < 0 }) && harness.readFile(harness.file) === good
+      harness.check("a change that would make the lists file larger than Stonks reads leaves the file as it was, and the footer says the changes aren't saved until they fit",
+        made && unsaved && untouched && fits, [made, unsaved, untouched, fits, footer()].join(" | "))
+
       // The file gone, then back: what comes back is read.
       sh('rm -f "$1"')
       var gone = within(3000, function() { return !service.listsUnreadable && service.lists.length === 1 })
