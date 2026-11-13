@@ -57,11 +57,14 @@ Item {
       Math.max.apply(null, [0].concat(got.map(function(a) { return a.retryAfter }))), sentUnder)
   }
 
+  // The answers go with `ended`: the run keeps none once over.
   function end(text) {
     var fresh = read(text)
     root.out = false
     tell()
     if (streaming && fresh.length > 0) root.arrived(fresh)
+    var got = root.got
+    root.got = []
     root.ended(got)
   }
 

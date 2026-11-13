@@ -165,11 +165,16 @@ function ownColor(hue, ground) {
 }
 
 // Made once: the search can take several milliseconds, and every surface asks
-// for up and down apart, on every theme switch.
+// for up and down apart, on every theme switch. A theme has a few grounds;
+// past 16, the oldest goes.
 var ownPairs = {}
 function ownPair(ground) {
   var key = hexOf(ground)
-  if (!ownPairs[key]) ownPairs[key] = { up: ownColor(OWN_HUES.up, ground), down: ownColor(OWN_HUES.down, ground) }
+  if (!ownPairs[key]) {
+    var keys = Object.keys(ownPairs)
+    if (keys.length >= 16) delete ownPairs[keys[0]]
+    ownPairs[key] = { up: ownColor(OWN_HUES.up, ground), down: ownColor(OWN_HUES.down, ground) }
+  }
   return ownPairs[key]
 }
 

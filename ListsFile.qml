@@ -142,9 +142,10 @@ Item {
   }
 
   // While a save awaits its read-back: each text the file may still hold
-  // if Stonks' last write was lost, as keys. Quickshell 0.3.2 reports a
+  // if Stonks' last write was lost, by its md5. Quickshell 0.3.2 reports a
   // write done when a full disk fails its commit (fileview.cpp,
-  // FileViewWriter::write), so only a read tells.
+  // FileViewWriter::write), so only a read tells. At most 1024, the first
+  // kept: the text the file held before the saves began to fail.
   property var staleTexts: null
   property string written: ""
   // A read of an earlier text, or none, says the last save was lost, and
@@ -152,7 +153,7 @@ Item {
   function takesRead(text) {
     if (root.making) return false
     if (root.staleTexts === null) return true
-    var lost = text === null || (text !== root.written && root.staleTexts[text] === true)
+    var lost = text === null || (text !== root.written && root.staleTexts["m" + Qt.md5(text)] === true)
     if (lost && !root.saveFailed)
       console.warn("stonks: " + root.path + " didn't take the save; keeping the changes until one lands")
     root.saveFailed = lost
@@ -221,12 +222,18 @@ Item {
     var before = root.known
     if (body === before && root.staleTexts === null) return
     if (root.staleTexts === null) root.staleTexts = {}
-    else root.staleTexts[root.written] = true
-    root.staleTexts[before] = true
+    else root.stale(root.written)
+    root.stale(before)
     root.written = body
     if (root.missing) return root.makeFile()
     root.writeText(body)
     root.readFile()
+  }
+  // Keys never read as numbers, so they keep the order they came in.
+  function stale(text) {
+    var keys = Object.keys(root.staleTexts)
+    if (keys.length >= 1024) delete root.staleTexts[keys[1]]
+    root.staleTexts["m" + Qt.md5(text)] = true
   }
 
   // A missing lists file is made, not written: Quickshell writes a new file

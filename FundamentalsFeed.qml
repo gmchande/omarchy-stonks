@@ -117,8 +117,11 @@ Item {
       read = null
     }
     if (step === "rate") {
-      var held = Object.assign({}, rates)
-      if (read) held[job.pair] = { value: read, checkedAt: clock.wallSecond() }
+      // A rate a day old is asked again before use: it goes as another comes.
+      var now = clock.wallSecond()
+      var held = {}
+      for (var pair in rates) if (now - rates[pair].checkedAt < Fundamentals.FUNDAMENTALS_FRESH) held[pair] = rates[pair]
+      if (read) held[job.pair] = { value: read, checkedAt: now }
       else {
         delete held[job.pair]
         if (failedPairs.indexOf(job.pair) < 0) root.failedPairs = failedPairs.concat([job.pair])

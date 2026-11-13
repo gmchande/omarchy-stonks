@@ -1255,6 +1255,7 @@ Item {
     held: root.rowMenu !== null
     visible: root.rowsShown
     view: root.view
+    listKeys: root.service && root.service.listKey ? root.service.lists.map(function(list) { return root.service.listKey(list.name) }) : []
     quotes: root.quotes
     newestTrades: root.newestTrades
     nights: root.nights

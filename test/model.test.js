@@ -2068,6 +2068,13 @@ test("search keeps each answer by the words it answers until it closes: two word
   // Asked again, those words alone are let go; the rest still answer.
   const again = M.withoutAnswer(kept, "app")
   expect([M.keptAnswer(again, "app"), M.keptAnswer(again, "apple"), M.keptAnswer(kept, "app")]).toEqual([null, pineapple, apple])
+  // The last 64 words answered are kept: the 65th lets the oldest go, and
+  // words answered again count as the newest.
+  let many = new Map()
+  for (let i = 0; i < 64; i++) many = M.withAnswer(many, "w" + i, apple)
+  many = M.withAnswer(many, "w0", pineapple)
+  many = M.withAnswer(many, "w64", apple)
+  expect([many.size, M.keptAnswer(many, "w1"), M.keptAnswer(many, "w0"), M.keptAnswer(many, "w64")]).toEqual([64, null, pineapple, apple])
 })
 
 test("search leaves out a symbol no request can carry", () => {

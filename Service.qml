@@ -52,6 +52,7 @@ Item {
     if (JSON.stringify(root.fileSettings.symbols) !== JSON.stringify(root.allSymbols)) root.allSymbols = root.fileSettings.symbols
     root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
+    root.forgetListKeys()
   }
 
   // Each list's identity for the session, for what is kept by list and not
@@ -64,6 +65,15 @@ Item {
     var next = Object.assign({}, root.listKeys)
     next[name] = key
     root.listKeys = next
+  }
+  // A freed name's key is kept only while a list still holds the key that
+  // name would get without it, so the two can't meet.
+  function forgetListKeys() {
+    var names = root.fileSettings.lists.map(function(list) { return list.name })
+    var used = names.map(root.listKey)
+    var kept = {}
+    for (var name in root.listKeys) if (names.indexOf(name) >= 0 || used.indexOf("=" + name) >= 0) kept[name] = root.listKeys[name]
+    if (Object.keys(kept).length < Object.keys(root.listKeys).length) root.listKeys = kept
   }
   // Added symbols with no first answer yet, quote or failure: saved and
   // fetched, but no list shows them until it comes.
@@ -826,6 +836,18 @@ Item {
     var keep = function(s) { return root.allSymbols.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
     for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
+    // A fill is said once while it's on a chart.
+    for (var said in root.saidFills) {
+      var part = said.split(" ")
+      var filled = root.fills[part[0]]
+      if (!filled || !filled.stretches.some(function(s) { return String(s.from) === part[1] && String(s.to) === part[2] })) delete root.saidFills[said]
+    }
+    var missed = Object.keys(root.aheadMissed).filter(function(key) { return keep(key.split("|")[0]) })
+    if (missed.length < Object.keys(root.aheadMissed).length) {
+      var still = {}
+      missed.forEach(function(key) { still[key] = true })
+      root.aheadMissed = still
+    }
     var prune = function(cache, fresh) {
       var next = {}
       var dropped = false
