@@ -210,6 +210,47 @@ test("the chimes' player plays each chime it's sent that its names allow, and no
   expect(readFileSync(log, "utf8").trim().split("\n").sort()).toEqual(["/sounds/chime-smooth-10.wav", "/sounds/chime-smooth-3.wav"])
 }))
 
+// pw-cat -v says "-> streaming" as its silence reaches the output, and
+// Stonks waits for that to know the chimes play at once.
+test("the silence's word that it reached the output comes while it plays, and what it says stops at 64 KB", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
+  try {
+    const bin = join(dir, "bin")
+    const said = async script => {
+      standIn(bin, "pw-cat", script)
+      const proc = Bun.spawn(C.silenceStream(5), { env: { PATH: bin + ":" + process.env.PATH }, stdout: "pipe", stderr: "ignore" })
+      const reader = proc.stdout.getReader()
+      let text = "", heard = -1
+      const started = Date.now()
+      const reading = (async () => {
+        for (;;) {
+          const { value, done } = await reader.read()
+          if (done) return
+          text += new TextDecoder().decode(value)
+          if (heard < 0 && text.includes("-> streaming")) heard = Date.now() - started
+        }
+      })()
+      await Bun.sleep(1000)
+      const playing = proc.exitCode === null
+      proc.kill("SIGTERM")
+      await proc.exited
+      await reading
+      return { heard, playing, bytes: Buffer.byteLength(text) }
+    }
+    const quiet = await said("echo 'stream state changed paused -> streaming' >&2\nwhile :; do sleep 0.1; done\n")
+    expect(quiet.playing).toBe(true)
+    expect(quiet.heard).toBeGreaterThanOrEqual(0)
+    expect(quiet.heard).toBeLessThan(500)
+    // dd counts each read toward its 16 blocks, so a chatty stream stops a
+    // little short of 64 KB, never past it.
+    const chatty = await said("yes 'stream state changed paused -> streaming' >&2\n")
+    expect(chatty.bytes).toBeLessThanOrEqual(65536)
+    expect(chatty.bytes).toBeGreaterThan(32768)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 10000)
+
 test("an update that restarts the shell restarts it only when the plugin's folder moved", () => scratch(dir => {
   const home = join(dir, "home")
   const plugin = join(home, ".config/omarchy/plugins/grvc.stonks")

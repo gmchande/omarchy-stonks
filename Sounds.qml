@@ -301,15 +301,14 @@ Item {
   // when PipeWire restarts, or fails to start: then it starts again 2 s
   // later. Each ends after `streamSeconds`, so none outlives a shell that
   // dies, and starts again at once if still wanted. What it says is cut at
-  // 64 KB: it says a few lines.
+  // 64 KB, each line handed on as it comes (`Commands.silenceStream`).
   property int streamSeconds: 60
   Timer { id: afterScrub; interval: 1000; onTriggered: root.scrubHeld = false }
   onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
     property int code: -1
-    command: ["timeout", "-k", "1", String(root.streamSeconds), "sh", "-c", "pw-cat -v --playback --raw --rate 24000 --channels 1 --format s16"
-      + " --media-role Notification --latency 30ms /dev/zero 2>&1 > /dev/null | head -c 65536"]
+    command: Commands.silenceStream(root.streamSeconds)
     stdout: SplitParser {
       onRead: function(line) { if (root.awakeAt < 0 && line.indexOf("-> streaming") >= 0) root.awakeAt = Date.now() }
     }

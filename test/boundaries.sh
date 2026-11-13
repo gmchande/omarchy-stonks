@@ -69,7 +69,7 @@ none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
 # chime under its own; the update's are a terminal and a restart, started
 # apart from the shell.
 none 'command:\s*\[(?!"timeout", "-k", "1",)' Camera.qml OwnerOnly.qml Sounds.qml
-for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved; do
+for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved silenceStream; do
   rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", \"-k\", \"1\", " Commands.js || fail "Commands.js: $made does not start with timeout -k 1"
 done
 rg -qUP 'function curlCommand\([^)]*\) \{\n  return \["timeout", "-k", "1", ' Fetch.js || fail "Fetch.js: curlCommand does not start with timeout -k 1"
