@@ -5,8 +5,8 @@
 
 // The camera's: the editor, then the file, printed once its folder can take
 // it. With Omasnap, as Omarchy 4.5 hands it screenshots, its folder; without,
-// Omarchy 4.0's. Cut at 8 KB, twice Linux's PATH_MAX, and a byte past, so an
-// answer over the cap names no file.
+// Omarchy 4.0's, from at most 64 KiB of user-dirs.dirs. Cut at 8 KB, twice
+// Linux's PATH_MAX, and a byte past, so an answer over the cap names no file.
 function screenshotName(symbol, omasnapFolder, pictures) {
   return ["timeout", "-k", "1", "5", "sh", "-c", "{\n"
     + "if command -v omasnap > /dev/null; then\n"
@@ -19,7 +19,7 @@ function screenshotName(symbol, omasnapFolder, pictures) {
     + "  dir=${OMARCHY_SCREENSHOT_DIR:-}\n"
     + "  dirs=$HOME/.config/user-dirs.dirs\n"
     + "  if [ -z \"$dir\" ] && [ -f \"$dirs\" ]; then\n"
-    + "    dir=$(sed -n 's/^XDG_PICTURES_DIR=\"\\(.*\\)\"[[:space:]]*$/\\1/p' \"$dirs\" | tail -n 1)\n"
+    + "    dir=$(head -c 65536 \"$dirs\" | sed -n 's/^XDG_PICTURES_DIR=\"\\(.*\\)\"[[:space:]]*$/\\1/p' | tail -n 1)\n"
     + "    case $dir in\n"
     + "      '$HOME'*) dir=$HOME${dir#'$HOME'} ;;\n"
     + "      '${HOME}'*) dir=$HOME${dir#'${HOME}'} ;;\n"
