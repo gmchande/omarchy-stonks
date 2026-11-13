@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "grvc.stonks",
   "name": "Stonks",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Gaurav Chande",
   "license": "MIT",
   "description": "Your stock watchlist in the Omarchy bar: a pill with today's move, and the chart a click away. Stocks, ETFs, indexes and crypto from New York to London and Tokyo, with pre-market, after-hours and US overnight prices, each in its own currency. From Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
