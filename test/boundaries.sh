@@ -92,6 +92,27 @@ sites=$(awk '/^\*\*Sites\*\*/,/^\*\*Files/' README.md | rg -o '^- `([^`]+)`' -r 
 while read -r host; do
   [ -z "$host" ] || grep -qxF -- "$host" <<< "$sites" || fail "$host: a site the README's \"What it runs\" doesn't name"
 done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
+# The programs Stonks runs, and the README's "Commands" names them all and
+# no others. A program the code starts, at a command's head or after its
+# `timeout`, must be here; each here must be in the code and the README;
+# and each the README names must be here.
+programs="curl timeout sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
+  omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
+programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
+named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)
+started=$( { rg -o --no-filename -P '(?:command:\s*|return\s+|\.exec\s*\()\["([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  rg -o --no-filename -P '"timeout", (?:"-[a-z-]+", (?:"\d+", )?)?"[0-9.]+"\s*\)?,\s*"([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+  rg -o --no-filename -P '"timeout", "-k", "1", String\([^)]*\)\)?, "([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js; } | sort -u)
+while read -r program; do
+  [ -z "$program" ] || grep -qxF -- "$program" <<< "$programs" || fail "$program: a program the code starts that boundaries.sh's list doesn't name"
+done <<< "$started"
+while read -r program; do
+  grep -qxF -- "$program" <<< "$named" || fail "$program: a program Stonks runs that the README's \"Commands\" doesn't name"
+  rg -qw -- "$program" *.qml *.js || fail "$program: a program the README names that no code runs"
+done <<< "$programs"
+while read -r program; do
+  [ -z "$program" ] || grep -qxF -- "$program" <<< "$programs" || fail "$program: a program the README's \"Commands\" names that Stonks doesn't run"
+done <<< "$named"
 # Every request goes through Fetch.curlCommand, which compresses and caps
 # it.
 while read -r hit; do
