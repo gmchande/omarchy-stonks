@@ -262,19 +262,25 @@ test("an update that restarts the shell restarts it only when the plugin's folde
   git("commit", "-q", "--allow-empty", "-m", "one")
   const bin = join(dir, "bin")
   const log = join(dir, "omarchy.log")
-  const update = moves => {
+  const update = (moves, restarts = true) => {
     standIn(bin, "omarchy", `echo "$*" >> "${log}"
 case "$1 $2" in
   "launch floating") shift 5; exec bash -c "$1" ;;
-  "plugin update") ${moves ? `git -C "${plugin}" -c user.name=t -c user.email=t@t commit -q --allow-empty -m next` : ":"} ;;
+  "plugin update") echo "the changes' pager: $(git var GIT_PAGER)" >> "${log}"
+    ${moves ? `git -C "${plugin}" -c user.name=t -c user.email=t@t commit -q --allow-empty -m next` : ":"} ;;
 esac
 `)
     writeFileSync(log, "")
-    run(C.updateAndRestart("grvc.stonks"), { HOME: home, PATH: bin + ":" + process.env.PATH })
+    run((restarts ? C.updateAndRestart : C.update)("grvc.stonks"), { HOME: home, PATH: bin + ":" + process.env.PATH })
     return readFileSync(log, "utf8").trim().split("\n").slice(1)
   }
-  expect(update(false)).toEqual(["plugin update grvc.stonks"])
-  expect(update(true)).toEqual(["plugin update grvc.stonks", "restart shell"])
+  // Omarchy's update shows the changes with git, whose pager would hold a
+  // long list until q is pressed, with nothing saying so: git runs without
+  // one, so the changes print and Omarchy's question follows.
+  expect(update(false)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat"])
+  expect(update(true)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat", "restart shell"])
+  // The update alone, as while a change is unsaved, never restarts.
+  expect(update(true, false)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat"])
 }))
 
 // The clipboard's owner is the stand-in wl-paste beside the stand-in curl

@@ -293,14 +293,26 @@ function chimePlayer(names, folder) {
 }
 
 // The update that restarts the shell: in a terminal Omarchy opens, which
-// shows what changes and asks, and only when the plugin's folder moved. The
+// shows what changes and asks, and only when the plugin's folder moved. Git
+// shows the changes for it, and runs here without its pager, which would
+// hold a long list until q is pressed with nothing saying so. The
 // launcher joins its arguments into a `bash -c` script, so the last one is
 // shell code.
 function updateAndRestart(pluginId) {
   return ["omarchy", "launch", "floating", "terminal", "with", "presentation",
     "p=$HOME/.config/omarchy/plugins/" + pluginId + "; was=$(git -C \"$p\" rev-parse HEAD);"
-    + " omarchy plugin update " + pluginId + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
+    + " " + updating(pluginId) + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
     + " && echo 'Restarting the shell…' && omarchy restart shell"]
+}
+
+// The update alone, in the same terminal, while Stonks holds what a restart
+// would lose.
+function update(pluginId) {
+  return ["omarchy", "launch", "floating", "terminal", "with", "presentation", updating(pluginId)]
+}
+
+function updating(pluginId) {
+  return "GIT_PAGER= omarchy plugin update " + pluginId
 }
 
 // A paste's (`Field`): the clipboard's text, or the primary selection's, as

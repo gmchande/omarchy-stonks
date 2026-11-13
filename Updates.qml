@@ -97,7 +97,7 @@ Item {
 
   Process {
     id: updatePlugin
-    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", root.pluginId]
+    command: Commands.update(root.pluginId)
   }
 
   Process {
