@@ -44,6 +44,9 @@ FocusScope {
     if (area.text === text) return
     area.text = text
     area.cursorPosition = area.length
+    // A text set here starts the undo afresh, as Qt's does.
+    removals = []
+    pastedOver = null
   }
   property alias placeholderText: area.placeholderText
   property alias font: area.font
@@ -124,7 +127,7 @@ FocusScope {
         icon.width: 24
         icon.height: 24
         enabled: area.canUndo
-        onTriggered: area.undo()
+        onTriggered: root.undo()
       }
       Action {
         text: qsTr("Redo")
@@ -132,7 +135,7 @@ FocusScope {
         icon.width: 24
         icon.height: 24
         enabled: area.canRedo
-        onTriggered: area.redo()
+        onTriggered: root.redo()
       }
       MenuSeparator {}
       Action {
@@ -233,12 +236,13 @@ FocusScope {
     onContentWidthChanged: root.scroll()
     onWidthChanged: root.scroll()
     onTextChanged: {
+      root.noteText()
       root.text = area.text
       root.edited()
     }
-    onCursorPositionChanged: root.edited()
-    onSelectionStartChanged: root.edited()
-    onSelectionEndChanged: root.edited()
+    onCursorPositionChanged: { root.noteSelection(); root.edited() }
+    onSelectionStartChanged: { root.noteSelection(); root.edited() }
+    onSelectionEndChanged: { root.noteSelection(); root.edited() }
     onPreeditTextChanged: root.edited()
   }
 
@@ -266,6 +270,12 @@ FocusScope {
     if (event.matches(StandardKey.Paste)) {
       event.accepted = true
       pasteFrom(false)
+    } else if (event.matches(StandardKey.Undo)) {
+      event.accepted = true
+      undo()
+    } else if (event.matches(StandardKey.Redo)) {
+      event.accepted = true
+      redo()
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       // A TextField says so and lets the key on; here it would be a line.
       event.accepted = true
@@ -384,9 +394,80 @@ FocusScope {
       if (running || root.pasteAsked !== root.edits) return
       var text = Commands.readPastedText(root.pasteCode, pasted.data.byteLength, pasted.text, root.pasteCap)
       if (text === null) return
+      // A paste is a step of its own, apart from the typing on either side,
+      // as a TextField's is: Qt's document joins edits only while it counts
+      // itself modified (QTextDocumentPrivate::appendUndoItem).
+      area.textDocument.modified = false
+      var over = area.selectedText !== ""
+      var before = root.live()
       area.remove(area.selectionStart, area.selectionEnd)
+      var mid = root.live()
       area.insert(area.cursorPosition, text)
+      area.textDocument.modified = false
+      root.pastedOver = over ? { before: before, mid: mid, after: root.live() } : null
     }
+  }
+
+  // A TextField's undo where a TextEdit's differs (QQuickTextInputPrivate's
+  // paste and internalUndo). A paste over a selection is one step, though
+  // Qt keeps its removal and its insert as two. And an undo that puts back
+  // text taken while selected, by a cut, a delete, a paste or typing over
+  // it, selects it again, with the cursor where it was: Qt's puts it back
+  // unselected (QTextDocument::undo). Each removal of a selection is noted
+  // as it happens, from the text and selection just before it; the last 32
+  // are kept.
+  property string shadowText: ""
+  property int shadowStart: 0
+  property int shadowEnd: 0
+  property int shadowCursor: 0
+  property var removals: []
+  property var pastedOver: null
+  property bool undoing: false
+  // The document's text now: `text` is cached, and a selection's signals
+  // during an edit come before it catches up.
+  function live() { return area.getText(0, area.length) }
+  function noteSelection() {
+    if (live() !== shadowText) return
+    shadowStart = area.selectionStart
+    shadowEnd = area.selectionEnd
+    shadowCursor = area.cursorPosition
+  }
+  function noteText() {
+    var old = shadowText, now = live()
+    var head = old.slice(0, shadowStart), tail = old.slice(shadowEnd)
+    if (!undoing && shadowEnd > shadowStart && now.length >= head.length + tail.length
+        && now.slice(0, head.length) === head && now.slice(now.length - tail.length) === tail) {
+      removals.push({ pos: shadowStart, text: old.slice(shadowStart, shadowEnd), before: old, cursorAtStart: shadowCursor === shadowStart })
+      if (removals.length > 32) removals.shift()
+    }
+    shadowText = now
+    shadowStart = area.selectionStart
+    shadowEnd = area.selectionEnd
+    shadowCursor = area.cursorPosition
+  }
+  function undo() {
+    if (!area.canUndo) return
+    var from = live()
+    undoing = true
+    area.undo()
+    if (pastedOver && from === pastedOver.after && live() === pastedOver.mid && area.canUndo) area.undo()
+    undoing = false
+    var back = live()
+    for (var i = removals.length - 1; i >= 0; i--) {
+      var r = removals[i]
+      if (r.before !== back || back.substr(r.pos, r.text.length) !== r.text) continue
+      if (r.cursorAtStart) area.select(r.pos + r.text.length, r.pos)
+      else area.select(r.pos, r.pos + r.text.length)
+      break
+    }
+  }
+  function redo() {
+    if (!area.canRedo) return
+    var from = live()
+    undoing = true
+    area.redo()
+    if (pastedOver && from === pastedOver.before && live() === pastedOver.mid && area.canRedo) area.redo()
+    undoing = false
   }
 
   // Text selected with the pointer goes to the primary selection, as a

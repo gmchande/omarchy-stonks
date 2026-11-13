@@ -356,6 +356,12 @@ Harness {
       harness.check("by keys alone, after words typed in search, Delete takes a row and Ctrl+Z puts it back",
         !!row && gone && back, [row, gone, back, service.symbols.join(",")].join(" | "))
 
+      press("a")
+      var undoneSearch = typing("searchField") ? undoSteps(harness.find(b, "searchField")) : "search took no keys"
+      press("Esc")
+      harness.check("in search, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneSearch === undoWanted && !b.adding, undoneSearch + " | adding " + b.adding)
+
       // Yahoo's search down: the words say so beside RETRY, and Enter asks
       // again, once. Words that name none of the list's own, which Enter
       // would take at once.
@@ -461,12 +467,70 @@ Harness {
       press("↓")
       press("⏎")
       var managing = within(1500, function() { return b.managingLists })
+      // Enter renames the list; Esc leaves its name as it was.
+      press("⏎")
+      var undoneRename = typing("renameField") ? undoSteps(harness.find(b, "renameField")) : "rename took no keys"
+      press("Esc")
+      harness.check("in a list's rename, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneRename === undoWanted && b.managingLists, undoneRename + " | managing " + b.managingLists)
       press("Delete")
       press("⏎")
       var gone = within(2000, function() { return service.lists.length === 1 && service.listName === "" })
       press("Esc")
       harness.check("by keys alone, Manage lists deletes a list, and All keeps its stock",
         managing && gone && service.symbols.indexOf("SHOP") >= 0, [managing, service.lists.length, service.listName, service.symbols.join(",")].join(" "))
+    }
+
+    // Undo as Omarchy's field undoes, in the focused field `f`: a paste is a
+    // step of its own, so Ctrl+Z after typing "ab" and pasting "cd" leaves
+    // "ab", and redo brings "ab" back first; a cut, or a paste over a
+    // selection, undone brings the text back selected, the cursor where it
+    // was. The clipboard holds what the stand-in owner gives
+    // (bin/wl-paste), for a field that reads it either way. Each step's
+    // text, cursor and selection, as `undoWanted` holds them.
+    readonly property string undoWanted: "abcd 4 4 4 | ab 2 2 2 |  0 0 0 | ab 2 2 2 | abcd 4 4 4 | msft 4 0 4 | abc def 4 4 7"
+    function undoSteps(f) {
+      var C = Qt.ControlModifier, S = Qt.ShiftModifier
+      var at = function() { return [f.text, f.cursorPosition, f.selectionStart, f.selectionEnd].join(" ") }
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var give = function(text) {
+        flag.command = ["sh", "-c", 'printf text > "$1/wl-paste.owner" && printf %s "$2" > "$1/wl-paste.text"', "sh", Quickshell.env("STONKS_FAKE_STATE"), text]
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+        Quickshell.clipboardText = text
+      }
+      var clear = function() { keyClick(Qt.Key_A, C); keyClick(Qt.Key_Backspace) }
+      var got = []
+      clear()
+      type("ab")
+      give("cd")
+      keyClick(Qt.Key_V, C)
+      within(2000, function() { return f.text === "abcd" })
+      got.push(at())
+      keyClick(Qt.Key_Z, C)
+      got.push(at())
+      keyClick(Qt.Key_Z, C)
+      got.push(at())
+      keyClick(Qt.Key_Z, C | S)
+      got.push(at())
+      keyClick(Qt.Key_Z, C | S)
+      got.push(at())
+      clear()
+      type("msft")
+      keyClick(Qt.Key_A, C)
+      keyClick(Qt.Key_X, C)
+      keyClick(Qt.Key_Z, C)
+      got.push(at())
+      clear()
+      type("abc def")
+      for (var i = 0; i < 3; i++) keyClick(Qt.Key_Left, S)
+      give("XY")
+      keyClick(Qt.Key_V, C)
+      within(2000, function() { return f.text === "abc XY" })
+      keyClick(Qt.Key_Z, C)
+      got.push(at())
+      clear()
+      return got.join(" | ")
     }
 
     // A text field's keys, as Omarchy's own field takes them, in a new
@@ -548,6 +612,11 @@ Harness {
       var atStart = within(2000, function() { return seen() === "NVDAabc def 4 4 4 true" })
       harness.check("Ctrl+V pastes over the selection and Shift+Insert at the cursor",
         over && atStart, [over, atStart, seen()].join(" | "))
+
+      var undoneName = undoSteps(field)
+      harness.check("in a new list's name, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        undoneName === undoWanted, undoneName)
+      fresh()
 
       // 4096 bytes land; one more, and nothing does.
       var full = new Array(4097).join("x")
