@@ -63,13 +63,16 @@ only 'Commands\.readSaved\b' FileRead.qml
 only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' Sounds.qml
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
-# Every command the camera and the file keeper run is under `timeout`, and
-# so are the sounds' survey, the text field's paste and the file reader's
-# read: those written there, and those in Commands.js.
-none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-for made in screenshotName createPrivately soundSurvey pastedText readSaved; do
-  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", " Commands.js || fail "Commands.js: $made does not start with timeout"
+# Every finite command runs under `timeout` with a kill after it: those the
+# camera, the file keeper and the sounds write out, and those Commands.js
+# and Fetch.js make. The chimes' one shell runs while sounds are on, each
+# chime under its own; the update's are a terminal and a restart, started
+# apart from the shell.
+none 'command:\s*\[(?!"timeout", "-k", "1",)' Camera.qml OwnerOnly.qml Sounds.qml
+for made in screenshotName createPrivately soundSurvey bellCheck pastedText readSaved; do
+  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", \"-k\", \"1\", " Commands.js || fail "Commands.js: $made does not start with timeout -k 1"
 done
+rg -qUP 'function curlCommand\([^)]*\) \{\n  return \["timeout", "-k", "1", ' Fetch.js || fail "Fetch.js: curlCommand does not start with timeout -k 1"
 # Hyprland's dispatcher can start a program too: only the plugin's entry
 # reaches Hyprland, to hand it on, and the one dispatch is the window
 # host's, which focuses the window.

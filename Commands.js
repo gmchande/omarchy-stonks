@@ -8,7 +8,7 @@
 // Omarchy 4.0's. Cut at 8 KB, twice Linux's PATH_MAX, and a byte past, so an
 // answer over the cap names no file.
 function screenshotName(symbol, omasnapFolder, pictures) {
-  return ["timeout", "5", "sh", "-c", "{\n"
+  return ["timeout", "-k", "1", "5", "sh", "-c", "{\n"
     + "if command -v omasnap > /dev/null; then\n"
     + "  editor=omasnap\n"
     + "  conf=$2\n"
@@ -197,7 +197,7 @@ function iniValue(raw) {
 // command starts: a command line is world-readable, /proc/PID/environ is
 // 0400.
 function createPrivately(path) {
-  return ["timeout", "5", "sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
+  return ["timeout", "-k", "1", "5", "sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
     + "printf '%s' \"$STONKS_TEXT\" > \"$tmp\" && ln -- \"$tmp\" \"$1\"\n"
     + "code=$?\n"
     + "rm -f -- \"$tmp\"\n"
@@ -229,7 +229,7 @@ function readSavedFile(code, bytes, text, cap) {
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is
 // read up to 64.
 function soundSurvey(pluginFolder, cacheFolder) {
-  return ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml Waking.js sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
+  return ["timeout", "-k", "1", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml Waking.js sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
     + "for look in smooth retro; do\n"
     + "  [ -f \"stamp-$look\" ] || continue\n"
     + "  printf 'stamp %s %s\\n' \"$look\" \"$(head -c 64 -- \"stamp-$look\")\"\n"
@@ -262,9 +262,11 @@ function readSoundSurvey(text, fixed) {
 // The bell's: quiet under Omarchy's Do Not Disturb, asked as Omarchy's
 // toggle asks it, and otherwise PipeWire's state, cut a byte past 4 MB to
 // show an answer over the cap. omarchy-shell's -q would hide its answer too.
+// Each has its own time; the whole has 8 s, past both, and a stop ends both:
+// --foreground keeps each in the whole's process group.
 function bellCheck() {
-  return ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
-    + "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
+  return ["timeout", "-k", "1", "8", "bash", "-c", "[ \"$(timeout --foreground -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
+    + "set -o pipefail; timeout --foreground -k 1 3 pw-dump | head -c 4000001"]
 }
 
 // An app's capture stream running, not one reading a speaker's monitor, as

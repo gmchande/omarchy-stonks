@@ -82,5 +82,8 @@ Item {
       }
       onStreamFinished: root.end(String(text || ""))
     }
+    // A command that fails to start ends with no stream's end: the run ends
+    // there, with no answers.
+    onRunningChanged: if (!running && root.out) root.end("")
   }
 }

@@ -86,18 +86,26 @@ Item {
           root.shotTaken = null
           root.shotItem = null
           if (taken) taken()
-          if (result.saveToFile(root.shotFile)) copying.running = true
-          else root.finish(1)
+          if (!result.saveToFile(root.shotFile)) return root.finish(1)
+          copying.code = -1
+          copying.running = true
         })) root.finish(1)
       }
     }
+    // A command that fails to start ends with no stream's end.
+    onRunningChanged: if (!running && root.shotDone && root.shotFile === "") root.finish(1)
   }
 
+  // Read as `running` falls, since a command that fails to start never
+  // exits.
   Process {
     id: copying
-    command: ["timeout", "5", "sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile]
-    onExited: function(code) {
-      if (code === 0) announcing.running = true
+    property int code: -1
+    command: ["timeout", "-k", "1", "5", "sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile]
+    onExited: function(code) { copying.code = code }
+    onRunningChanged: {
+      if (running) return
+      if (copying.code === 0) announcing.running = true
       else root.finish(2)
     }
   }
@@ -106,8 +114,8 @@ Item {
   // then.
   Process {
     id: announcing
-    command: ["timeout", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
+    command: ["timeout", "-k", "1", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
       "Click to edit", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
-    onExited: root.finish(0)
+    onRunningChanged: if (!running) root.finish(0)
   }
 }

@@ -8,6 +8,7 @@ import { load } from "./load.js"
 // shell runs them, each in a scratch folder. A tool that would reach the
 // desktop, such as pw-dump or omarchy, is a stand-in first on PATH.
 const C = load("Commands.js")
+const F = load("Fetch.js")
 const root = join(import.meta.dir, "..")
 
 function scratch(body) {
@@ -172,6 +173,32 @@ test("the bell keeps quiet under Do Not Disturb and while an app records, and ri
   // An answer that doesn't read counts as recording.
   expect(ask("off", "not json")).toBe(false)
 }))
+
+// The shell stops a command as QProcess::terminate does, with a TERM to the
+// one it started: what that started ends with it. Each stand-in hangs, its
+// PID kept.
+test("a request or a bell's check stopped by the shell ends with everything it started", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
+  try {
+    const bin = join(dir, "bin")
+    for (const name of ["curl", "pw-dump"]) standIn(bin, name, `echo $$ > "${dir}/${name}.pid"\nsleep 3600 &\necho $! > "${dir}/${name}.child"\nwait\n`)
+    standIn(bin, "omarchy-shell", "echo off\n")
+    for (const [name, argv] of [["curl", F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000)], ["pw-dump", C.bellCheck()]]) {
+      const proc = Bun.spawn(argv, { env: { PATH: bin + ":" + process.env.PATH }, stdout: "ignore", stderr: "ignore" })
+      const pids = () => ["pid", "child"].map(kind => { try { return readFileSync(join(dir, `${name}.${kind}`), "utf8").trim() } catch (e) { return "" } })
+      for (let t = 0; t < 100 && pids().includes(""); t++) await Bun.sleep(20)
+      expect(pids().includes("")).toBe(false)
+      proc.kill("SIGTERM")
+      await proc.exited
+      await Bun.sleep(1500)
+      // A process gone, or a zombie no one has reaped yet, has ended.
+      const live = pid => { try { return !/^\d+ \(.*\) Z /.test(readFileSync(`/proc/${pid}/stat`, "utf8")) } catch (e) { return false } }
+      expect(pids().filter(live)).toEqual([])
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 10000)
 
 test("the chimes' player plays each chime it's sent that its names allow, and nothing else", () => scratch(dir => {
   const bin = join(dir, "bin")
