@@ -346,6 +346,16 @@ Harness {
       harness.check("by keys alone, a, the words and Enter add the stock Yahoo finds",
         searching && added, searching + " " + service.symbols.join(",") + " adding " + b.adding)
 
+      // With words typed in search since, Delete and Ctrl+Z still take the
+      // row and put it back: the field's own undo is only the field's.
+      var row = b.watchlist.cursorRow
+      press("Delete")
+      var gone = within(2000, function() { return service.symbols.indexOf(row) < 0 })
+      press("Ctrl+Z")
+      var back = within(2000, function() { return service.symbols.indexOf(row) >= 0 })
+      harness.check("by keys alone, after words typed in search, Delete takes a row and Ctrl+Z puts it back",
+        !!row && gone && back, [row, gone, back, service.symbols.join(",")].join(" | "))
+
       // Yahoo's search down: the words say so beside RETRY, and Enter asks
       // again, once. Words that name none of the list's own, which Enter
       // would take at once.

@@ -103,7 +103,10 @@ FocusScope {
     // The right-click menu, Qt's own for a TextArea in Fusion
     // (TextEditingContextMenu), but for its Paste: Qt's calls the text's own
     // paste, which reads the clipboard on the shell's thread. This one
-    // pastes once it has closed and handed the keys back to the field.
+    // pastes once it has closed and handed the keys back to the field. Its
+    // actions carry no shortcut: the field takes those keys itself, and an
+    // action's would take Ctrl+Z and the rest from the whole surface while
+    // the field is out of use.
     ContextMenu.menu: Menu {
       id: menu
       property bool pasteOwed: false
@@ -120,7 +123,6 @@ FocusScope {
         icon.name: "edit-undo"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Undo
         enabled: area.canUndo
         onTriggered: area.undo()
       }
@@ -129,7 +131,6 @@ FocusScope {
         icon.name: "edit-redo"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Redo
         enabled: area.canRedo
         onTriggered: area.redo()
       }
@@ -139,7 +140,6 @@ FocusScope {
         icon.name: "edit-cut"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Cut
         enabled: area.selectedText.length > 0
         onTriggered: area.cut()
       }
@@ -148,7 +148,6 @@ FocusScope {
         icon.name: "edit-copy"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Copy
         enabled: area.selectedText.length > 0
         onTriggered: area.copy()
       }
@@ -157,7 +156,6 @@ FocusScope {
         icon.name: "edit-paste"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Paste
         onTriggered: menu.pasteOwed = true
       }
       Action {
@@ -165,7 +163,6 @@ FocusScope {
         icon.name: "edit-delete"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.Delete
         enabled: area.selectedText.length > 0
         onTriggered: area.remove(area.selectionStart, area.selectionEnd)
       }
@@ -175,7 +172,6 @@ FocusScope {
         icon.name: "edit-select-all"
         icon.width: 24
         icon.height: 24
-        shortcut: StandardKey.SelectAll
         onTriggered: area.selectAll()
       }
     }
