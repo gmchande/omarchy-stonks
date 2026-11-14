@@ -245,7 +245,6 @@ Rectangle {
         }
 
         Text {
-          id: detailText
           visible: y >= row.menuCovers
           x: row.gap
           anchors.bottom: parent.bottom

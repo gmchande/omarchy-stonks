@@ -2176,7 +2176,7 @@ test("a quote's time no Date holds is none: its price and chart stay, and its ti
   const sent = time => M.parseChart(chartAnswer(r => { r.meta.regularMarketTime = time; r.meta.gmtoffset = 32400 }), [])
   const none = sent(undefined)
   const said = q => [M.freshnessText(M.freshness({ status: "ok", answeredAt: T0 }, q, T0 + 600, 0, false), q, null),
-    M.words({ quote: q, day: q, history: null, latest: null, scrubT: 0, changeMode: "pct", range: "1D", now: T0 + 600, calendars: null })]
+    M.words({ quote: q, day: q, history: null, scrubT: 0, changeMode: "pct", range: "1D", now: T0 + 600, calendars: null })]
   for (const bad of [1e300, 8.64e12]) {
     expect(sent(bad)).toEqual(none)
     expect(said(sent(bad))).toEqual(said(none))

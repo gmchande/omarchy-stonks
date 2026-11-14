@@ -1361,7 +1361,7 @@ test("search names the kinds it leaves out, beside what it shows or alone", () =
   expect(pair.results.map(r => r.symbol)).toEqual(["18QQ.Z", "Q0SF.Z"])
   expect(pair.note).toBe("Stonks doesn't show currencies or futures")
   // Yahoo's top answer is the currency, so search takes neither index for
-  // it (window-search.qml).
+  // it (render.qml's popup-search-eurusd states).
   expect([pair.topLeftOut, M.parseSearch(search).topLeftOut]).toEqual([true, false])
   // Three kinds, in the answer's order; a kind with no name of Stonks' own
   // goes by Yahoo's word for it.
@@ -2528,7 +2528,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const newest = model.newest
     expect(newest.t).toBe(at23)
     expect(M.historyScrubForms(chart.history, chart.history.bars.at(-1))[1]).toBe("25 OCT 2026 23:00")
-    expect(load("Share.js").words({ quote: sunday.quotes.NBIS, day: chart.day, history: chart.history, latest: chart.latest, newest, scrubT: 0,
+    expect(load("Share.js").words({ quote: sunday.quotes.NBIS, day: chart.day, history: chart.history, newest, scrubT: 0,
       calendars }).foot).toBe("SUN 25 OCT 2026 · 23:00 EDT")
   }
   // Sunday 1 November at 21:48, the clocks gone back, under a week kept from
@@ -3758,10 +3758,10 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
 // currency.
 test("a screenshot's foot says when its price is from, a close as the close, and an index's level has no currency", () => {
   const Share = load("Share.js")
-  const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, latest: null, scrubT: 0, calendars })
+  const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, scrubT: 0, calendars })
   expect(words.foot).toBe("SAT 12 SEP 2026 · 18:32 UTC")
   expect([Share.subject("BTC-USD", "1D", words.said), Share.fileSymbol("BTC-USD")]).toEqual(["BTC-USD at 18:32 UTC", "btc-usd"])
-  const scrubbed = (day, quote, t) => Share.words({ quote, day, history: null, latest: null, scrubT: t, calendars }).foot
+  const scrubbed = (day, quote, t) => Share.words({ quote, day, history: null, scrubT: t, calendars }).foot
   const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
   expect(["07:30", "12:00", "18:10"].map(clock => scrubbed(spy, spy, at("2026-09-11", clock))))
     .toEqual(["FRI 11 SEP 2026 · 07:30 EDT", "FRI 11 SEP 2026 · 12:00 EDT", "FRI 11 SEP 2026 · 18:10 EDT"])
@@ -3780,14 +3780,14 @@ test("a screenshot's foot says when its price is from, a close as the close, and
   const tops = topsAt("watch-2026-10-26-1800")
   const nbis = dayAt("watch-2026-10-26-1800", "nbis")
   const weekHistory = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
-  expect([null, weekHistory].map(history => Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history, latest: nbis.latest,
+  expect([null, weekHistory].map(history => Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history,
     newest: tops.newest.NBIS, scrubT: 0, calendars }).foot)).toEqual(["MON 26 OCT 2026 · 17:58 EDT", "MON 26 OCT 2026 · 17:58 EDT"])
   // Since the open, the picture at rest says the open its move counts from,
   // which the panel says under its ranges; not where the move counts from a
   // close, nor at night, where the day ahead hasn't opened and the move is a
   // dash. Scrubbed into the session, the panel's legend and the picture's
   // name that open, where from a close they name the dashed line.
-  const openOf = (at, built, s, mode, scrubT = 0) => Share.words({ quote: at.quotes[s], day: built.day, history: null, latest: built.latest,
+  const openOf = (at, built, s, mode, scrubT = 0) => Share.words({ quote: at.quotes[s], day: built.day, history: null,
     newest: at.newest[s] || null, scrubT, changeMode: mode, calendars }).open
   const noon = at("2026-10-26", "12:00")
   expect([openOf(tops, nbis, "NBIS", "open"), openOf(tops, nbis, "NBIS", "open", noon), openOf(tops, nbis, "NBIS", "pct")])

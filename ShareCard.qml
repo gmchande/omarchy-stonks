@@ -57,7 +57,7 @@ Rectangle {
   readonly property real u: 2 / dpr
   readonly property real px: 1 / dpr
   readonly property real margin: 64 * u
-  readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
+  readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history,
     newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, calendars: calendars }) : null
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubT !== 0)
   // At rest since the open, the open the move counts from takes the line

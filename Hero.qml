@@ -186,7 +186,6 @@ Item {
   }
 
   Text {
-    id: smoothPrice
     visible: !root.look.retro
     x: -Math.round(root.inkLeft)
     y: root.baselineY - baselineOffset
