@@ -6,11 +6,12 @@ import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// Every key the README's table lists acts, on the surface it is listed for:
-// pressed with real Qt keys through the real panel (Panel.qml, its card in
-// CardWindow.qml) and the real window (App.qml), it changes what it should
-// and nothing else. A key a handler lost, or one renamed in the README but
-// not in the handlers, fails here. HOME and curl are scratch fixtures.
+// Every key the README's table lists, and Omarchy's panel keys it names
+// after it, acts: pressed with real Qt keys through the real panel
+// (Panel.qml, its card in CardWindow.qml) and the real window (App.qml), it
+// changes what it should and nothing else. A key a handler lost, or one
+// renamed in the README but not in the handlers, fails here. HOME and curl
+// are scratch fixtures.
 Harness {
   id: harness
   marker: "KEYS DONE"
@@ -35,60 +36,48 @@ Harness {
   readonly property string readmePath: String(Qt.resolvedUrl("README.md")).replace(/^file:\/\//, "")
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
 
-  // The keys a label names, in one spelling: a capital as Shift and it, and
-  // "Delete or Backspace" as the two.
+  // The keys a label names: "Delete or Backspace" as the two.
   function tokens(label) {
-    return label.replace(/`/g, "").split(/\s+/)
-      .filter(function(t) { return t !== "" && t !== "or" })
-      .map(function(t) { return /^[A-Z]$/.test(t) ? "Shift+" + t : t })
+    return label.replace(/`/g, "").split(/\s+/).filter(function(t) { return t !== "" && t !== "or" })
   }
 
-  // The keys the README's table lists for `surface`: a row ending "(panel
-  // only)" or "(window only)" is that surface's alone (the panel's surface
-  // is named "popup" here). Null with no table.
-  function readmeKeys(surface) {
+  // The keys the README's table lists. Null with no table.
+  function readmeKeys() {
     var lines = readFile(readmePath).split("\n")
     var start = lines.indexOf("| Key | Does |")
     if (start < 0) return null
     var keys = []
-    for (var i = start + 2; i < lines.length && lines[i].charAt(0) === "|"; i++) {
-      var cells = lines[i].split("|")
-      var only = /\((panel|window) only\)$/.exec(cells[2].trim())
-      if (!only || (only[1] === "panel" ? "popup" : only[1]) === surface) keys = keys.concat(tokens(cells[1].trim()))
-    }
+    for (var i = start + 2; i < lines.length && lines[i].charAt(0) === "|"; i++) keys = keys.concat(tokens(lines[i].split("|")[1].trim()))
     return keys
   }
 
   // What Omarchy's panel keys mean in every widget's panel on the bar,
   // Stonks' among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
+  // Omarchy's panel keys Stonks answers as itself, on each surface: the
+  // window has no bar to step through.
+  function omarchyOwn(surface) {
+    return ["Esc", "Ctrl+↑", "Ctrl+↓"].concat(surface === "popup" ? ["Tab", "Shift+Tab"] : [])
+  }
 
   // The stand-in curl's flags (bin/curl): a file there turns a fault on.
   Process { id: flag }
 
-  // What the stand-in commands were given (bin/curl, bin/omarchy). Every
-  // row asked for again goes as one spark request, and an update is one
-  // omarchy command that names the plugin.
+  // What the stand-in commands were given (bin/wl-paste).
   function logged(name) {
     return readFile(Quickshell.env("STONKS_FAKE_STATE") + "/" + name).split("\n").filter(function(line) { return line !== "" })
   }
-  function sparks() { return logged("requests.log").filter(function(line) { return line.indexOf("spark ") === 0 }).length }
-  function updateRuns() { return logged("omarchy.log").filter(function(line) { return line.indexOf("plugin update grvc.stonks") >= 0 }).length }
 
-  // The wall's clock, and as far ahead of it as a step has set: prices this
-  // fresh are asked for again only ten seconds on.
-  property int ahead: 0
-  Stonks.Service { id: service; pluginId: "grvc.stonks"; wallClock: function() { return Math.floor(Date.now() / 1000) + harness.ahead } }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service, updates: updates, camera: camera } }
-    function updateEntryInline(id, settings) { harness.entrySaves++; return true }
+    function updateEntryInline(id, settings) { return true }
   }
-  // The pill the panel opened from, and its bar entry's saves.
-  property int entrySaves: 0
+  // The pill the panel opened from.
   Stonks.BarWidget { id: pill; bar: api; moduleName: "grvc.stonks"; settings: ({ id: "grvc.stonks", barStyle: "sparkline" }) }
   PluginBarApi {
     id: api
@@ -133,9 +122,8 @@ Harness {
         symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
-        help: b.showingHelp, open: b.surfaceOpen, refreshes: harness.sparks(), tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: harness.updateRuns(),
-        pill: pill.barStyle, entrySaves: harness.entrySaves }
+        help: b.showingHelp, open: b.surfaceOpen, tabs: harness.tabs, direction: harness.tabDirection,
+        rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -146,15 +134,10 @@ Harness {
       var b = s.body
       b.undoRemoval()
       b.closeViews()
-      // As a surface opens: the camera out, so Ctrl+C lights it again.
-      b.cameraLit = false
       b.endScrub()
       if (service.listName !== "") service.switchList("")
       if (service.order !== "manual") service.setOrder("manual")
       if (service.range !== "1D") service.setRange("1D")
-      if (!service.soundsOn) service.persist({ sounds: true })
-      // No newer Stonks out, so Shift+U has nothing to run.
-      updates.mainVersion = ""
       var rows = b.watchlist.displayedSymbols
       service.feature(rows[rows.length - 1])
       // As a person waits for the chart before moving along it: a row's day
@@ -178,13 +161,8 @@ Harness {
       // A row held only by All, which these keys remove directly.
       "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
-      "Shift+O": function(s) { service.setOrder("pct") },
-      // A newer Stonks on main, which the footer offers.
-      "Shift+U": function(s) { updates.mainVersion = "99.0.0" },
       // The day is the first range.
-      "[": function(s) { service.setRange("1W") },
-      // Past the ten seconds in which prices just answered aren't asked again.
-      "r": function(s) { harness.ahead += 11 }
+      "[": function(s) { service.setRange("1W") }
     })
 
     // One key, as a person presses it; false for a key it can't name. A
@@ -231,8 +209,7 @@ Harness {
       } else if (token === "[" || token === "]") {
         changed = ["range"]
         effect = function() { return service.range === (token === "[" ? "1D" : "1W") }
-      } else if (token === "p") { changed = ["scrub", "replay"]; effect = function() { return b.motion.replayRunning } }
-      else if (token === "a" || token === "/") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
+      } else if (token === "a" || token === "/") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
       else if (token === "Delete" || token === "Backspace") {
         changed = ["symbols", "cursor"]
         effect = function() { return service.symbols.join(",") === rows.filter(function(r) { return r !== selected }).join(",") }
@@ -248,37 +225,17 @@ Harness {
       } else if (token === "o") {
         changed = ["order", "cursor"]
         effect = function() { return service.order === "symbol" }
-      } else if (token === "Shift+O") {
-        changed = ["reversed", "cursor"]
-        effect = function() { return service.reversed === !before.reversed }
       } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
-      else if (token === "b") {
-        changed = ["pill", "entrySaves"]
-        var form = {sparkline:"arrow", arrow:"text", text:"icon", icon:"sparkline"}[before.pill]
-        effect = function() { return pill.barStyle === form && harness.entrySaves === before.entrySaves + 1 }
-      } else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
-      else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return harness.updateRuns() === before.updates + 1 } }
-      else if (token === "c") {
-        changed = ["mode"]
-        var mode = {pct:"abs", abs:"open", open:"pct"}[before.mode]
-        effect = function() { return service.changeMode === mode }
-      } else if (token === "s") {
+      else if (token === "s") {
         changed = ["retro"]
         effect = function() { return service.retro === !before.retro }
-      } else if (token === "m") {
-        changed = ["sounds"]
-        effect = function() { return service.soundsOn === !before.sounds }
-      } else if (token === "Ctrl+C") {
-        changed = ["camera"]
-        effect = function() { return b.cameraLit }
-      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return harness.sparks() === before.refreshes + 1 } }
-      else if (token === "Tab" || token === "Shift+Tab") {
+      } else if (token === "Tab" || token === "Shift+Tab") {
         changed = ["tabs", "direction"]
         effect = function() { return harness.tabs === before.tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
       else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
       if (!effect || !press(pressed)) return false
-      return within(token === "Ctrl+C" ? 3000 : 1500, function() {
+      return within(1500, function() {
         var after = state(b)
         return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
       })
@@ -298,9 +255,10 @@ Harness {
     }
 
     function walk(s) {
-      var listed = harness.readmeKeys(s.name)
-      var dead = (listed || []).filter(function(t) { return !acts(s, t) })
-      harness.check("in the " + s.name + ", every README key does its documented action (" + (listed || []).length + " keys)",
+      var listed = harness.readmeKeys()
+      var dead = (listed || []).concat(harness.omarchyOwn(s.name)).filter(function(t) { return !acts(s, t) })
+      harness.check("in the " + s.name + ", every README key and Omarchy's Esc and Ctrl+↑ ↓" + (s.name === "popup" ? ", Tab and Shift+Tab" : "")
+        + " do their documented action (" + (listed || []).length + " README keys)",
         listed !== null && dead.length === 0, listed === null ? "no key table in the README" : "wrong: " + dead.join(" "))
       // Ctrl moves a row; Shift, which moved it once, moves the selection alone.
       base(s)
@@ -729,11 +687,6 @@ Harness {
       // The window has no bar to step through; a Tab there must leave the
       // keys with the window.
       base(harness.window)
-      var still = state(harness.window.body)
-      press("b")
-      harness.check("in the window, b leaves the pill's form alone",
-        !within(200, function() { return JSON.stringify(state(harness.window.body)) !== JSON.stringify(still) }),
-        pill.barStyle + " " + harness.entrySaves)
       press("Tab")
       press("o")
       harness.check("in the window, after Tab a key still does its action",

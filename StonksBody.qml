@@ -39,8 +39,6 @@ Item {
   property string headerWhenMissing: "No data"
   // The panel's: Tab steps to the next widget's panel.
   property bool switchesPanels: false
-  // The panel's: the pill it opened from, whose form `b` changes.
-  property var pill: null
   property int margins: 0
 
   property int chartHeight: Style.space(190)
@@ -716,18 +714,18 @@ Item {
 
   // ---- Keys, and what they change
 
-  // The keys both surfaces answer; each reads Esc, and the panel Tab, itself.
+  // The `?` sheet's keys, which both surfaces answer; each reads Esc, and
+  // the panel Tab, itself. Ctrl with ↑ or ↓ moves a row, as Omarchy's
+  // panels reorder.
   function pressKey(event) {
     var key = event.key
     var mods = event.modifiers & ~Qt.KeypadModifier
-    // A letter's command is its key and Shift, never its text: Caps Lock
-    // sends "O" for o, which would reverse the order.
+    // A letter's command is its key, never its text: Caps Lock sends "S"
+    // for s.
     var t = KeyText.typed(event)
-    if (mods === Qt.ControlModifier && key === Qt.Key_C) takeScreenshot()
-    else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
+    if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
     else if (mods === Qt.ControlModifier && key === Qt.Key_Up) moveSelected(-1)
     else if (mods === Qt.ControlModifier && key === Qt.Key_Down) moveSelected(1)
-    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
     else if (key === Qt.Key_Up) moveCursor(-1)
     else if (key === Qt.Key_Down) moveCursor(1)
     else if (key === Qt.Key_Left) nudgeScrub(-1)
@@ -736,23 +734,16 @@ Item {
     else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
     else if (t === "?") toggleHelp()
     else if (t === "a" || t === "/") startAdding()
-    else if (t === "c") cycleChangeMode()
-    else if (t === "r") refreshRequested()
     else if (t === "[") stepRange(-1)
     else if (t === "]") stepRange(1)
-    else if (t === "p") replay()
     else if (t === "s") toggleStyle()
-    else if (t === "m") toggleSounds()
     else if (t === "o") cycleOrder()
-    else if (t === "O") reverseOrder()
-    else if (t === "U") runOffered()
     else if (t === "w") openListMenu()
-    else if (t === "b" && pill) pill.cycleBarStyle()
     else return false
     return true
   }
 
-  // The order and the change mode are separate settings; each key moves one.
+  // The order and the change mode are separate settings; each click moves one.
   function cycleChangeMode() {
     showingHelp = false
     if (service) service.persist({ changeMode: Settings.nextChangeMode(changeMode) })
@@ -1048,12 +1039,6 @@ Item {
   }
 
   readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
-  function runOffered() {
-    if (!updates) return
-    if (footerSays.restartOffered) updates.restart()
-    else if (footerSays.updateOffer !== "") updates.update(footerSays.restartable)
-    else say("Nothing to update")
-  }
 
   readonly property string stillUnsaved: "Still not saved · your disk may be full"
   property bool savingAgain: false

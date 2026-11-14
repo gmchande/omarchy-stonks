@@ -7,14 +7,14 @@ import qs.Ui
 import "plugin" as Stonks
 
 // The screenshot, through the real panel (Panel.qml, its card in
-// CardWindow.qml) by keys and the real window (App.qml) by the pointer,
-// with stand-ins first on PATH for wl-copy and omarchy-notification-send
-// (bin/) that record what they get: Ctrl+C and a click on the camera each
-// save one picture, named for the symbol and the moment, in the folder the
-// reader's user-dirs.dirs names for pictures, put that picture on the
-// clipboard as a PNG, and send Omarchy's notification with that file, its
-// thumbnail and a click to edit it; the picture is of the chart on show,
-// its symbol, range, and scrub, never the list. Then, with Omasnap absent
+// CardWindow.qml) and the real window (App.qml), with stand-ins first on
+// PATH for wl-copy and omarchy-notification-send (bin/) that record what
+// they get: a click on the camera saves one picture, named for the symbol
+// and the moment, in the folder the reader's user-dirs.dirs names for
+// pictures, puts that picture on the clipboard as a PNG, and sends
+// Omarchy's notification with that file, its thumbnail and a click to edit
+// it; the picture is of the chart on show, its symbol, range, and the
+// moment moved to by keys, never the list. Then, with Omasnap absent
 // and present (camera.sh), the folder and editor each version of Omarchy
 // uses, under each version's settings. HOME and curl are scratch. With
 // STONKS_CAMERA_SIZES=1 (all.sh's runs at QT_SCALE_FACTOR=2 and 1.75) only
@@ -213,21 +213,26 @@ Harness {
       // Every row's symbol and every list's name, the one on show too: none
       // is the chart's, so none may be on the picture.
       var rows = service.allSymbols.concat(service.lists.map(function(l) { return l.label }), ["All"])
+      // A click on a surface's camera, as a hand gives it.
+      var snap = function(body) {
+        var button = find(body, "cameraButton")
+        tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
+        waitForRendering(button)
+        mouseClick(button, button.width / 2, button.height / 2)
+      }
 
-      // The panel by keys, in smooth, on AAPL's day at rest.
+      // The panel, in smooth, on AAPL's day at rest.
       service.feature("AAPL")
       panel.open()
       var body = panel.body
       tryVerify(function() { return body && body.surfaceOpen && !body.chartLoading && body.featuredSymbol === "AAPL" }, 5000)
-      panel.refocusKeys()
-      tryVerify(function() { return harness.find(panel.keyboardPanel.card, "bodyKeys").activeFocus }, 2000)
       var still = shots().length
       var unlit = !body.cameraLit
-      var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+      var rest = shoot(body, function() { snap(body) })
       var lit = body.cameraLit
       // The after-hours trade on top, at 17:31.
       var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", /^TUE 1 SEP 2026 · 17:31 EDT$/, rows))
-      check("Ctrl+C in the panel saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
+      check("a click on the panel's camera saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       // The day's line starts 6 of the picture's pixels in from the chart's
       // edge, whatever the screen's scale.
@@ -235,15 +240,17 @@ Harness {
         Math.abs(rest.card.inset - 6) < 0.01, String(rest.card.inset))
 
       if (!harness.sizeOnly) {
-        // Scrubbed back two steps, into AAPL's after hours: the picture shows
-        // the scrub and says its date and time at its foot, and the footer
-        // names it.
+        // Moved back two steps by keys, into AAPL's after hours: the picture
+        // shows that moment and says its date and time at its foot, and the
+        // footer names it.
+        panel.refocusKeys()
+        tryVerify(function() { return harness.find(panel.keyboardPanel.card, "bodyKeys").activeFocus }, 2000)
         keyClick(Qt.Key_Left)
         keyClick(Qt.Key_Left)
         tryVerify(function() { return body.scrubT !== 0 }, 2000)
-        var scrubbed = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+        var scrubbed = shoot(body, function() { snap(body) })
         problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", /^TUE 1 SEP 2026 · \d\d:\d\d [A-Z]+$/, rows))
-        check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its date and time at its foot, and the footer says it too",
+        check("moved along by ← and then a click on the camera, the picture shows that moment and says its date and time at its foot, and the footer says it too",
           problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && scrubbed.card.foot !== rest.card.foot
             && scrubbed.name !== rest.name,
           problems.join("; ") + " | " + scrubbed.card.foot + " | " + scrubbed.footer)
@@ -251,15 +258,17 @@ Harness {
         // Since the open, still scrubbed: the picture says what the move
         // counts from in the words the panel's legend says it.
         var mode = service.changeMode
-        for (var press = 0; press < 3 && service.changeMode !== "open"; press++) keyClick(Qt.Key_C)
+        service.persist({ changeMode: "open" })
+        panel.refocusKeys()
+        tryVerify(function() { return harness.find(panel.keyboardPanel.card, "bodyKeys").activeFocus }, 2000)
         keyClick(Qt.Key_Left)
         tryVerify(function() { return body.changeMode === "open" && body.scrubT !== 0 }, 2000)
         var legend = body.baselineText
-        var opened = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+        var opened = shoot(body, function() { snap(body) })
         var said = opened.card.texts || []
         check("since the open, a scrubbed picture names what its move counts from as the panel's legend does",
           opened.card.scrubT === body.scrubShown && legend !== "" && said.indexOf(legend) >= 0, legend + " against " + said.join(" | "))
-        for (press = 0; press < 3 && service.changeMode !== mode; press++) keyClick(Qt.Key_C)
+        service.persist({ changeMode: mode })
 
         // Lit through the close's fade, and out when the panel opens again;
         // the wait lets the fade end.
@@ -282,10 +291,7 @@ Harness {
       app.open("{}")
       var win = app.body
       tryVerify(function() { return win && win.surfaceOpen && !win.chartLoading && win.historyShown && win.retro }, 8000)
-      var button = find(win, "cameraButton")
-      tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
-      waitForRendering(button)
-      var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
+      var year = shoot(win, function() { snap(win) })
       problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", /^TUE 1 SEP 2026 · CLOSE 16:00 EDT$/, rows))
       var marks = harness.marksSaid(win)
       if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
@@ -297,20 +303,17 @@ Harness {
         return
       }
 
-      // The pointer on the chart scrubs it, and Ctrl+C takes that moment: the
-      // way a mouse hand takes a scrubbed picture, since leaving the chart
-      // for the camera ends the scrub.
+      // Moved back by keys, a click on the camera takes the bar the window
+      // shows.
       harness.find(app.floatingWindow.contentItem, "keyCatcher").forceActiveFocus()
-      var chart = win.chartItem
-      mouseMove(chart, chart.width * 0.4, chart.height / 2)
+      keyClick(Qt.Key_Left)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
-      var hovered = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", /^\d{1,2} [A-Z]{3} \d{4}/, rows))
-      check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
-        problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
-        problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)
-      mouseMove(win, 1, 1)
-      tryVerify(function() { return win.scrubT === 0 }, 2000)
+      var moved = shoot(win, function() { snap(win) })
+      problems = landed(moved, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(moved, "AAPL", "1Y", /^\d{1,2} [A-Z]{3} \d{4}/, rows))
+      check("moved along the window's 1Y by ←, a click on the camera takes the bar it shows",
+        problems.length === 0 && moved.card.scrubT === win.scrubShown && moved.card.scrubX >= 0,
+        problems.join("; ") + " | " + moved.card.scrubT + " vs " + win.scrubShown)
+      win.endScrub()
 
       // Omarchy 4.5 hands its screenshots to Omasnap, which keeps them in a
       // folder of its own; 4.0 to Tensaku, in the pictures folder. Each shot
@@ -345,8 +348,7 @@ Harness {
         var env = step.env
         if (step.omasnap) env.PATH = Quickshell.env("STONKS_OMASNAP") + ":" + Quickshell.env("PATH")
         camera.testEnvironment = env
-        harness.find(app.floatingWindow.contentItem, "keyCatcher").forceActiveFocus()
-        var shot = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) }, step.folder)
+        var shot = shoot(win, function() { snap(win) }, step.folder)
         problems = landed(shot, "aapl", /^AAPL 1Y at .+$/, step.folder, step.editor)
         check(step.label, problems.length === 0, problems.join("; "))
       }

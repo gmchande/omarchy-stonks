@@ -3,13 +3,15 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Ui
 import "plugin" as Stonks
 
 // What looks clickable acts, by the pointer alone but for the words typed
-// into search. The real window (App.qml) on the real service, with real Qt
-// pointer events. Each step is judged by what the lists and the surface
-// then hold: a handler that lost its target, or a target that lost its
-// handler, fails here. HOME and curl are scratch fixtures.
+// into search. The real window (App.qml) and the real pill (BarWidget.qml)
+// on the real service, with real Qt pointer events. Each step is judged by
+// what the lists, the surface and the stand-in commands then hold: a
+// handler that lost its target, or a target that lost its handler, fails
+// here. HOME and curl are scratch fixtures.
 Harness {
   id: harness
   marker: "MOUSE DONE"
@@ -19,6 +21,28 @@ Harness {
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
+  // The pill on a bar of its own, and its bar entry's saves.
+  property int entrySaves: 0
+  QtObject {
+    id: shellApi
+    function serviceFor(id) { return { service: service, updates: updates, camera: camera } }
+    function updateEntryInline(id, settings) { harness.entrySaves++; return true }
+  }
+  PluginBarApi { id: barApi; pluginId: "grvc.stonks"; moduleName: "grvc.stonks"; shell: shellApi }
+  FloatingWindow {
+    visible: true
+    implicitWidth: 320
+    implicitHeight: 52
+    Stonks.BarWidget {
+      id: pill
+      y: 10
+      width: implicitWidth
+      height: 32
+      bar: barApi
+      moduleName: "grvc.stonks"
+      settings: ({ id: "grvc.stonks", barStyle: "sparkline" })
+    }
+  }
   // The clipboard's owner, as the stand-in wl-paste reads it (bin/wl-paste).
   Process { id: owning }
 
@@ -146,6 +170,30 @@ Harness {
       click("helpToggle")
       harness.check("the header's look, sound, camera and ? each act, and ? again closes the sheet",
         looked && sounded && shot && sheet && within(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
+
+      click("animal")
+      harness.check("a click on the bull or the bear replays the chart",
+        within(1500, function() { return body.motion.replayRunning }), body.animalKind)
+      body.endScrub()
+
+      // A newer Stonks out: the footer offers it, and a click runs the update.
+      var runs = function() {
+        return harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/omarchy.log").split("\n")
+          .filter(function(line) { return line.indexOf("plugin update grvc.stonks") >= 0 }).length
+      }
+      var ran = runs()
+      updates.mainVersion = "99.0.0"
+      var offered = within(1500, function() { var button = harness.find(body, "footerUndo"); return !!button && button.visible })
+      click("footerUndo")
+      harness.check("with a newer Stonks out, a click on \"Update to\" runs the update",
+        offered && within(2000, function() { return runs() === ran + 1 }), [offered, runs() - ran].join(" "))
+      updates.mainVersion = ""
+
+      var form = ({ sparkline: "arrow", arrow: "text", text: "icon", icon: "sparkline" })[pill.barStyle]
+      var saves = harness.entrySaves
+      click(pill, Qt.MiddleButton)
+      harness.check("a middle-click on the pill changes its look and saves it",
+        within(1500, function() { return pill.barStyle === form && harness.entrySaves === saves + 1 }), pill.barStyle + " " + harness.entrySaves)
 
       // The words are typed; the rest is the pointer's.
       click("footerText")

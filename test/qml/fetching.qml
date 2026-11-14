@@ -484,8 +484,8 @@ Harness {
         recovered > 0 && marks().length === 0, (recovered ? recovered - askedAt : "never") + " s | " + marks().join(" | "))
 
       // No network for two minutes, as on a train: the pause between tries
-      // grows to about a minute, and r tries at once instead of waiting it
-      // out.
+      // grows to about a minute, and RETRY, on a chart that failed meanwhile,
+      // tries at once instead of waiting it out.
       touch("YAHOO.offline")
       var pausedLong = false, offline = ""
       for (var offFor = 0; offFor < 240 && !(pausedLong && offline !== ""); offFor++) {
@@ -499,7 +499,7 @@ Harness {
       app.refresh()
       var tried = within(2000, function() { return harness.yahoo(harness.requests().slice(rFrom)).length > 0 })
       settle()
-      harness.check("no network: the header says it can't connect, and once it is back r asks at once and its answer reopens Yahoo",
+      harness.check("no network: the header says it can't connect, and once it is back RETRY asks at once and its answer reopens Yahoo",
         pausedLong && /^Can't connect/.test(offline) && tried && service.now === pressedAt && gate.pause === "",
         [pausedLong, offline, tried, service.now - pressedAt, gate.pause].join(" | "))
       closeWindow()
