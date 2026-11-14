@@ -5,7 +5,6 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Cells.js" as Cells
-import "Motion.js" as Motion
 // The header: the animal, the stock's name over its status, the speaker, the
 // camera, the look and the ?, with a rule under them, as a shell panel's hero
 // has. The words start after the animal's slot, drawn or not, so neither the
@@ -321,7 +320,6 @@ Item {
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     HeaderPress {
       id: helpPress
       objectName: "helpToggle"
