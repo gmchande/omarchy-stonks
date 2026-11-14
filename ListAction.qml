@@ -2,8 +2,9 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 
-// A word that acts as a button. A disabled MouseArea keeps the hover it
-// had, so `hovered` checks `enabled` too.
+// A word that acts as a button, on the shell's resting fill (Style's
+// normal fill) so it reads as one before the pointer finds it. A disabled
+// MouseArea keeps the hover it had, so `hovered` checks `enabled` too.
 Text {
   id: root
 
@@ -25,14 +26,18 @@ Text {
 
   Rectangle {
     z: -1
+    // Inside today's room: the gap between two buttons in a row stays
+    // open, and the box centres on the letters, not their last spacing.
     anchors.centerIn: parent
-    width: parent.implicitWidth + Style.space(12)
-    height: parent.implicitHeight + Style.space(4)
+    anchors.horizontalCenterOffset: -root.font.letterSpacing / 2
+    width: parent.implicitWidth - root.font.letterSpacing + Style.space(10)
+    height: parent.implicitHeight + Style.space(6)
     radius: root.look.retro ? 0 : Style.cornerRadius
     // The pressed fill while the button is down.
     color: mouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
       : root.hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
-      : root.enterTakes ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+      : root.enterTakes ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+      : Style.normalFillFor(root.look.foreground, Commons.Color.accent)
   }
 
   MouseArea {
