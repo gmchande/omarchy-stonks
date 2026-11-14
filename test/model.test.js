@@ -1240,6 +1240,10 @@ test("each trade says its own time across a change of clocks, the 1D's day keeps
   const sundayTrade = { t: at("2026-11-01", "21:00"), p: 100.5, s: "overnight" }
   const sunday = M.dayChart(quote, { bars: [sundayTrade], through: sundayTrade.t }, calendars)
   expect(M.extendedStack(quote, sunday.latest, at("2026-11-01", "21:05"), sunday.day)).toMatchObject({ label: "OVERNIGHT", time: "21:00" })
+  // Before the chart has its day, the trade's time is read on the
+  // calendars all the same: Sunday night is in winter time, not in the
+  // summer time of Friday's quote.
+  expect(M.extendedStack(quote, sunday.latest, at("2026-11-01", "21:05"), null, "pct", calendars)).toMatchObject({ time: "21:00" })
   // Each day's trades stand at their times, from its first trade, or the
   // open if that is earlier, to its end while it runs and to its last trade
   // once it is over. Friday in summer time, over once Robinhood's answer
