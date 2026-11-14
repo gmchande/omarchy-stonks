@@ -104,7 +104,7 @@ Item {
     return Chart.retroColumn(grid, fraction)
   }
 
-  // The centre of the column `layout` puts it in.
+  // The centre of the column `columnAt` puts it in.
   function xAt(fraction) {
     return columnAt(fraction) * grid.pitch + pixel / 2
   }

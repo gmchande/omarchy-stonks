@@ -8,7 +8,7 @@
 # notification with that file. Then the folder and the editor on Omarchy 4.0
 # and 4.5, with Omasnap absent and present, under each version's settings.
 # The shell's layer-shell card window does not load offscreen, so the copy
-# of Panel.qml puts the card in CardWindow.qml, as sounds.sh does. HOME and
+# of Panel.qml puts the card in CardWindow.qml (lib.sh's card_window). HOME and
 # curl are scratch; the scratch HOME names its Pictures folder in
 # user-dirs.dirs, as a reader's may.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

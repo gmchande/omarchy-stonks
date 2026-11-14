@@ -254,7 +254,7 @@ Item {
     }
 
     // The blocks stand a band's gap apart, and the list's header a group's gap
-    // over its rows (`listGap`), so it groups with them.
+    // over its rows (`StonksBody.groupGap`), so it groups with them.
     RangeSelector {
       id: rangeRow
       objectName: "rangeRow"

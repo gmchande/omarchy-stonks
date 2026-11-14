@@ -57,12 +57,12 @@ Harness {
         try { return Settings.settingsEqual(JSON.parse(harness.readFile(harness.file)), service.fileSettings) } catch (e) { return false }
       })
     }
-    // The words the footer shows.
     // The footer's words, clicked as a person clicks them.
     function clickFooter() {
       var words = harness.find(body, "footerText")
       mouseClick(words, words.width / 2, words.height / 2)
     }
+    // The words the footer shows.
     function footer() {
       var out = []
       var walk = function(node) {

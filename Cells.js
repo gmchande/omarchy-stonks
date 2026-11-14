@@ -57,7 +57,7 @@ function blockCells(text) {
 // 20 by 14, front on. The bull reads by its long horns and nostrils, the
 // bear by round ears notched underneath and cheeks wider than its ears: an
 // outline running straight up into the ears reads as a cat.
-// test/qml/render.qml draws the other candidates beside these.
+// test/qml/render.qml's sprite-candidates draws them at three sizes.
 var BULL_SPRITE = [
   "....................",
   "#..................#",
