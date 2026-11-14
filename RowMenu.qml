@@ -53,12 +53,13 @@ OverRows {
     event.accepted = true
   }
 
+  // The list menu's border (ListMenu.qml).
   Rectangle {
     anchors.fill: parent
     radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
-    border.width: 1
-    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
+    border.width: Style.normalBorderWidth
+    border.color: Qt.tint(root.background, Style.normalBorderFor(root.look.foreground, Commons.Color.accent))
   }
 
   RowPointer {

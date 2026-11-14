@@ -170,14 +170,15 @@ OverRows {
     else event.accepted = true
   }
 
-  // Qt draws a border in place of the fill, so a translucent edge would
-  // show the rows' cursor bar under it.
+  // The shell's resting control border, as the search field and the
+  // footer wear it. Qt draws a border in place of the fill, so it is mixed
+  // into the ground: a translucent edge would show the rows under it.
   Rectangle {
     anchors.fill: parent
     radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
-    border.width: 1
-    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
+    border.width: Style.normalBorderWidth
+    border.color: Qt.tint(root.background, Style.normalBorderFor(root.look.foreground, Commons.Color.accent))
   }
 
   RowPointer {
