@@ -734,6 +734,7 @@ Item {
     else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
     else if (t === "?") toggleHelp()
     else if (t === "a" || t === "/") startAdding()
+    else if (t === "r") refreshRequested()
     else if (t === "[") stepRange(-1)
     else if (t === "]") stepRange(1)
     else if (t === "s") toggleStyle()

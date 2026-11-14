@@ -11,7 +11,8 @@ function sheet() {
         { key: "⏎", does: "Show the row's chart" },
         { key: "a /", does: "Find or add a symbol" },
         { key: "Del ⌫", does: "Remove the selected row" },
-        { key: "Ctrl+Z", does: "Undo a removal" }
+        { key: "Ctrl+Z", does: "Undo a removal" },
+        { key: "r", does: "Refresh the prices" }
       ]},
       { title: "Chart", rows: [
         { key: "← →", does: "Move along the chart" },

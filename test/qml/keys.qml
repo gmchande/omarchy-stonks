@@ -63,12 +63,17 @@ Harness {
   // The stand-in curl's flags (bin/curl): a file there turns a fault on.
   Process { id: flag }
 
-  // What the stand-in commands were given (bin/wl-paste).
+  // What the stand-in commands were given (bin/curl, bin/wl-paste). Every
+  // row asked for again goes as one spark request.
   function logged(name) {
     return readFile(Quickshell.env("STONKS_FAKE_STATE") + "/" + name).split("\n").filter(function(line) { return line !== "" })
   }
+  function sparks() { return logged("requests.log").filter(function(line) { return line.indexOf("spark ") === 0 }).length }
 
-  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  // The wall's clock, and as far ahead of it as a step has set: prices this
+  // fresh are asked for again only ten seconds on.
+  property int ahead: 0
+  Stonks.Service { id: service; pluginId: "grvc.stonks"; wallClock: function() { return Math.floor(Date.now() / 1000) + harness.ahead } }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
@@ -122,7 +127,7 @@ Harness {
         symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
-        help: b.showingHelp, open: b.surfaceOpen, tabs: harness.tabs, direction: harness.tabDirection,
+        help: b.showingHelp, open: b.surfaceOpen, refreshes: harness.sparks(), tabs: harness.tabs, direction: harness.tabDirection,
         rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
     }
 
@@ -162,7 +167,9 @@ Harness {
       "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       // The day is the first range.
-      "[": function(s) { service.setRange("1W") }
+      "[": function(s) { service.setRange("1W") },
+      // Past the ten seconds in which prices just answered aren't asked again.
+      "r": function(s) { harness.ahead += 11 }
     })
 
     // One key, as a person presses it; false for a key it can't name. A
@@ -229,7 +236,8 @@ Harness {
       else if (token === "s") {
         changed = ["retro"]
         effect = function() { return service.retro === !before.retro }
-      } else if (token === "Tab" || token === "Shift+Tab") {
+      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return harness.sparks() === before.refreshes + 1 } }
+      else if (token === "Tab" || token === "Shift+Tab") {
         changed = ["tabs", "direction"]
         effect = function() { return harness.tabs === before.tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }

@@ -224,6 +224,7 @@ clipboard, with a notification that opens it in your screenshot editor.
 | `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
 | `Ctrl+Z` | Undo a removal |
+| `r` | Refresh the prices |
 | `←` `→` | Move along the chart |
 | `[` `]` | Change the range |
 | `s` | Switch between smooth and retro |
@@ -250,9 +251,10 @@ again.
 
 - **"Can't connect".** Yahoo sent nothing back. Rows keep the price they
   had, with its time. Check your internet: if other sites load, Yahoo may
-  be down. Stonks retries within two minutes.
+  be down. Stonks retries within two minutes, and `r` retries at once.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
-  retries at the time shown, at most 36 minutes on.
+  retries at the time shown, at most 36 minutes on, and `r` won't hurry
+  it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" on the top
   line.** A price hasn't come in time. Rows keep the price they had, with
   its time, and Stonks keeps trying, less often the longer Yahoo stays

@@ -92,7 +92,7 @@ function pausedGate(gate, kind, seconds, now) {
   })
 }
 
-// By RETRY: the network may be back, so a pause for no answer ends now.
+// By r or RETRY: the network may be back, so a pause for no answer ends now.
 // A refusal's holds: the host asked for fewer requests.
 function gateRetriedNow(gate, now) {
   return gate.pause === "none" && !gate.loneOut && gate.pausedUntil > now ? Object.assign({}, gate, { pausedUntil: now }) : gate
