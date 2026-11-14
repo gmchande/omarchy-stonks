@@ -19,8 +19,8 @@ the rules a change is judged by.
 
 ## Test it
 
-- `test/all.sh` runs every check a pull request needs. It takes about two
-  minutes, on a machine with Omarchy: the walks draw offscreen, but need
+- `test/all.sh` runs every check a pull request needs. It takes about a
+  minute, on a machine with Omarchy: the walks draw offscreen, but need
   Quickshell, Omarchy's shell and a display for Qt's GTK theme.
 - Most checks replay saved answers from Yahoo and Robinhood. These stay
   private, since the sites' terms forbid republishing them. Without them,
@@ -29,12 +29,13 @@ the rules a change is judged by.
   the last line must be `ALL PASS`.
 - A test of a rule goes in `test/model.test.js`, which every clone runs, or
   in `test/saved.test.js` if it needs a saved answer. Most tests are these.
-- Five walks drive the real plugin, each for what passes between its
+- Six walks drive the real plugin, each for what passes between its
   pieces: `keys` (a key and what it does), `mouse` (what looks clickable
   acts), `saving` (a save and the next read), `fetching` (what is asked,
-  and when) and `cost` (what a long list costs, counted). A new step goes
-  in the walk it belongs to, `test/qml/NAME.qml`, judged by what a person
-  then sees or what is then saved or asked. A step may read where a thing
+  and when), `cost` (what a long list costs, counted) and `camera` (a
+  screenshot and where it goes). A new step goes in the walk it belongs
+  to, `test/qml/NAME.qml`, judged by what a person then sees or what is
+  then saved or asked. A step may read where a thing
   is, to click it or to know what is in sight, and may give a thing time to
   happen. None says what a position, a size, a colour or a duration must
   be: how Stonks looks is for the pictures below, and how it moves and
