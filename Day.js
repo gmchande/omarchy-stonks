@@ -129,7 +129,7 @@ function litFrom(points, evening, over) {
 // `day` is shaped as a quote, so the chart and a scrub read it as they
 // read Yahoo's; the day's figures stay the quote's. `slideAt` slides the
 // day's start (`slidWindow`); without it, as where only the newest price is
-// wanted (`Chart.newestTrades`) or a harness gives no clock, the newest trade
+// wanted (`Chart.newestTradeOf`) or a harness gives no clock, the newest trade
 // stands in for it.
 function dayChart(quote, answer, calendars, slideAt) {
   var cal = Calendar.calendarFor(calendars, quote)

@@ -250,7 +250,7 @@ OverRows {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     // A Flickable that scrolls takes presses itself. Held still while
-    // renaming, so a click on it reaches `renameAway`.
+    // renaming, so a click on it reaches the click-away that keeps the name.
     interactive: contentHeight > height && !root.renaming
     // `moving` stays false for a key's scroll.
     onContentYChanged: {

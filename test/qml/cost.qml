@@ -161,6 +161,15 @@ Harness {
       var rows = app.body.watchlist.rowItems()
       return Object.keys(rows).filter(function(s) { return rows[s].inSight && s !== service.view.featured })
     }
+    // `source` again, each of `keys` read through a getter that counts in
+    // `reads.n` while `reads.on`.
+    function counted(source, keys, reads) {
+      var out = {}
+      keys.forEach(function(s) {
+        Object.defineProperty(out, s, { enumerable: true, get: function() { if (reads.on) reads.n++; return source[s] } })
+      })
+      return out
+    }
 
     function test_cost() {
       // A tall window, many rows in sight.
@@ -281,6 +290,49 @@ Harness {
         service.view.featured === clicked && charted && service.feeds.quotes.symbols === fed && reworked.length === 0,
         "featured " + service.view.featured + " after a click on " + clicked + "; its chart answered: " + charted
           + "; feeds' stocks the same: " + (service.feeds.quotes.symbols === fed) + "; " + reworked.length + " other rows worked out again")
+
+      // Three costs, each counted as it is today, so a change that makes
+      // one grow fails here: what the shell does every second a surface is
+      // open, for each batch of prices, and for each new trade at night.
+      settle()
+      var quotesFeed = service.feeds.quotes
+      var held = quotesFeed.quotes
+
+      // A second of the clock. The header's trouble check is among the
+      // readers: it reads every stock's quote in All, in sight or not.
+      var reads = { on: false, n: 0 }
+      var watched = counted(held, Object.keys(held), reads)
+      quotesFeed.quotes = watched
+      reads.on = true
+      harness.clockOn(1)
+      reads.on = false
+      var unlanded = quotesFeed.quotes === watched
+      quotesFeed.quotes = held
+      settle()
+      harness.check("a second with the window open reads a stock's quote at most 480 times in all",
+        unlanded && reads.n > 0 && reads.n <= 480, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
+
+      // A batch of prices for the rows in sight lands: the whole view is
+      // made again, the stock on show's day with it.
+      var fresh = Object.assign({}, held)
+      rowsInSight().forEach(function(s) { fresh[s] = Object.assign({}, held[s]) })
+      var batchReads = { on: true, n: 0 }
+      quotesFeed.quotes = counted(fresh, Object.keys(fresh), batchReads)
+      batchReads.on = false
+      quotesFeed.quotes = held
+      settle()
+      harness.check("a batch of prices for the rows in sight reads a stock's quote at most 1909 times in all",
+        batchReads.n > 0 && batchReads.n <= 1909, batchReads.n + " reads")
+
+      // One stock's new trade: the service hands the surfaces a new map of
+      // newest trades, and every row reads it again, in sight or not.
+      var trades = service.newestTrades
+      var tradeReads = { on: true, n: 0 }
+      service.newestTrades = counted(trades, service.allSymbols, tradeReads)
+      tradeReads.on = false
+      service.newestTrades = trades
+      harness.check("one stock's new trade reads the newest trades at most 482 times in all",
+        tradeReads.n > 0 && tradeReads.n <= 482, tradeReads.n + " reads")
 
       app.close()
       harness.finish()

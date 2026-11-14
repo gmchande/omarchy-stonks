@@ -1,6 +1,5 @@
 .pragma library
 .import "History.js" as History
-.import "Quote.js" as Quote
 
 // Settings in, settings out. Each rule takes settings as `fileSettings`
 // returns them, changes none it is given, and normalises its result once:

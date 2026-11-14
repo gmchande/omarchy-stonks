@@ -3,8 +3,8 @@
 # (CONTRIBUTING.md, Releases): the real panel, window, and pill (readme.qml)
 # on the demo watchlist (test/demo.json), quoted from the capture named below
 # (test/capture-demo.sh) a minute after it, in Tokyo Night at twice the
-# scale, plus one panel in Catppuccin Latte. Writes media/*.png, or into
-# STONKS_README_OUT to look at first.
+# scale, plus one panel in Catppuccin Latte, in a run of its own. Writes
+# media/*.png, or into STONKS_README_OUT to look at first.
 #
 # `readme.sh --marketplace SCALE DIR` writes no README picture: it grabs
 # the maintainer's marketplace picture's two, drawn at SCALE, into DIR:
@@ -52,6 +52,19 @@ export STONKS_README_RAW="${keep:-$work/raw}"
 mkdir -p "$STONKS_README_RAW"
 export QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=$scale
 run_qs 90
+if [ -z "$keep" ]; then
+  # The light picture in a run of its own, in Catppuccin Latte from the
+  # start, under Adwaita's light GTK theme, as Omarchy sets for a light
+  # theme (omarchy-theme-set-gnome): Qt reads it, which draws the rows'
+  # scrollbar, only as it starts.
+  dark_code=$code
+  mv "$work/log" "$work/log.dark"
+  ln -sfn /usr/share/omarchy/themes/catppuccin-latte "$HOME/.local/state/omarchy/current/theme"
+  export STONKS_README_LIGHT=1 GTK_THEME=Adwaita
+  run_qs 90
+  cat "$work/log.dark" "$work/log" > "$work/log.both" && mv "$work/log.both" "$work/log"
+  [ "$code" -ne 0 ] || code=$dark_code
+fi
 raw=$STONKS_README_RAW
 if [ -n "$keep" ]; then
   for grab in popup strip; do

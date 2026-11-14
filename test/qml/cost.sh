@@ -2,7 +2,9 @@
 # What a long list costs, counted, through the real Plugin, Service, App
 # and a pill on a clock the walk sets: 154 symbols answer in one run of
 # nine requests, refresh whole every minute in a few requests, build only
-# the rows near sight, and work out and redraw a row's day only in sight.
+# the rows near sight, and work out and redraw a row's day only in sight;
+# and what a second of the clock, a batch of prices and a new trade cost
+# today, which may not grow.
 # HOME and curl are scratch; the fake curl answers from test/fixtures.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree cost.qml

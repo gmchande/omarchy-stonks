@@ -34,7 +34,8 @@ unset OMARCHY_SCREENSHOT_DIR OMARCHY_SCREENSHOT_EDITOR
 export OMASNAP_SCREENSHOT_DIR="$HOME/Pictures/Screenshots"
 # Qt draws its own controls, such as the rows' scrollbar, in the colours of
 # the GTK theme, which follows the reader's light or dark setting: every
-# picture takes Adwaita's dark ones instead, whatever the desktop says.
+# picture takes Adwaita's dark ones instead, whatever the desktop says, but
+# the README's light one, which takes Adwaita's light ones (readme.sh).
 export QT_QPA_PLATFORMTHEME=gtk3 GTK_THEME=Adwaita:dark
 # The reader is in New York: an exchange's time names its
 # zone only where it differs from the reader's clock.

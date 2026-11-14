@@ -32,7 +32,7 @@ function currencyLabel(code) {
 // overnight one is a trade, and stays. Since the open the move still
 // counts from the close: one from the open would count the regular session
 // again under an AFTER HOURS label.
-function extendedStack(quote, latest, now, day, changeMode) {
+function extendedStack(quote, latest, now, day, changeMode, calendars) {
   var ext = Quote.extendedTrade(quote, latest)
   var close = Quote.regularClose(quote)
   var overnight = !!ext && ext.phase === "overnight"
@@ -45,7 +45,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
     changeText: Format.changeText(chg, unit, digits),
     tone: Format.changeTone(chg, unit, digits),
     label: overnight ? "OVERNIGHT" : ext.phase === "post" ? "AFTER HOURS" : "PRE-MARKET",
-    time: overnight ? Market.tradeTime(day || quote, ext.t) : "",
+    time: overnight ? Market.tradeTime(day || quote, ext.t, calendars) : "",
     stale: overnight && now - ext.t > Overnight.OVERNIGHT_STALE
   }
 }
@@ -376,7 +376,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   var from = closeCountedFrom(quote, view, today, calendars)
   var close = null
   if (!scrubbing && newest) close = closeLine(quote, today, changeMode, view, calendars)
-  else if (!scrubbing) close = extendedStack(quote, latest, now, day, changeMode) || closeOnly(from)
+  else if (!scrubbing) close = extendedStack(quote, latest, now, day, changeMode, calendars) || closeOnly(from)
   var whole = !!close && !!newest && newest.closed && !newest.joined
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)

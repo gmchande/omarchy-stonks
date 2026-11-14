@@ -157,7 +157,7 @@ Harness {
 
   Process { id: fileProc }
 
-  // A screen as Hyprland reports it, for the window host (fetch.sh): on or
+  // A screen as Hyprland reports it, for the window host (WindowHost.qml): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
   // comes, showing this workspace. It counts the asks it has not answered
   // yet (`screensHeard`). While `holding`, it answers none asked meanwhile,

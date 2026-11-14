@@ -1,7 +1,6 @@
 import QtQuick
 import QtTest
 import Quickshell
-import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -11,9 +10,10 @@ import "plugin" as Stonks
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
 // grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
-// With STONKS_README_MARKETPLACE naming a symbol on the list, it grabs only
-// the marketplace picture's two: that symbol's smooth panel and its pill on
-// the bar.
+// With STONKS_README_LIGHT set, it grabs only the light picture: readme.sh
+// runs it again in Catppuccin Latte. With STONKS_README_MARKETPLACE naming
+// a symbol on the list, it grabs only the marketplace picture's two: that
+// symbol's smooth panel and its pill on the bar.
 Harness {
   id: harness
   walk: false
@@ -23,8 +23,7 @@ Harness {
   readonly property string marketplace: Quickshell.env("STONKS_README_MARKETPLACE") || ""
   readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].concat(marketplace ? [marketplace] : [])
   readonly property var us: ["AAPL", "JNJ", "SPY"].concat(marketplace ? [marketplace] : [])
-  readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
-  property bool themeLinked: false
+  readonly property bool light: Quickshell.env("STONKS_README_LIGHT") === "1"
 
   // The clock stands still a minute after the capture (readme.sh).
   readonly property int at: Number(Quickshell.env("STONKS_README_AT"))
@@ -45,7 +44,6 @@ Harness {
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   Stonks.App { id: app; service: service; updates: updates; trendColors: colors }
-  Process { id: themeSwitch; onExited: harness.themeLinked = true }
 
   // The pill on strips of bar: one as wide as the panel's card, for the
   // marketplace picture's bar; and each of its four forms.
@@ -163,15 +161,32 @@ Harness {
       return Date.now() - capWholeSince > 900
     }
 
+    // The header's animal between moves: no fidget step drawn, its eyes
+    // wholly open or shut. Its pose as a key, which a move changes.
+    function animalRests(body) {
+      var animal = find(body, "animal")
+      return !animal || (animal.fidgetStep < 0 && (animal.closing === 0 || animal.closing === 1))
+    }
+    function animalPose(body) {
+      var animal = body ? find(body, "animal") : null
+      return animal ? [animal.fidgetMoves, animal.fidgetStep, animal.closing].join(" ") : ""
+    }
+
     // `item` as drawn now, into STONKS_README_RAW/<name>.png, once `body` is
-    // at rest and `ready` holds. A new price's ripples take six seconds.
+    // at rest and `ready` holds. A new price's ripples take six seconds. A
+    // grab the animal began a move during is taken again.
     function grab(name, item, body, ready) {
-      capWholeSince = 0
-      tryVerify(function() { return (!body || atRest(body)) && (!ready || ready()) }, 10000, name + " ready to grab")
-      waitForRendering(item)
-      var saved = false
-      item.grabToImage(function(result) { saved = result.saveToFile(harness.rawDir + "/" + name + ".png") })
-      tryVerify(function() { return saved }, 3000, "grab " + name)
+      for (var tries = 0; tries < 3; tries++) {
+        capWholeSince = 0
+        tryVerify(function() { return (!body || (atRest(body) && animalRests(body))) && (!ready || ready()) }, 10000, name + " ready to grab")
+        var pose = animalPose(body)
+        waitForRendering(item)
+        var saved = false
+        item.grabToImage(function(result) { saved = result.saveToFile(harness.rawDir + "/" + name + ".png") })
+        tryVerify(function() { return saved }, 3000, "grab " + name)
+        if (animalPose(body) === pose) return
+      }
+      fail("the animal moved during every grab of " + name)
     }
 
     function test_pictures() {
@@ -179,6 +194,7 @@ Harness {
       if (harness.marketplace) return marketplacePictures()
       verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
         && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
+      if (harness.light) return lightPicture()
 
       panel.open()
       var body = panel.body
@@ -209,9 +225,8 @@ Harness {
       panel.close()
       tryVerify(function() { return !body.surfaceOpen }, 3000)
 
-      // Retro from a fresh open, so the header's colour and the look
-      // button's cells, which ease on a switch, ease while it is closed,
-      // before the open's draw-in starts.
+      // Retro from a fresh open, so the look button's cells, which ease on
+      // a switch, ease while it is closed, before the open's draw-in starts.
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.keyboardPanel.card, body, function() { return service.retro && body.surfaceOpen })
@@ -222,23 +237,17 @@ Harness {
       app.open("{}")
       grab("window", harness.find(app.floatingWindow.contentItem, "keyCatcher"), app.body, function() { return app.body.surfaceOpen })
       app.close()
+      harness.finish()
+    }
 
-      // Catppuccin Latte, as omarchy-theme-set switches it: the theme's
-      // files in place, then its palette handed to the shell. Its green and
-      // red are no real pair, so up and down are Stonks' own pair for a
-      // light ground.
-      var before = colors.green
-      themeSwitch.command = ["ln", "-sfn", "/usr/share/omarchy/themes/catppuccin-latte", harness.themeLink]
-      themeSwitch.running = true
-      tryVerify(function() { return harness.themeLinked }, 2000, "Catppuccin Latte in place")
-      var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', harness)
-      view.path = harness.themeLink + "/colors.toml"
-      Commons.Color.loadColors(view.text())
-      Commons.Color.loadShell("")
-      view.destroy()
-      tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
+    // Catppuccin Latte, from the start, as on a reader's light theme: Qt
+    // reads the GTK theme, which draws the rows' scrollbar, only as it
+    // starts (readme.sh). Its green and red are no real pair, so up and
+    // down are Stonks' own pair for a light ground.
+    function lightPicture() {
       panel.open()
-      grab("light", panel.keyboardPanel.card, body, function() { return body.surfaceOpen })
+      var body = panel.body
+      grab("light", panel.keyboardPanel.card, body, function() { return body.surfaceOpen && robinhoodIn() })
       panel.close()
       harness.finish()
     }

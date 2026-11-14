@@ -98,7 +98,6 @@ Item {
   // The painters draw in behind it in the plot's terms, retro's whole columns
   // included.
   readonly property real replayX: replayRunning && scrubX >= 0 ? scrubX : -1
-  readonly property real drawn: replayX >= 0 ? replayX : reveal
 
   // Each change of the view is compared with this once: another chart on
   // screen draws in; one asked for and not ready keeps the chart on screen
