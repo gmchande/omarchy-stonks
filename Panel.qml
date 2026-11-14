@@ -203,7 +203,6 @@ Panel {
           surfaceOpen: root.opened
           onScreen: root.screenOn
           switchesPanels: true
-          pill: root.hostWidget
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

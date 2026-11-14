@@ -52,9 +52,8 @@ something to show. Add your own and remove the ones you don't follow.
 
 The pill shows today's move for the stock you last looked at, as a
 sparkline, an arrow, the price as text, or an icon: a bull on an up day, a
-bear on a down one. Middle-click it to switch, or press `b` in the panel.
-On a bar at the side of the screen, it switches between the icon and the
-symbol over its change.
+bear on a down one. Middle-click it to switch. On a bar at the side of the
+screen, it switches between the icon and the symbol over its change.
 
 Click the pill for the panel, right-click it for the window, scroll over it
 to step through your list, and drag it to move it along the bar. Point at
@@ -127,7 +126,7 @@ while its market trades, or saved from before and not yet refreshed.
 Click the list's name to switch lists, start one, or manage them. All
 holds every symbol you follow, and your own lists each hold some of them.
 To choose which lists a row is in, right-click it and pick "Choose
-lists…", Ctrl-click it, or select it and press Ctrl+Enter.
+lists…", or Ctrl-click it.
 
 To find or add a stock, click "+ Find or add a symbol" or press `/`, and
 type a name or a symbol. Stocks in the list you're looking at come first,
@@ -194,7 +193,7 @@ a light wallpaper, the pill's green and red darken with the bar's text.
 
 ## Sounds
 
-Sounds are off until you press `m` or click the speaker at the top right.
+Sounds are off until you click the speaker at the top right.
 Then adding, removing or undoing a row makes a short sound, a screenshot
 clicks like a shutter, a replay plays the line as it draws, and the chart
 chimes as you run the pointer along it. A soft bell rings as the market of
@@ -204,52 +203,42 @@ make no sound.
 
 ## Screenshots
 
-Press `Ctrl+C`, or click the camera at the top right, for a picture of the
-chart, sized so X shows it whole. It shows the company's name, the price
-and its move, the two lines under them, and the price's date, time and
-zone. If you've moved along the chart, it shows that moment: with the
-pointer, press `Ctrl+C` while it's still on the chart. Your list is never
-in it.
+Click the camera at the top right for a picture of the chart, sized so X
+shows it whole. It shows the company's name, the price and its move, the
+two lines under them, and the price's date, time and zone. To take a moment
+on the chart, press `←` `→` to move to it, then click the camera without
+crossing the chart: the pointer leaving the chart takes it back to now.
+Your list is never in it.
 
 Like Omarchy's own screenshots, it goes to your screenshots folder and the
 clipboard, with a notification that opens it in your screenshot editor.
 
 ## Keys
 
-`?` lists the keys you'll use every day. This table has all of Stonks' own:
+`?` lists these keys:
 
 | Key | Does |
 | --- | --- |
 | `↑` `↓` | Move the selection |
 | `⏎` | Show the selected row's chart |
-| `Ctrl+⏎` | Choose the selected row's lists |
-| `←` `→` | Move along the chart |
-| `[` `]` | Change the range |
-| `p` | Replay the chart |
-| `Ctrl+C` | Take a screenshot |
 | `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
 | `Ctrl+Z` | Undo a removal |
-| `Ctrl+↑` `Ctrl+↓` | Move the selected row, in your own order |
-| `o` | Change the order |
-| `Shift+O` | Reverse the order |
-| `w` | Open the list menu |
-| `⏎` | Rename the selected list, in Manage lists |
-| `Ctrl+↑` `Ctrl+↓` | Move the selected list, in Manage lists |
-| Delete or Backspace | Ask to delete the selected list, in Manage lists; `⏎` deletes it |
-| `c` | Show the change in %, an amount or since the open |
+| `r` | Refresh the prices |
+| `←` `→` | Move along the chart |
+| `[` `]` | Change the range |
 | `s` | Switch between smooth and retro |
-| `m` | Turn sounds on or off |
-| `r` | Refresh |
-| `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
-| `b` | Change how the pill looks, as a middle-click on it does (panel only) |
-| Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
-| `?` | Show the keys you'll use every day |
-| `Esc` | Close |
+| `w` | Open the list menu |
+| `o` | Change the order |
+| `?` | Show these keys |
 
-In the panel, Omarchy's panel keys work too: `j` `k` move the selection,
-`h` `l` move along the chart, Space shows the selected row's chart, and `x`
-removes the selected row.
+Omarchy's panel keys work too. `Esc` closes, and `Ctrl+↑` `Ctrl+↓` move
+the selected row in your own order. In Manage lists, `Ctrl+↑` `Ctrl+↓`
+move the selected list, `⏎` renames it, and Delete or Backspace asks to
+delete it, which `⏎` confirms. In the panel, `j` `k` move the selection,
+`h` `l` move along the chart, Space shows the selected row's chart, `x`
+removes the selected row, and Tab or `Shift+Tab` switches to the bar's
+next or previous panel.
 
 ## If something's wrong
 
@@ -365,7 +354,7 @@ empty.
 - Only when you ask for an update: `omarchy plugin update grvc.stonks` in
   a terminal, then `omarchy restart shell` when `git` shows the update
   moved Stonks' folder. After an update run elsewhere, `omarchy restart
-  shell` alone, when you click the footer or press `Shift+U`.
+  shell` alone, when you click the footer.
 
 **Sites**, and nothing else:
 
@@ -423,12 +412,11 @@ omarchy plugin update grvc.stonks
 omarchy restart shell
 ```
 
-Or, when the footer says "Update to …", click it or press `Shift+U`. A
-terminal opens and shows what changes. Say yes, and it updates Stonks and
-restarts the shell, unless Stonks has changes it hasn't saved or can't read
-your lists file. Then, or after an update run anywhere else, the footer
-says "Updated to … · click to restart the shell". Stonks never updates
-itself.
+Or, when the footer says "Update to …", click it. A terminal opens and
+shows what changes. Say yes, and it updates Stonks and restarts the shell,
+unless Stonks has changes it hasn't saved or can't read your lists file.
+Then, or after an update run anywhere else, the footer says "Updated to … ·
+click to restart the shell". Stonks never updates itself.
 
 ## Remove
 

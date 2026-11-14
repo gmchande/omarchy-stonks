@@ -28,8 +28,7 @@ function footerNotice(state, listsFile) {
       : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : "",
     actions: state.unreadable ? ["fix or remove " + listsFile, "fix " + listsFile] : unsaved ? ["click to try again"] : [],
     updateOffer: state.releasedTo && updatedTo === "" ? state.releasedTo : "",
-    restartable: restartable,
-    restartOffered: updatedTo !== "" && restartable
+    restartable: restartable
   }
 }
 

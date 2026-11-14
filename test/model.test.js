@@ -1057,18 +1057,18 @@ const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
 const sortedKeys = labels => labels.flatMap(keyTokens).sort()
 
 // The keys harness proves each README key does what its row says, so a key
-// on the sheet that the README lacks, or keeps to one surface, is unproven.
+// on the sheet that the README lacks is unproven.
 test("every key on the key sheet, and every key the README's prose says to press, is one the README's table documents", () => {
   const lines = readFileSync(join(root, "README.md"), "utf8").split("\n")
   const start = lines.indexOf("| Key | Does |")
   expect(start).toBeGreaterThan(0)
   const table = []
   for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
-  const both = sortedKeys(table.filter(c => !/\((panel|window) only\)$/.test(c[2])).map(c => c[1]))
+  const documented = sortedKeys(table.map(c => c[1]))
   const drawn = sortedKeys(M.sheet().groups.flatMap(g => g.rows.map(r => r.key)))
-  expect(drawn.filter(k => !both.includes(k))).toEqual([])
+  expect(drawn.filter(k => !documented.includes(k))).toEqual([])
   // A key the README's prose tells you to press is one its table lists, as
-  // the table spells it: Shift+U, never U.
+  // the table spells it.
   const listed = new Set(table.flatMap(c => c[1].match(/`[^`]+`/g) || []))
   const pressed = lines.slice(0, start).concat(lines.slice(start + 2 + table.length)).join("\n")
     .match(/press (`[^`]+`(?: `[^`]+`)*)/gi).flatMap(m => m.match(/`[^`]+`/g))
@@ -2073,14 +2073,14 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
 test("the footer says a save that didn't land ahead of the update, says what to do with a file it can't read, and offers the update and the restart only when no change would be lost", () => {
   const file = "~/.config/omarchy/grvc.stonks.json"
   const says = state => M.footerNotice(state, file)
-  expect(says({})).toMatchObject({ text: "", actions: [], updateOffer: "", restartable: true, restartOffered: false })
+  expect(says({})).toMatchObject({ text: "", actions: [], updateOffer: "", restartable: true })
   // A newer Stonks out: offered, and its update may restart the shell.
   expect(says({ releasedTo: "1.3.0" })).toMatchObject({ text: "", updateOffer: "1.3.0", restartable: true })
   // Updated: the restart is offered, and no newer one beside it.
-  expect(says({ updatedTo: "1.2.0", releasedTo: "1.2.0" })).toMatchObject({ text: "Updated to 1.2.0 · click to restart the shell", updateOffer: "", restartOffered: true })
+  expect(says({ updatedTo: "1.2.0", releasedTo: "1.2.0" })).toMatchObject({ text: "Updated to 1.2.0 · click to restart the shell", updateOffer: "" })
   // A save that didn't land comes first, and holds the restart back.
   expect(says({ saveFailed: true, updatedTo: "1.2.0" }))
-    .toMatchObject({ text: "Your changes aren't saved", actions: ["click to try again"], restartable: false, restartOffered: false })
+    .toMatchObject({ text: "Your changes aren't saved", actions: ["click to try again"], restartable: false })
   // A file it can't read: what to do, in a long and a short form; once a
   // change waits on it, that comes first.
   expect(says({ unreadable: true, releasedTo: "1.3.0" }))
