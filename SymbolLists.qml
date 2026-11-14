@@ -248,13 +248,9 @@ OverRows {
             radius: root.look.retro ? 0 : Style.cornerRadius
             color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
               : entry.index === root.cursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+            border.width: entry.index === root.cursor ? Style.hoverBorderWidth : 0
+            border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-          }
-
-          CursorBar {
-            visible: entry.index === root.cursor
-            retro: root.look.retro
-            foreground: root.look.foreground
           }
 
           Rectangle {

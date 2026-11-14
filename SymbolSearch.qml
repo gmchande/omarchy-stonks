@@ -340,6 +340,8 @@ OverRows {
           color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
             : chosen ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
             : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+          border.width: chosen ? Style.hoverBorderWidth : 0
+          border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
 
           // The pointer only tints a row: one resting over the results never
           // changes what Enter adds.

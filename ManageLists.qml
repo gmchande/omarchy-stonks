@@ -287,14 +287,9 @@ OverRows {
             height: root.itemHeight
             radius: root.look.retro ? 0 : Style.cornerRadius
             color: entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+            border.width: entry.isCursor ? Style.hoverBorderWidth : 0
+            border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-          }
-
-          CursorBar {
-            visible: entry.isCursor
-            rowHeight: root.itemHeight
-            retro: root.look.retro
-            foreground: root.look.foreground
           }
 
           Text {

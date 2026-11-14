@@ -165,8 +165,11 @@ Rectangle {
     : featuredRow ? Style.selectedFillFor(look.foreground, Commons.Color.accent)
     : cursor ? Style.hoverFillFor(look.foreground, Commons.Color.accent) : "transparent"
   color: fill
-  border.width: lifted ? 1 : 0
-  border.color: Style.normalBorderFor(look.foreground, Commons.Color.accent)
+  // Lifted, the row wears the resting control border; under the cursor, the
+  // shell's cursor outline (CursorSurface).
+  border.width: lifted ? 1 : cursor ? Style.hoverBorderWidth : 0
+  border.color: lifted ? Style.normalBorderFor(look.foreground, Commons.Color.accent)
+    : Style.hoverBorderFor(look.foreground, Commons.Color.accent)
 
   // The shell's hover speed (CursorSurface).
   Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
@@ -228,12 +231,6 @@ Rectangle {
     sourceComponent: Component {
       Item {
         objectName: "rowContent"
-        CursorBar {
-          visible: row.cursor
-          retro: row.look.retro
-          foreground: row.look.foreground
-        }
-
         Text {
           id: symbolText
           visible: y >= row.menuCovers
