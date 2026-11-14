@@ -301,11 +301,12 @@ Harness {
       // A second of the clock. The header's trouble check is among the
       // readers: it reads every stock's quote in All, in sight or not.
       var reads = { on: false, n: 0 }
-      quotesFeed.quotes = counted(held, Object.keys(held), reads)
+      var watched = counted(held, Object.keys(held), reads)
+      quotesFeed.quotes = watched
       reads.on = true
       harness.clockOn(1)
       reads.on = false
-      var unlanded = quotesFeed.quotes !== held
+      var unlanded = quotesFeed.quotes === watched
       quotesFeed.quotes = held
       settle()
       harness.check("a second with the window open reads a stock's quote at most 480 times in all",

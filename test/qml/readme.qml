@@ -225,9 +225,8 @@ Harness {
       panel.close()
       tryVerify(function() { return !body.surfaceOpen }, 3000)
 
-      // Retro from a fresh open, so the header's colour and the look
-      // button's cells, which ease on a switch, ease while it is closed,
-      // before the open's draw-in starts.
+      // Retro from a fresh open, so the look button's cells, which ease on
+      // a switch, ease while it is closed, before the open's draw-in starts.
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.keyboardPanel.card, body, function() { return service.retro && body.surfaceOpen })
