@@ -50,10 +50,10 @@ change. This file says what a change is judged by, and why.
   backs off from a site that refuses it.
 - **Lists stay safe.** Stonks never writes over a data file it can't read,
   keeps the keys it doesn't know, and every release reads every older file.
-- **Mouse and keys.** Every flow works by mouse alone and by keys alone, and
-  what looks clickable acts. A button says what it does, and keys are listed
-  on the `?` sheet, never on screen. Tooltips go only where a control can't
-  say what it does.
+- **Mouse and keys.** Every flow works by mouse alone, and what looks
+  clickable acts. Stonks' only keys are the `?` sheet's and Omarchy's own
+  panel keys. A button says what it does, and tooltips go only where a
+  control can't say what it does.
 - **Text.** Every character drawn must be one JetBrainsMono Nerd Font has, or
   it shows as a box.
 
