@@ -108,7 +108,7 @@ name_of() {
 
 # serve URL: one URL's answer on stdout; its exit code says what kind:
 # 0 an answer, 22 a failure (502), 40 a request refused as asked (400),
-# 43 forbidden (403), 44 not found (404).
+# 44 not found (404).
 serve() {
   local url=$1
   if [[ "$url" == *"raw.githubusercontent.com/"* ]]; then
@@ -322,7 +322,6 @@ for i in "${!urls[@]}"; do
     case $served in
       0) status=200 ;;
       40) status=400 ;;
-      43) status=403 ;;
       44) status=404 ;;
       *) status=502 ;;
     esac
