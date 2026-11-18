@@ -602,15 +602,45 @@ Harness {
       // before (`CarriedClose.carryClose`), which leaves the move out where Yahoo
       // may not have caught up with it.
       var ranges = {}
-      var parsed = function(answer) {
-        var quote = CarriedClose.carryClose(null, Quote.parseChart(answer, Calendar.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
+      var answers = {}
+      var parsed = function(answer, held) {
+        var quote = CarriedClose.carryClose(held || null, Quote.parseChart(answer, Calendar.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
         return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
       }
       listed.forEach(function(s) {
         var answer = read(file(s))
+        answers[s] = answer
         ranges[s] = answer.chart.result[0].meta.range
         quotes[s] = parsed(answer)
       })
+      // Two moments saved in one day where Stonks asks for two, in the first
+      // minutes after the open while the chart holds the day before
+      // (`CarriedClose.heldDay`): their two-day answer is the day before's,
+      // saved at the moment named, joined to the moment's own, as one
+      // request brings both, read by a shell that held that day before.
+      var dayBefore = { "watch-2026-10-26-0935": "watch-2026-10-25-1000", "open-2026-11-02-0941": "gap-2026-11-01-2148" }[folder]
+      var joinedTwo = function(s) {
+        if (!dayBefore) return null
+        var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', root)
+        view.path = fixtureDir + "/moments/" + dayBefore + "/" + file(s) + ".json"
+        var text = String(view.text())
+        view.destroy()
+        if (text === "") return null
+        var a = JSON.parse(text).chart.result[0]
+        var b = answers[s].chart.result[0]
+        var periods = {}
+        Object.keys(a.meta.tradingPeriods).forEach(function(k) { periods[k] = a.meta.tradingPeriods[k].concat(b.meta.tradingPeriods[k]) })
+        var series = {}
+        ;["open", "high", "low", "close", "volume"].forEach(function(f) {
+          series[f] = a.indicators.quote[0][f].concat((b.timestamp && b.indicators.quote[0][f]) || [])
+        })
+        console.log("joined " + s + ": moments/" + dayBefore + " and moments/" + folder + ", as one two-day answer")
+        return { held: parsed(JSON.parse(text)), answer: { chart: { result: [{
+          meta: Object.assign({}, b.meta, { range: "2d", tradingPeriods: periods }),
+          timestamp: a.timestamp.concat(b.timestamp || []),
+          indicators: { quote: [series] }
+        }] } } }
+      }
       // Each answer as Stonks asks for it at the moment, Yahoo's one day or
       // two: two for every listing on a fresh shell's first ask, so a moment
       // saved in two days throughout is that; otherwise as a surface open a
@@ -638,8 +668,9 @@ Harness {
         var swapped = listed.filter(function(s) {
           if (asks[s] !== "2d" || ranges[s] !== "1d") return false
           var two = saved("2d/" + file(s))
-          if (two === "") return false
-          quotes[s] = parsed(JSON.parse(two))
+          var joined = two === "" ? joinedTwo(s) : null
+          if (two === "" && !joined) return false
+          quotes[s] = joined ? parsed(joined.answer, joined.held) : parsed(JSON.parse(two))
           ranges[s] = "2d"
           return true
         })
