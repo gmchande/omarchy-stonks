@@ -323,7 +323,11 @@ test("a paste takes the clipboard's text up to 4096 bytes, and nothing from one 
   expect(silent.text).toBe(null)
   expect(silent.ms).toBeGreaterThanOrEqual(1900)
   expect(silent.ms).toBeLessThan(3500)
-  expect(existsSync("/proc/" + readFileSync(join(state, "wl-paste.pid"), "utf8").trim())).toBe(false)
+  // Killed, it can stay listed for a moment until it's reaped.
+  const stuck = "/proc/" + readFileSync(join(state, "wl-paste.pid"), "utf8").trim()
+  const until = Date.now() + 1000
+  while (existsSync(stuck) && Date.now() < until) Bun.sleepSync(20)
+  expect(existsSync(stuck)).toBe(false)
 }))
 
 // ---------------------------------------------------------------- waking the sound output
