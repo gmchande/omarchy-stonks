@@ -142,9 +142,10 @@ every_state() (
   # The 1D chart's day at each phase, in both looks, its price on top: Friday
   # all weekend, with a night and without; SHOP's thin Friday; Sunday's
   # night alone, busy and thin; the night on past midnight; Friday's
-  # pre-market; Monday's open, its session, its after hours on a busy day
-  # after the bell, and its evening's night, busy and thin; a coin's last 24
-  # hours; and CVR's two trades, its close carrying the dot. Tokyo's,
+  # pre-market; Monday's open, Friday held through its first minutes with
+  # Monday's first trades at its end; Monday's session, its after hours on a
+  # busy day after the bell, and its evening's night, busy and thin; a coin's
+  # last 24 hours; and CVR's two trades, its close carrying the dot. Tokyo's,
   # London's and Sydney's opens are below, saved in one day and two, as
   # Stonks asks for them in their first minutes.
   for moment in watch-2026-10-25-1000-nbis watch-2026-10-25-1000-brk-a thinfeed-2026-10-23-2030-shop \
@@ -194,10 +195,12 @@ every_state() (
     states="$states popup-sweep-gap-2026-11-01-2148-fig-held-$range-smooth popup-sweep-gap-2026-11-01-2148-fig-held-$range-retro"
   done
   # Monday 2 November at 09:41, when Yahoo sent no bar from 08:30 to 09:29:
-  # Robinhood's trades fill the hour on each line, CRWV's and NBIS's every
-  # slot of it, SHOP's 8 of the 13 slots from its last bar, at 08:20, to
-  # 09:25.
-  for symbol in nbis crwv shop; do
+  # Robinhood's trades fill the hour, NBIS's every slot of it, SHOP's 8 of
+  # the 13 slots from its last bar, at 08:20, to 09:25, on Friday's chart,
+  # held through Monday's first minutes with Monday's night, pre-market and
+  # first bars at its end (Friday from Sunday's saved answers, render.qml).
+  # CRWV, saved then too, has no Friday saved to hold.
+  for symbol in nbis shop; do
     states="$states popup-sweep-open-2026-11-02-0941-$symbol-smooth popup-sweep-open-2026-11-02-0941-$symbol-retro"
   done
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
@@ -207,12 +210,11 @@ every_state() (
   # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
   # and its night, the dashed line stepping to Monday's close at its bell;
   # Tuesday 03:50 and 04:05, the count carrying on; Monday 07:00, Friday
-  # with the night and the pre-market joined, the pre-market bright; noon
-  # and 18:00, Monday from its open, the hours to come empty, at noon its
-  # move as an amount too.
+  # with the night and the pre-market joined, the pre-market bright; and at
+  # noon Monday's move as an amount, its currency named.
   for moment in thu-2026-10-29-2155-nbis thu-2026-10-29-2155-jnj thu-2026-10-29-2155-psix thu-2026-10-29-2155-btc-usd \
     watch-2026-10-25-2100-nbis watch-2026-10-27-0130-nbis watch-2026-10-27-0350-nbis watch-2026-10-27-0405-nbis \
-    watch-2026-10-26-0700-nbis watch-2026-10-26-1200-nbis watch-2026-10-26-1800-nbis watch-2026-10-26-1200-nbis-abs; do
+    watch-2026-10-26-0700-nbis watch-2026-10-26-1200-nbis-abs; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
   states="$states popup-sweep-thu-2026-10-29-2155-nbis-smooth-size-16 popup-sweep-thu-2026-10-29-2155-nbis-retro-size-16"
@@ -440,4 +442,7 @@ for state in $states; do
   fi
   echo "OK $state ($(wc -c < "$shot") bytes)"
   mv "$shot" "$dest"
+  # What the picture is drawn from where a saved answer stood in for
+  # another: a two-day answer joined from two saved days, or a row left out.
+  rg -o 'qml: ((joined|left out) .*)' -r '  $1' "$work/$state.log" | sort -u || true
 done
