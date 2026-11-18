@@ -1196,7 +1196,7 @@ test("the close the day's move counts from is named by the trading day before, a
   expect(M.closeBeforeDate(US, at("2026-09-08", "09:30"))).toBe("2026-09-04")
   expect(M.closeBeforeDate(null, at("2026-09-08", "09:30"))).toBeNull()
   const quote = {
-    symbol: "X", instrumentType: "EQUITY", exchange: "NASDAQ", gmtoffset: -14400, prevClose: 100, price: 102.5,
+    symbol: "X", instrumentType: "EQUITY", exchange: "NASDAQ", currency: "USD", gmtoffset: -14400, prevClose: 100, price: 102.5,
     priceDigits: 2, marketTime: at("2026-09-08", "12:00"),
     session: {
       pre: { start: at("2026-09-08", "04:00"), end: at("2026-09-08", "09:30") },
@@ -1206,9 +1206,13 @@ test("the close the day's move counts from is named by the trading day before, a
     points: [{ t: at("2026-09-08", "09:30"), p: 101 }, { t: at("2026-09-08", "11:55"), p: 102.5 }]
   }
   const lines = (now, mode = "pct", scrubbing = false) => M.heroLines(quote, M.rowModel(quote, 0, mode), null, now, null, calendars, mode, scrubbing)
+  // A move in money names its currency beside the percent, so it never
+  // reads as one; London's pence as the listing's line names them.
   expect(lines(at("2026-09-08", "12:00"))).toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false },
-    caption: { label: "TODAY", changeText: "+2.50", tone: "up" } })
-  expect(lines(at("2026-09-08", "12:00"), "abs").caption).toEqual({ label: "TODAY", changeText: "+2.50%", tone: "up" })
+    caption: { label: "TODAY", changeText: "+2.50 USD", tone: "up" }, move: "+2.50%" })
+  expect(lines(at("2026-09-08", "12:00"), "abs")).toMatchObject({ caption: { label: "TODAY", changeText: "+2.50%", tone: "up" }, move: "+2.50 USD" })
+  expect(M.heroLines({ ...quote, currency: "GBp" }, M.rowModel(quote, 0, "pct"), null, at("2026-09-08", "12:00"), null, calendars, "pct", false).caption.changeText)
+    .toBe("+2.50 PENCE")
   // A week on, every line names the day by its date: SEP alone reads as the
   // month. The day's move, the close above a night's price, and the rows.
   expect(lines(at("2026-09-15", "12:00"))).toMatchObject({ close: { label: "4 SEP CLOSE" }, caption: { label: "8 SEP" } })
@@ -1217,11 +1221,11 @@ test("the close the day's move counts from is named by the trading day before, a
   expect(M.rowsDay(["X"], { X: quote }, { X: night }, at("2026-09-15", "12:00"), calendars)).toBe("8 SEP")
   // A scrub rests the line under the price, whose place the dashed line's
   // legend takes; the moment's move keeps its amount.
-  expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "+2.50", tone: "up" } })
+  expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "+2.50 USD", tone: "up" }, move: "+2.50%" })
   // An unknown move is left out, with its day; the close it would count from stays.
   const unpriced = { ...quote, price: null, marketTime: null, points: [] }
   expect(M.heroLines(unpriced, M.rowModel(unpriced, 0, "pct"), null, at("2026-09-08", "12:00"), null, calendars, "pct", false))
-    .toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false }, caption: { label: "", changeText: "", tone: "flat" } })
+    .toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false }, caption: { label: "", changeText: "", tone: "flat" }, move: "—" })
 })
 
 test("each trade says its own time across a change of clocks, the 1D's day keeps its hours across it, and the day marks an early close", () => {

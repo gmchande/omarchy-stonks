@@ -94,9 +94,11 @@ The move beside the price counts from the close the chart's dashed line
 marks, and the line under the price names it, such as FRI CLOSE 158.74.
 While the large price is still the close, that line shows the pre-market
 or after-hours price instead. The line under the move names the move and
-gives it in the other unit: TODAY ▲4.57, OVERNIGHT ▼1.83 or PRE-MARKET
-▼5.74. On a longer range, the move counts from the range's start. A coin
-never closes, so its day is its last 24 hours.
+gives it in the other unit, an amount in the listing's currency: TODAY
+▲4.57 USD, OVERNIGHT ▼1.83 USD or PRE-MARKET ▼5.74 USD. Shown as an
+amount, the move beside the price names its currency too. On a longer
+range, the move counts from the range's start. A coin never closes, so
+its day is its last 24 hours.
 
 The 1D chart shows one trading day, with the regular session bright and
 the hours around it dim. For about ten minutes after a market abroad

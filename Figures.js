@@ -351,25 +351,25 @@ function closeCountedFrom(quote, view, today, calendars) {
     price: Format.money(view.close, quote.priceDigits), dayT: dayT }
 }
 
-// The two lines under the price and the move, one rule at every hour.
-// Under the price, the close before the price on top, named by its day,
-// with its day's move until the next session opens (`closeLine`), and while
-// the move on top is the whole day's with trades after the bell in it, the
-// part since the close (`since`), which gives way first. Where the price on
-// top is a trade of the session or the close itself, the close it counts
-// from (`closeCountedFrom`); where it is the close and Yahoo holds a pre-
-// or after-hours trade beside it, that trade (`extendedStack`). Under the
-// move, its name and the same move in the other unit (`view.unit`): TODAY
-// +4.57, OVERNIGHT −1.83, PRE-MARKET −5.74, FRI −0.43, 24H −795.72,
-// 1M −90.97, SINCE OPEN +9.34. A scrubbed moment keeps its amount and a
-// range's name, and the legend of what it counts from takes the first
-// line's place. Where the move isn't known, the first is the close it would
-// count from, if known, and the second a mode's or a range's name alone, or
-// at an open while the day's move waits on its close, FIRST TRADES · MOVE
-// SOON.
+// The two lines under the price and the move, one rule at every hour, and
+// the move itself (`move`). Under the price, the close before the price on
+// top, named by its day, with its day's move until the next session opens
+// (`closeLine`), and while the move on top is the whole day's with trades
+// after the bell in it, the part since the close (`since`), which gives way
+// first. Where the price on top is a trade of the session or the close
+// itself, the close it counts from (`closeCountedFrom`); where it is the
+// close and Yahoo holds a pre- or after-hours trade beside it, that trade
+// (`extendedStack`). Under the move, its name and the same move in the
+// other unit (`view.unit`): TODAY +4.57 USD, OVERNIGHT −1.83 USD,
+// PRE-MARKET −5.74 USD, FRI −0.43 USD, 24H −795.72 USD, 1M −90.97 USD,
+// SINCE OPEN +9.34 USD. A scrubbed moment keeps its amount and a range's
+// name, and the legend of what it counts from takes the first line's place.
+// Where the move isn't known, the first is the close it would count from, if
+// known, and the second a mode's or a range's name alone, or at an open
+// while the day's move waits on its close, FIRST TRADES · MOVE SOON.
 function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing) {
   var none = { label: "", changeText: "", tone: "flat" }
-  if (!quote || !view) return { close: null, caption: none }
+  if (!quote || !view) return { close: null, caption: none, move: "" }
   var today = exchangeDay(quote, now)
   var newest = view.newest || null
   var period = view.periodLabel || ""
@@ -381,11 +381,24 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
   var rangeName = period === "24H" ? "" : period
-  if (view.pct === null) return { close: close, caption: { label: !scrubbing && period === "" && moveAwaited(quote, view) ? "FIRST TRADES · MOVE SOON" : rangeName, changeText: "", tone: "flat" } }
+  if (view.pct === null) return { close: close, caption: { label: !scrubbing && period === "" && moveAwaited(quote, view) ? "FIRST TRADES · MOVE SOON" : rangeName, changeText: "", tone: "flat" }, move: view.changeText }
   var label = scrubbing ? rangeName : period || moveName(quote, newest, from, today)
   var other = view.unit === "abs" ? "pct" : "abs"
-  var caption = { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) }
-  return { close: close, caption: caption }
+  var caption = { label: label, changeText: inMoney(quote, Format.changeText(view, other, quote.priceDigits), other), tone: Format.changeTone(view, other, quote.priceDigits) }
+  return { close: close, caption: caption, move: inMoney(quote, view.changeText, view.unit) }
+}
+
+// A move in money beside a percent names its currency, as the listing's
+// line does (`listingMeta`), so +4.75 USD never reads as a percent.
+function inMoney(quote, text, unit) {
+  var code = moneyName(quote)
+  return unit === "abs" && code ? text + " " + code : text
+}
+
+// The currency a listing's prices are in, as Stonks names it; none for an
+// index, whose level isn't money.
+function moneyName(quote) {
+  return quote.instrumentType === "INDEX" ? "" : currencyLabel(String(quote.currency || ""))
 }
 
 function closeOnly(from) {

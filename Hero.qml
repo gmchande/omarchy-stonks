@@ -215,7 +215,7 @@ Item {
     anchors.right: parent.right
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
-    text: root.view ? Format.lookSigns(root.view.changeText, root.look.retro) : ""
+    text: Format.lookSigns(root.lines.move, root.look.retro)
     color: root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.display

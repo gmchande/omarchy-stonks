@@ -2043,7 +2043,7 @@ test("through a night, until 04:00, the chart keeps the day that closed with ton
   const top = M.rowModel(quote, 0, "pct", newest)
   const lines = M.heroLines(quote, top, latest, at("2026-10-07", "00:05"), day, calendars, "pct", false)
   expect([top.changeText, lines.close.label, lines.close.price, lines.close.changeText, lines.caption.label, lines.caption.changeText])
-    .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64"])
+    .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64 USD"])
   const geometry = M.chartGeometry(day, calendars)
   expect([geometry.step.x, geometry.step.y < geometry.baselineY]).toEqual([M.axisFraction(M.chartSpan(day), day.session.regular.end), true])
   // Yahoo can send the close without the one before it: the night keeps its
@@ -2099,7 +2099,7 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(M.newestNote(quote, newest, one, calendars)).toBe("Overnight 00:50")
   expect(M.heroLines(quote, top, latest, one, day, calendars, "pct", false)).toEqual({
     close: { label: "TUE CLOSE", time: "", price: "249.87", changeText: "+7.44%", tone: "up", stale: false },
-    caption: { label: "OVERNIGHT", changeText: "\u22121.83", tone: "down" } })
+    caption: { label: "OVERNIGHT", changeText: "\u22121.83 USD", tone: "down" }, move: "\u22120.73%" })
   expect(M.rowModel(day, latest.t, "pct", newest)).toMatchObject({ changeText: "\u22120.73%", dayUp: false })
   const morning = at("2026-10-06", "11:00")
   expect([M.scrubBaselineText(day, latest.t, M.exchangeDay(day, one), calendars), M.scrubBaselineText(day, morning, M.exchangeDay(day, one), calendars)])
@@ -2191,26 +2191,26 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // the price on top is the close itself, the close it counts from. Under
   // the move, its name and its amount.
   const phases = {
-    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% | THU CLOSE 159.17 | FRI −0.43",
-      "JNJ 263.16 −1.66% | FRI CLOSE 263.81 −1.42% · AFTER HOURS −0.25% | FRI −4.45",
-      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48"],
-    "watch-2026-10-25-2335": ["NBIS 152.51 −3.92% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −6.23",
-      "JNJ 264.11 +0.11% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.30",
-      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48"],
-    "watch-2026-10-26-0100": ["NBIS 153.07 −3.57% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −5.67",
-      "JNJ 264.05 +0.09% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.24"],
-    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −7.46",
-      "JNJ 264.55 +0.28% | FRI CLOSE 263.81 −1.42% | PRE-MARKET +0.74"],
-    "watch-2026-10-26-0700": ["NBIS 153.00 −3.62% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −5.74"],
-    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88% | FRI CLOSE 158.74 | TODAY +4.57", "JNJ 265.78 +0.75% | FRI CLOSE 263.81 | TODAY +1.97"],
-    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% | CLOSE 153.27 −3.45% · AFTER HOURS +1.35% | TODAY −3.40",
-      "JNJ 266.42 +0.99% | CLOSE 266.30 +0.94% · AFTER HOURS +0.05% | TODAY +2.61", "PSIX 47.15 +3.33% | FRI CLOSE 45.63 | TODAY +1.52",
-      "CVR 9.82 −6.48% | FRI CLOSE 10.50 | TODAY −0.68"],
-    "watch-2026-10-26-2005": ["NBIS 156.80 +2.30% | CLOSE 153.27 −3.45% | OVERNIGHT +3.53", "JNJ 266.30 +0.94% | FRI CLOSE 263.81 | TODAY +2.49"],
-    "watch-2026-10-27-0350": ["NBIS 153.03 −0.16% | MON CLOSE 153.27 −3.45% | OVERNIGHT −0.24",
-      "JNJ 266.89 +0.22% | MON CLOSE 266.30 +0.94% | OVERNIGHT +0.59"],
-    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% | MON CLOSE 153.27 −3.45% | PRE-MARKET +0.77",
-      "JNJ 266.60 +0.11% | MON CLOSE 266.30 +0.94% | PRE-MARKET +0.30"]
+    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% | THU CLOSE 159.17 | FRI −0.43 USD",
+      "JNJ 263.16 −1.66% | FRI CLOSE 263.81 −1.42% · AFTER HOURS −0.25% | FRI −4.45 USD",
+      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48 USD"],
+    "watch-2026-10-25-2335": ["NBIS 152.51 −3.92% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −6.23 USD",
+      "JNJ 264.11 +0.11% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.30 USD",
+      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48 USD"],
+    "watch-2026-10-26-0100": ["NBIS 153.07 −3.57% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −5.67 USD",
+      "JNJ 264.05 +0.09% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.24 USD"],
+    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −7.46 USD",
+      "JNJ 264.55 +0.28% | FRI CLOSE 263.81 −1.42% | PRE-MARKET +0.74 USD"],
+    "watch-2026-10-26-0700": ["NBIS 153.00 −3.62% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −5.74 USD"],
+    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88% | FRI CLOSE 158.74 | TODAY +4.57 USD", "JNJ 265.78 +0.75% | FRI CLOSE 263.81 | TODAY +1.97 USD"],
+    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% | CLOSE 153.27 −3.45% · AFTER HOURS +1.35% | TODAY −3.40 USD",
+      "JNJ 266.42 +0.99% | CLOSE 266.30 +0.94% · AFTER HOURS +0.05% | TODAY +2.61 USD", "PSIX 47.15 +3.33% | FRI CLOSE 45.63 | TODAY +1.52 USD",
+      "CVR 9.82 −6.48% | FRI CLOSE 10.50 | TODAY −0.68 USD"],
+    "watch-2026-10-26-2005": ["NBIS 156.80 +2.30% | CLOSE 153.27 −3.45% | OVERNIGHT +3.53 USD", "JNJ 266.30 +0.94% | FRI CLOSE 263.81 | TODAY +2.49 USD"],
+    "watch-2026-10-27-0350": ["NBIS 153.03 −0.16% | MON CLOSE 153.27 −3.45% | OVERNIGHT −0.24 USD",
+      "JNJ 266.89 +0.22% | MON CLOSE 266.30 +0.94% | OVERNIGHT +0.59 USD"],
+    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% | MON CLOSE 153.27 −3.45% | PRE-MARKET +0.77 USD",
+      "JNJ 266.60 +0.11% | MON CLOSE 266.30 +0.94% | PRE-MARKET +0.30 USD"]
   }
   for (const [set, expected] of Object.entries(phases)) {
     const at = topsAt(set)
@@ -2284,7 +2284,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // the close, which isn't the open's; in money, the close's lines in money.
   {
     const at = topsAt("watch-2026-10-26-1800")
-    expect(at.lines("NBIS", "open")).toEqual(["CLOSE 153.27 \u22123.45%", "SINCE OPEN +1.37"])
+    expect(at.lines("NBIS", "open")).toEqual(["CLOSE 153.27 \u22123.45%", "SINCE OPEN +1.37 USD"])
     expect(at.lines("NBIS", "abs")).toEqual(["CLOSE 153.27 \u22125.47 · AFTER HOURS +2.07", "TODAY \u22122.14%"])
     expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
   }
@@ -2302,45 +2302,47 @@ test("in every phase, a stock that has traded since its close shows that newest 
   {
     const noon = topsAt("watch-2026-10-26-1200")
     expect(under(noon, "NBIS")).toEqual({ close: { label: "FRI CLOSE", time: "", price: "158.74", changeText: "", tone: "flat", stale: false },
-      caption: { label: "TODAY", changeText: "+4.57", tone: "up" } })
+      caption: { label: "TODAY", changeText: "+4.57 USD", tone: "up" }, move: "+2.88%" })
     expect(said(under(noon, "NBIS", "abs"))).toEqual(["FRI CLOSE 158.74", "TODAY +2.88%"])
-    expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34"])
+    expect(under(noon, "NBIS", "abs").move).toBe("+4.57 USD")
+    expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34 USD"])
+    // An index's level isn't money: its points name no currency.
     expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42"])
-    expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00"])
-    expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57"])
+    expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00 JPY"])
+    expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57 AUD"])
     const evening = topsAt("watch-2026-10-26-1605")
     expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09"])
     // Power Solutions' only after-hours trade repeats its close, so the
     // close it counts from stands under it; J&J's moved the price, so that
     // close and its day's move go under the price, then the part since it,
     // and the day's whole move under the change.
-    expect(said(under(evening, "PSIX"))).toEqual(["FRI CLOSE 45.63", "TODAY +1.52"])
-    expect(evening.lines("JNJ")).toEqual(["CLOSE 266.35 +0.96% · AFTER HOURS \u22120.02%", "TODAY +2.49"])
+    expect(said(under(evening, "PSIX"))).toEqual(["FRI CLOSE 45.63", "TODAY +1.52 USD"])
+    expect(evening.lines("JNJ")).toEqual(["CLOSE 266.35 +0.96% · AFTER HOURS \u22120.02%", "TODAY +2.49 USD"])
     // Sunday: Friday's close on top for the S&P 500, and for Nebius, whose
     // last after-hours trade was at its close; the move is Friday's, from
     // Thursday's close, and named so.
     const saturday = topsAt("watch-2026-10-25-1000")
     expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75"])
-    expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43"])
+    expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43 USD"])
     // Monday 07:00, the pre-market: Friday's close and its day's move, as
     // before, and the pre-market's move from that close under the change.
-    expect(said(under(topsAt("watch-2026-10-26-0700"), "NBIS"))).toEqual(["FRI CLOSE 158.74 \u22120.27%", "PRE-MARKET \u22125.74"])
+    expect(said(under(topsAt("watch-2026-10-26-0700"), "NBIS"))).toEqual(["FRI CLOSE 158.74 \u22120.27%", "PRE-MARKET \u22125.74 USD"])
     // From a new day's first answer until its first trade, the price on top
     // is still the last day's close and its move: Berkshire at 04:05 Monday,
     // Friday's close counted from Thursday's, and Toyota at 09:05 Monday in
     // Tokyo, before Yahoo's first bar, Friday's close counted from Thursday's.
-    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905.00"])
-    expect(said(under(topsAt("watch-2026-10-25-2005"), "7203.T"))).toEqual(["THU CLOSE 3,084.00", "FRI +21.00"])
+    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905.00 USD"])
+    expect(said(under(topsAt("watch-2026-10-25-2005"), "7203.T"))).toEqual(["THU CLOSE 3,084.00", "FRI +21.00 JPY"])
     // A coin's day is its last 24 hours: the price 24 hours ago, and the
     // move in dollars under the 24H its row says.
     const coin = savedDay("coin-2026-10-25-2005", "btc-usd")
     expect(said(M.heroLines(coin, M.rowModel(coin, 0, "pct"), null, at("2026-10-25", "20:05"), null, calendars, "pct", false)))
-      .toEqual(["24H AGO 80,711", "24H \u2212795.72"])
+      .toEqual(["24H AGO 80,711", "24H \u2212795.72 USD"])
   }
   // Wherever those lines show, at every saved watch moment: the close plus
   // the move under the change is the price on top, to its last digit where
   // the price shows cents, and a price from a past day never says TODAY.
-  const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
+  const number = text => Number(text.split(" ")[0].replace(/,/g, "").replace("\u2212", "-"))
   const addsUp = (close, move, price, digits) => Math.abs(number(close) + number(move) - number(price)) < (digits >= 2 ? 1e-9 : 2 * Math.pow(10, -digits))
   {
     const off = []
@@ -2570,7 +2572,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const model = M.historyRowModel(chart.history, at.quotes.NBIS, 0)
     const lines = M.heroLines(at.quotes.NBIS, model, chart.latest, at.now, chart.day, calendars, "pct", false)
     expect([lines.close.label, lines.close.changeText, lines.close.since, lines.caption.label, lines.caption.changeText])
-      .toEqual(["CLOSE", "\u22123.45%", undefined, "1W", M.signedMoney(model.abs)])
+      .toEqual(["CLOSE", "\u22123.45%", undefined, "1W", M.signedMoney(model.abs) + " USD"])
   }
 })
 
@@ -3095,7 +3097,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // no move to cheer or mourn.
   const started1915 = M.carryClose(null, open("1915", "2d/7203.t.json"), calendars, nyAt("1915"))
   expect(M.heroLines(started1915, M.rowModel(started1915, 0, "pct"), null, nyAt("1915"), null, calendars, "pct", false))
-    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" } })
+    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" }, move: "\u2014" })
   expect(M.headerAnimal(M.rowModel(started1915, 0, "pct"))).toBe("plain")
   let started = null
   const startedRows = []

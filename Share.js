@@ -96,8 +96,7 @@ function barDate(history, bar) {
 function words(o) {
   var quote = o.quote
   var at = moment(o)
-  var out = { foot: "", open: null, start: "", end: "", said: "",
-    currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
+  var out = { foot: "", open: null, start: "", end: "", said: "", currency: Figures.moneyName(quote) }
   if (o.changeMode === "open" && !o.history && !o.scrubT) {
     var base = Quote.restingRead(quote, o.newest || null).base
     if (Format.isFiniteNumber(base.dayOpen)) out.open = { label: "OPEN", price: Format.money(base.dayOpen, quote.priceDigits) }
