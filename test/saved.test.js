@@ -3048,17 +3048,33 @@ test("at the open the chart holds the last session, with the new one's first tra
       .toEqual([allDay, "2026-10-23", at("2026-10-23", "09:30"), "reg", true])
     expect([allDay, M.dayBase(held), M.nightBell(held), M.regularClose(held)])
       .toEqual([allDay, savedDay("watch-2026-10-25-1000", "nbis").prevClose, at("2026-10-23", "16:00"), savedDay("watch-2026-10-25-1000", "nbis").price])
-    // A scrub of Monday's newest trade reads it, as its row does, never
-    // Friday's close; Monday's figures take in its pre-market as drawn.
-    const newest = held.points.at(-1)
-    const scrubbed = M.rowModel(held, newest.t, "pct")
-    expect([allDay, scrubbed.priceText, scrubbed.changeText]).toEqual([allDay, M.money(newest.p), M.listRow(carried, newest.t, "pct", null).changeText])
-    const morning = held.points.filter(p => p.t >= at("2026-10-26", "04:00") && p.t < at("2026-10-26", "09:30")).map(p => p.p)
-    expect([allDay, M.dayLine(carried, M.exchangeDay(carried, nineThirtyFive), held).range.high >= Math.max(...morning)]).toEqual([allDay, true])
+    // A scrub of Monday's newest trade, or of Friday's 15:00 trade, reads
+    // it, as its row does, never Friday's close at 0%.
+    for (const t of [held.points.at(-1).t, held.points.find(p => p.t >= at("2026-10-23", "15:00")).t]) {
+      const scrubbed = M.rowModel(held, t, "pct")
+      const row = M.listRow(carried, t, "pct", null)
+      expect([allDay, scrubbed.priceText, scrubbed.changeText]).toEqual([allDay, row.priceText, row.changeText])
+      expect([allDay, scrubbed.priceText]).toEqual([allDay, M.money(held.points.findLast(p => p.t <= t).p)])
+    }
+    // The figures under the chart are the held day's, Friday's: its low and
+    // high hold every trade of its own drawn, and Yahoo gives only Monday's
+    // volume, so none.
+    const line = M.dayLine(carried, M.exchangeDay(carried, nineThirtyFive), held)
+    const friday = held.points.filter(p => p.t < M.nightBell(held) + 4 * 3600).map(p => p.p)
+    expect([allDay, line.title, line.range.low <= Math.min(...friday), line.range.high >= Math.max(...friday), line.facts[1].value])
+      .toEqual([allDay, "FRI", true, true, ""])
     // Read weeks later, before a refresh, the held chart ends at its last trade.
     const late = nbisDay("watch-2026-10-26-0935", at("2026-11-18", "12:00"), allDay)
     expect([allDay, M.chartSpan(late).end]).toEqual([allDay, M.lastTradeTime(late)])
   }
+  // Robinhood's first three bars of Monday, 09:30 to 09:40, end the hold
+  // as Yahoo's would: with Friday's quote cached the chart is Monday's, and
+  // it stays Monday's when Yahoo's two-day answer, one bar of its own, comes.
+  const noonNight = nbisNight("watch-2026-10-26-1200")
+  const threeBars = { ...noonNight, bars: noonNight.bars.filter(b => b.t <= at("2026-10-26", "09:40")), through: at("2026-10-26", "09:40") }
+  const threeDay = quote => M.viewChart("NBIS", "1D", { NBIS: quote }, {}, {}, { NBIS: threeBars }, { NBIS: { status: "ok", allDay: true, at: 0 } },
+    calendars, at("2026-10-26", "09:45")).day
+  expect([sessionDate(threeDay(savedDay("watch-2026-10-25-1000", "nbis"))), sessionDate(threeDay(carried))]).toEqual(["2026-10-26", "2026-10-26"])
   expect(nbisDay("watch-2026-10-26-0935", nineThirtyFive, true).litFrom).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
   const noon = nbisDay("watch-2026-10-26-1200", at("2026-10-26", "12:00"), true)
   expect([sessionDate(noon), M.chartSpan(noon).start]).toEqual(["2026-10-26", at("2026-10-26", "09:30")])
@@ -3328,12 +3344,14 @@ test("at the open the chart holds the last session, with the new one's first tra
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
   expect([startedAt("tokyo", "7203.t", "1915", "open"), startedAt("tokyo", "7203.t", "1920", "open")]).toEqual(["\u2014", "\u2014"])
-  // Nor its high: an echo is no trade, so the 1D line keeps Yahoo's 3,030
-  // to 3,040, the session's own, though the chart draws the echo at 3,051.
+  // Nor its high: an echo is no trade. While the chart holds Monday, the
+  // day before, which it draws with the echo at 3,051 joined, the 1D line
+  // is Monday's own, its low and high from its bars, named by its day.
   const echo = answerAt("tokyo", "1915", "2d/7203.t.json")
   const echoDay = M.viewChart("7203.T", "1D", { "7203.T": echo }, {}, {}, {}, {}, calendars).day
-  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay).range
-  expect([M.money(echoDay.points.at(-1).p), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
+  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay)
+  expect([M.money(echoDay.points.at(-1).p), echoLine.title, echoLine.range.lowText, echoLine.range.highText])
+    .toEqual(["3,051.00", "MON", "3,019.00", "3,094.00"])
   // Friday 30 October at 09:26 there, with Friday's first two bars: Friday's
   // move, from Thursday's close, over Thursday's chart, Friday's trades
   // joined after it.

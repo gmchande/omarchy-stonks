@@ -1,5 +1,6 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
@@ -88,7 +89,8 @@ function exchangeDay(quote, t) {
 // so the line keeps its shape.
 function dayLine(quote, today, day) {
   if (!quote) return null
-  var q = quote
+  // While the chart holds the day just closed, its figures are that day's.
+  var q = day && day.held ? day : quote
   var drawn = day && day.session && day.session.regular ? exchangeDay(q, day.session.regular.start) : null
   var head = Quote.headlineQuote(q)
   var low = q.dayLow
@@ -200,10 +202,13 @@ function listRow(quote, scrubT, mode, newest) {
   return rowModel(quote, scrubT, mode, scrubT ? newest : Overnight.restingNewest(newest))
 }
 
+// A row scrubbed while the 1D chart holds the day just closed reads that
+// day, as the panel does (`CarriedClose.heldDay`).
 function reading(quote, scrubT, newest) {
   if (!scrubT) return Quote.restingRead(quote, newest)
-  var read = Quote.readingAt(quote, scrubT)
-  return { price: read.price, t: read.t, base: scrubbedBase(quote, scrubT, newest) }
+  var day = CarriedClose.heldDay(quote) || quote
+  var read = Quote.readingAt(day, scrubT)
+  return { price: read.price, t: read.t, base: scrubbedBase(day, scrubT, newest) }
 }
 
 // Every price on screen comes from here. It carries no drawing and reads no

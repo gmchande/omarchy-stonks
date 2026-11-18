@@ -347,11 +347,18 @@ function dayBefore(timestamps, series, periods, until, tick, index) {
   var kept = filterStrayCloses(bars, periods, tick).bars
   var regular = periodOf(periods.regular)
   var firstRegular = regular ? firstRegularBar(kept, regular) : null
+  // Its session's low and high, from its bars' own, as a chart answer
+  // sends them; a spark answer sends none.
+  var session = regular ? kept.filter(function(b) { return b.t >= regular.start && b.t < regular.end }) : []
+  var lows = session.map(function(b) { return knownPrice(b.l) }).filter(function(v) { return v !== null })
+  var highs = session.map(function(b) { return knownPrice(b.h) }).filter(function(v) { return v !== null })
   return {
     session: { pre: index ? null : periodOf(periods.pre), regular: regular, post: index ? null : periodOf(periods.post) },
     points: dayPoints(kept, null, regular, index),
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
-    openSession: firstRegular ? regular.start : null
+    openSession: firstRegular ? regular.start : null,
+    dayLow: lows.length ? Math.min.apply(null, lows) : null,
+    dayHigh: highs.length ? Math.max.apply(null, highs) : null
   }
 }
 

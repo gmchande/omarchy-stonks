@@ -61,11 +61,11 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // stays the last until its first bar, then holds it through the new day's
 // first minutes (`CarriedClose.heldDay`).
 function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
-  var held = CarriedClose.heldDay(quote)
-  var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
-  if (!Overnight.hasOvernight(quote, calendars)) return out
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
+  var held = CarriedClose.heldDay(quote, tradability && tradability.allDay && night ? night.bars : null)
+  var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
+  if (!Overnight.hasOvernight(quote, calendars)) return out
   out.allDay = !!tradability && tradability.allDay
   if (tradability && !tradability.allDay) out.day = Day.sessionDay(held || quote, dayClock)
   else if (tradability && night) {

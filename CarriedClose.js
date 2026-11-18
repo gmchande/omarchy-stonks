@@ -104,9 +104,15 @@ function firstTrade(quote, head) {
 // (`heldBase`), and its open its own; the new day's trades count from its
 // close, the one the move counts from, where the dashed line steps at the
 // bell, as it does for tonight's trades (`Day.nightBell`), or since the new
-// day's open (`nextOpen`). Each is left out where unknown (`held`).
-function heldDay(quote) {
-  if (!quote.before || !firstMinutes(quote)) return null
+// day's open (`nextOpen`). Its figures are its own: its open, its low and
+// high from its bars, and no volume, which Yahoo gives only the new day's.
+// Each is left out where unknown (`held`). Robinhood's trades of the new
+// session (`bars`, where it trades the stock all day) count toward its
+// first bars too, so a chart that has them doesn't hold the day again once
+// Yahoo's two-day answer comes.
+function heldDay(quote, bars) {
+  if (!quote.before || !firstBars(Quote.regularPoints(quote).concat((bars || []).filter(function(b) { return b.s === "reg" })),
+    quote.session.regular.start)) return null
   var close = quote.prevClose
   var known = Format.isFiniteNumber(close)
   return Object.assign({}, quote, {
@@ -121,7 +127,11 @@ function heldDay(quote) {
     marketTime: known ? quote.before.session.regular.end : null,
     dayOpen: quote.before.dayOpen,
     openSession: quote.before.openSession,
-    nextOpen: quote.dayOpen
+    nextOpen: quote.dayOpen,
+    figuresDay: quote.before.session.regular ? quote.before.session.regular.start : null,
+    dayLow: Format.isFiniteNumber(quote.before.dayLow) ? quote.before.dayLow : null,
+    dayHigh: Format.isFiniteNumber(quote.before.dayHigh) ? quote.before.dayHigh : null,
+    volume: null
   })
 }
 
@@ -134,12 +144,21 @@ function firstMinutes(quote) {
 }
 
 // Whether `trades` of a session opening at `open` are still its first
-// minutes' (`FIRST_BARS`), as Yahoo's or Robinhood's: a 1D chart that has
-// the new session's first trades from Robinhood before Yahoo's two-day
-// answer comes holds the day before as `heldDay` will (`Day.dayChart`).
+// minutes' (`FIRST_BARS`), Yahoo's and Robinhood's together, a bar each
+// slot: a 1D chart that has the new session's first trades from Robinhood
+// before Yahoo's two-day answer comes holds the day before as `heldDay`
+// will (`Day.dayChart`).
 function firstBars(trades, open) {
-  var bars = trades.filter(function(p) { return p.t >= open && (p.t - open) % Quote.BAR === 0 })
-  return bars.length < FIRST_BARS
+  var slots = {}
+  var count = 0
+  for (var i = 0; i < trades.length; i++) {
+    var t = trades[i].t
+    if (t >= open && (t - open) % Quote.BAR === 0 && !slots[t]) {
+      slots[t] = true
+      count++
+    }
+  }
+  return count < FIRST_BARS
 }
 
 // Yahoo's first bars came up to half an hour after the open in the saved
