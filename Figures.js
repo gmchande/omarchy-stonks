@@ -114,13 +114,20 @@ function dayLine(quote, today, day) {
 
 // The trades the chart draws outside the session, for the day the quote's
 // figures are of: its night, pre-market and after hours, but not tonight's,
-// joined after it, nor the coming day's. None when the chart is another
-// day's. Inside the session Yahoo's figures are the trades', and a bar there
-// can be Yahoo echoing its quote, as Tokyo's at the bell.
+// joined after it, nor the coming day's; or where the figures are of the
+// day those joined trades belong to, as while the chart holds the day
+// before (`CarriedClose.heldDay`), those. None when the chart is another
+// day's. Inside the session Yahoo's figures are the trades', and a bar
+// there can be Yahoo echoing its quote, as Tokyo's at the bell.
 function figuresTrades(quote, day) {
-  if (!day || !day.session || !day.session.regular || exchangeDay(quote, day.session.regular.start) !== exchangeDay(quote, quote.figuresDay)) return []
+  if (!day || !day.session || !day.session.regular) return []
+  var drawn = exchangeDay(quote, day.session.regular.start)
+  var figures = exchangeDay(quote, quote.figuresDay)
   var until = day.tonight || Quote.tailStart(day) || Infinity
-  return (day.trades || day.points).filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
+  var outside = function(p) { return Quote.pointSession(day, p) !== "reg" }
+  var pts = day.trades || day.points
+  if (drawn === figures) return pts.filter(function(p) { return p.t < until && outside(p) })
+  return day.tonight && drawn < figures ? pts.filter(function(p) { return p.t >= day.tonight && outside(p) }) : []
 }
 
 // Three letters at most, as a range's token is, so a day a week old or more,

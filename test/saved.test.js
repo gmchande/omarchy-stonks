@@ -2792,10 +2792,11 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   const evening = seven.day.points.find(p => p.t >= at("2026-10-23", "18:00")).t
   expect(M.listRow(twoDay, evening, "pct", sevenNewest).changeText).toBe(M.rowModel(seven.day, evening, "pct", sevenNewest).changeText)
   expect(M.rowModel(seven.day, evening, "pct", sevenNewest).close).toBe(M.regularClose(twoDay))
-  // By the shell's clock the chart turns at the open, though the newest
-  // answer, 09:25's, hasn't reached it.
+  // At the bell by the shell's clock, with the newest answer 09:25's, still
+  // Friday, its joined hours running on to now: the day turns with the new
+  // session's first trade, and is held through its first minutes.
   const bell = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-10-26", "09:30")).day
-  expect([M.chartSpan(bell).start, M.chartSpan(bell).end]).toEqual([at("2026-10-26", "09:30"), at("2026-10-26", "20:00")])
+  expect([M.chartSpan(bell).start, M.chartSpan(bell).end]).toEqual([at("2026-10-23", "09:30"), at("2026-10-26", "09:30")])
   // Answers more than a day behind the clock keep their own day: the 09:25
   // answer read a week on is still Friday, with Monday's pre-market joined.
   const stale = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-11-02", "12:00")).day
@@ -3035,12 +3036,23 @@ test("at the open the chart holds the last session, with the new one's first tra
     { NBIS: { status: "ok", allDay, at: 0 } }, calendars, at).day
   const nineThirtyFive = at("2026-10-26", "09:35")
   expect(M.twoDays(nbisAt("watch-2026-10-26-0935", nineThirtyFive), nineThirtyFive, calendars)).toBe(true)
+  const carried = nbisAt("watch-2026-10-26-0935", nineThirtyFive)
   for (const allDay of [true, false]) {
     const held = nbisDay("watch-2026-10-26-0935", nineThirtyFive, allDay)
     expect([allDay, sessionDate(held), M.chartSpan(held).start, M.pointSession(held, held.points.at(-1)), held.points.at(-1).t >= at("2026-10-26", "09:30")])
       .toEqual([allDay, "2026-10-23", at("2026-10-23", "09:30"), "reg", true])
     expect([allDay, M.dayBase(held), M.nightBell(held), M.regularClose(held)])
       .toEqual([allDay, savedDay("watch-2026-10-25-1000", "nbis").prevClose, at("2026-10-23", "16:00"), savedDay("watch-2026-10-25-1000", "nbis").price])
+    // A scrub of Monday's newest trade reads it, as its row does, never
+    // Friday's close; Monday's figures take in its pre-market as drawn.
+    const newest = held.points.at(-1)
+    const scrubbed = M.rowModel(held, newest.t, "pct")
+    expect([allDay, scrubbed.priceText, scrubbed.changeText]).toEqual([allDay, M.money(newest.p), M.listRow(carried, newest.t, "pct", null).changeText])
+    const morning = held.points.filter(p => p.t >= at("2026-10-26", "04:00") && p.t < at("2026-10-26", "09:30")).map(p => p.p)
+    expect([allDay, M.dayLine(carried, M.exchangeDay(carried, nineThirtyFive), held).range.high >= Math.max(...morning)]).toEqual([allDay, true])
+    // Read weeks later, before a refresh, the held chart ends at its last trade.
+    const late = nbisDay("watch-2026-10-26-0935", at("2026-11-18", "12:00"), allDay)
+    expect([allDay, M.chartSpan(late).end]).toEqual([allDay, M.lastTradeTime(late)])
   }
   expect(nbisDay("watch-2026-10-26-0935", nineThirtyFive, true).litFrom).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
   const noon = nbisDay("watch-2026-10-26-1200", at("2026-10-26", "12:00"), true)
@@ -3483,11 +3495,11 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   // the hours to come empty.
   const sixFive = at("2026-10-23", "06:05")
   expect(M.chartSpan(M.sessionDay(aapl.quote, sixFive)).end).toBe(sixFive)
-  // At the open by that clock, Friday from its open, counted from
-  // Thursday's close, though the answer is still the two-day one.
+  // At the bell by that clock, the answer still the two-day one, still
+  // Thursday with the pre-market joined, running on to now.
   const bellDay = M.sessionDay(aapl.quote, at("2026-10-23", "09:30"))
-  expect([M.chartSpan(bellDay).start, M.chartSpan(bellDay).end, bellDay.points.length, M.dayBase(bellDay)])
-    .toEqual([at("2026-10-23", "09:30"), at("2026-10-23", "20:00"), 0, M.regularClose(aapl.quote)])
+  expect([M.chartSpan(bellDay).start, M.chartSpan(bellDay).end, M.dayBase(bellDay)])
+    .toEqual([at("2026-10-22", "09:30"), at("2026-10-23", "09:30"), aapl.quote.prevClose])
   // CVR at 09:35 on Monday 26 October hadn't traded since Friday, and
   // Yahoo's day answer held Monday's periods and no bar: alone, an empty
   // chart. It is still asked for two days past the bell (`twoDays`), and
