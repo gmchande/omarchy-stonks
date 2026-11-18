@@ -442,4 +442,7 @@ for state in $states; do
   fi
   echo "OK $state ($(wc -c < "$shot") bytes)"
   mv "$shot" "$dest"
+  # What the picture is drawn from where a saved answer stood in for
+  # another: a two-day answer joined from two saved days, or a row left out.
+  rg -o 'qml: ((joined|left out) .*)' -r '  $1' "$work/$state.log" | sort -u || true
 done
