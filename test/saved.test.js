@@ -3049,10 +3049,11 @@ test("at the open the chart holds the last session, with the new one's first tra
     expect([allDay, M.dayBase(held), M.nightBell(held), M.regularClose(held)])
       .toEqual([allDay, savedDay("watch-2026-10-25-1000", "nbis").prevClose, at("2026-10-23", "16:00"), savedDay("watch-2026-10-25-1000", "nbis").price])
     // A scrub of Monday's newest trade, or of Friday's 15:00 trade, reads
-    // it, as its row does, never Friday's close at 0%.
+    // it, as its row does, which follows the scrub there, never Friday's
+    // close at 0% nor the price on top.
     for (const t of [held.points.at(-1).t, held.points.find(p => p.t >= at("2026-10-23", "15:00")).t]) {
       const scrubbed = M.rowModel(held, t, "pct")
-      const row = M.listRow(carried, t, "pct", null)
+      const row = M.listRow(carried, M.rowsScrub(carried, held, t), "pct", null)
       expect([allDay, scrubbed.priceText, scrubbed.changeText]).toEqual([allDay, row.priceText, row.changeText])
       expect([allDay, scrubbed.priceText]).toEqual([allDay, M.money(held.points.findLast(p => p.t <= t).p)])
     }

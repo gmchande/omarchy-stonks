@@ -11,7 +11,6 @@ import "KeySheet.js" as KeySheet
 import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
-import "Quote.js" as Quote
 import "Release.js" as Release
 import "Search.js" as Search
 import "Settings.js" as Settings
@@ -319,14 +318,8 @@ Item {
 
   // ---- The rows
 
-  // The rows follow a scrub of the day. They stay on now for a range and for
-  // hours outside Yahoo's day, but not the coming day's pre-market, which
-  // each row's quote holds too. The quote can change before the day does:
-  // until the day comes, the scrub stands.
-  readonly property var featuredTail: featuredQuote ? Quote.tailStart(featuredQuote) : null
-  readonly property int watchlistScrubShown: historyActive || !featuredQuote || scrubShown < Quote.dayStart(featuredQuote)
-    || (!!featuredDay && !!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)
-      && !(featuredTail !== null && scrubShown >= featuredTail)) ? 0 : scrubShown
+  // The rows follow a scrub of the day (`Figures.rowsScrub`).
+  readonly property int watchlistScrubShown: historyActive || !featuredQuote ? 0 : Figures.rowsScrub(featuredQuote, featuredDay, scrubShown)
 
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },

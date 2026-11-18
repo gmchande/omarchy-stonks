@@ -202,13 +202,29 @@ function listRow(quote, scrubT, mode, newest) {
   return rowModel(quote, scrubT, mode, scrubT ? newest : Overnight.restingNewest(newest))
 }
 
-// A row scrubbed while the 1D chart holds the day just closed reads that
-// day, as the panel does (`CarriedClose.heldDay`).
+// The day a row reads a scrub against: while the 1D chart holds the day
+// just closed, that day, as the panel reads it (`CarriedClose.heldDay`).
+function scrubbedDay(quote) {
+  return CarriedClose.heldDay(quote) || quote
+}
+
 function reading(quote, scrubT, newest) {
   if (!scrubT) return Quote.restingRead(quote, newest)
-  var day = CarriedClose.heldDay(quote) || quote
+  var day = scrubbedDay(quote)
   var read = Quote.readingAt(day, scrubT)
   return { price: read.price, t: read.t, base: scrubbedBase(day, scrubT, newest) }
+}
+
+// The moment the rows follow while the 1D chart is scrubbed at `scrubT`, 0
+// for none. They stay on now for hours outside Yahoo's day, but not the
+// coming day's pre-market, which each row's quote holds too. The quote can
+// change before the day does: until the day comes, the scrub stands. While
+// the chart holds the day just closed, Yahoo's day is that one
+// (`scrubbedDay`).
+function rowsScrub(quote, day, scrubT) {
+  var rows = scrubbedDay(quote)
+  var tail = Quote.tailStart(rows)
+  return scrubT < Quote.dayStart(rows) || (!!day && !!day.axis && scrubT >= Quote.dayEnd(rows) && !(tail !== null && scrubT >= tail)) ? 0 : scrubT
 }
 
 // Every price on screen comes from here. It carries no drawing and reads no
