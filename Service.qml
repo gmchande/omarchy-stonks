@@ -1158,11 +1158,11 @@ Item {
     flushQuotes()
   }
   property int prunedMinute: -1
-  // The clock five minutes at a time, to which 1D's day runs on before the
-  // open for a stock Robinhood doesn't trade all day (`Day.sessionDay`):
-  // the pill's line follows it while a screen is on, and the panel's and
-  // window's chart and rows (`viewDayClock`) only while one is open, so
-  // nothing rebuilds for a surface no screen shows.
+  // The clock five minutes at a time, which turns 1D's day at the open and
+  // carries the hours after its close on to now (`Day.dayChart`,
+  // `Day.sessionDay`): the pill's line follows it while a screen is on, and
+  // the panel's and window's chart and rows (`viewDayClock`) only while one
+  // is open, so nothing rebuilds for a surface no screen shows.
   property int dayClock: 0
   property int viewDayClock: 0
   function stepDayClock() {

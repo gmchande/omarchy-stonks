@@ -101,10 +101,10 @@ range, the move counts from the range's start. A coin never closes, so
 its day is its last 24 hours.
 
 The 1D chart starts at the open and runs by the clock to the close, or for
-a US stock to 20:00, when its after hours end. The line stops at the newest
-price and the hours still to come stay empty, so the open sits in the same
-place every day. The regular session is bright and the hours around it
-dim.
+a US stock to the end of its after hours, 20:00 on most days. The line
+stops at the newest price and the hours still to come stay empty, so the
+open sits in the same place every day. The regular session is bright and
+the hours around it dim.
 
 Until the next open, the chart keeps the day that closed and adds what has
 traded since at its end: tonight's trades, for a US stock Robinhood trades

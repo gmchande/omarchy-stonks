@@ -2029,6 +2029,10 @@ test("through a night the chart keeps the day that closed with tonight at its en
   const { day, latest, quote } = built
   expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "09:30"), end: at("2026-10-06", "23:55") })
   expect(M.lastTradeTime(day)).toBe(at("2026-10-06", "23:55"))
+  // By the shell's clock, five minutes on, the axis runs on to now, the
+  // closed day narrowing.
+  const nestNight = traded("2026-10-07-0005", fixture("moments/2026-10-07-0005/robinhood-day.json").results.map(r => r.symbol)).NEST
+  expect(M.chartSpan(M.dayChart(quote, nestNight, calendars, at("2026-10-07", "00:10")).day).end).toBe(at("2026-10-07", "00:10"))
   const newest = M.newestTrade(quote, latest, calendars, day)
   expect([M.money(newest.base), M.money(M.dayBase(day)), newest.closed, newest.joined]).toEqual(["249.87", "232.57", true, true])
   const top = M.rowModel(quote, 0, "pct", newest)
@@ -2084,7 +2088,7 @@ test("once a listing trades after its close, its newest price is on top, measure
   const { day, latest } = built
   const one = at("2026-10-07", "01:00")
   const newest = M.newestTrade(quote, latest, calendars, day)
-  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.price, own: false, closed: true, joined: true, dayStart: at("2026-10-06", "09:30") })
+  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.price, own: false, closed: true, joined: true, stepped: true, dayStart: at("2026-10-06", "09:30") })
   const top = M.rowModel(quote, 0, "pct", newest)
   expect([top.priceText, top.changeText, M.animalKind(top)]).toEqual(["248.04", "\u22120.73%", "bear"])
   expect(M.newestNote(quote, newest, one, calendars)).toBe("Overnight 00:50")
@@ -2297,12 +2301,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(said(under(noon, "NBIS", "abs"))).toEqual(["FRI CLOSE 158.74", "TODAY +2.88%"])
     expect(under(noon, "NBIS", "abs").move).toBe("+4.57 USD")
     expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34 USD"])
-    // An index's level isn't money: its points name no currency.
-    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42"])
+    // An index's points name the currency its listing's line names.
+    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42 USD"])
     expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00 JPY"])
     expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57 AUD"])
     const evening = topsAt("watch-2026-10-26-1605")
-    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09"])
+    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09 USD"])
     // Power Solutions' only after-hours trade repeats its close, so the
     // close it counts from stands under it; J&J's moved the price, so that
     // close and its day's move go under the price, then the part since it,
@@ -2313,7 +2317,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     // last after-hours trade was at its close; the move is Friday's, from
     // Thursday's close, and named so.
     const saturday = topsAt("watch-2026-10-25-1000")
-    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75"])
+    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75 USD"])
     expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43 USD"])
     // Monday 07:00, the pre-market: Friday's close and its day's move, as
     // before, and the pre-market's move from that close under the change.
@@ -2769,12 +2773,29 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   const one = dayAt("watch-2026-10-26-0100", "nbis").day
   expect(M.chartGeometry(one).ticks).toEqual([at("2026-10-23", "16:00"), at("2026-10-25", "20:00"), at("2026-10-26", "00:00")]
     .map(t => M.fractionAtTime(one, t)))
+  const robinhood = set => traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS
   const dawn = dayAt("watch-2026-10-26-0420", "nbis")
   const early = M.chartGeometry(dawn.day)
-  expect([M.chartSpan(dawn.day).start, M.nightBell(dawn.day), dawn.day.points.at(-1).s, M.newestTrade(dawn.quote, dawn.latest, calendars, dawn.day).base])
-    .toEqual([at("2026-10-23", "09:30"), at("2026-10-23", "16:00"), "pre", M.regularClose(sunday.quote)])
+  // Its Yahoo answer is one day, Monday's, its quote still Friday's close
+  // and its previous close Thursday's: Friday is dashed at Thursday's close
+  // until its bell, never at its own.
+  expect([M.chartSpan(dawn.day).start, M.dayBase(dawn.day), M.nightBell(dawn.day), dawn.day.points.at(-1).s, M.newestTrade(dawn.quote, dawn.latest, calendars, dawn.day).base])
+    .toEqual([at("2026-10-23", "09:30"), sunday.quote.prevClose, at("2026-10-23", "16:00"), "pre", M.regularClose(sunday.quote)])
   expect(M.lastLitPoint(early)).toBe(early.points.at(-1))
   expect(M.chartSpan(dayAt("watch-2026-10-26-0405", "jnj").day).start).toBe(at("2026-10-23", "09:30"))
+  // 07:00 from Yahoo's two-day answer: a scrub of Friday's after hours
+  // reads the same in the panel and in the row, both from Friday's close,
+  // where the dashed line steps.
+  const twoDay = M.parseChart(fixture("moments/watch-2026-10-26-0700/2d/nbis.json"), cents)
+  const seven = M.dayChart(twoDay, robinhood("watch-2026-10-26-0700"), calendars)
+  const sevenNewest = M.newestTrade(twoDay, seven.latest, calendars, seven.day)
+  const evening = seven.day.points.find(p => p.t >= at("2026-10-23", "18:00")).t
+  expect(M.listRow(twoDay, evening, "pct", sevenNewest).changeText).toBe(M.rowModel(seven.day, evening, "pct", sevenNewest).changeText)
+  expect(M.rowModel(seven.day, evening, "pct", sevenNewest).close).toBe(M.regularClose(twoDay))
+  // By the shell's clock the chart turns at the open, though the newest
+  // answer, 09:25's, hasn't reached it.
+  const bell = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-10-26", "09:30")).day
+  expect([M.chartSpan(bell).start, M.chartSpan(bell).end]).toEqual([at("2026-10-26", "09:30"), at("2026-10-26", "20:00")])
   // 09:35: Monday's chart from its open to its 20:00, dashed at Friday's
   // close, the dot on the session's trade.
   const open = dayAt("watch-2026-10-26-0935", "nbis")
@@ -2785,7 +2806,6 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   // Yahoo still on Friday, with no price: Monday's pre-market and Monday
   // count from Friday's last regular trade, never Thursday's close.
   const priceless = { ...sunday.quote, price: null }
-  const robinhood = set => traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS
   const pricelessDawn = M.dayChart(priceless, robinhood("watch-2026-10-26-0420"), calendars)
   expect(M.newestTrade(priceless, pricelessDawn.latest, calendars, pricelessDawn.day).base).toBe(M.regularClose(priceless))
   expect(M.dayBase(M.dayChart(priceless, robinhood("watch-2026-10-26-0935"), calendars).day)).toBe(M.regularClose(priceless))
@@ -3434,6 +3454,11 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   // the hours to come empty.
   const sixFive = at("2026-10-23", "06:05")
   expect(M.chartSpan(M.sessionDay(aapl.quote, sixFive)).end).toBe(sixFive)
+  // At the open by that clock, Friday from its open, counted from
+  // Thursday's close, though the answer is still the two-day one.
+  const bellDay = M.sessionDay(aapl.quote, at("2026-10-23", "09:30"))
+  expect([M.chartSpan(bellDay).start, M.chartSpan(bellDay).end, bellDay.points.length, M.dayBase(bellDay)])
+    .toEqual([at("2026-10-23", "09:30"), at("2026-10-23", "20:00"), 0, M.regularClose(aapl.quote)])
   // CVR at 09:35 on Monday 26 October hadn't traded since Friday, and
   // Yahoo's day answer held Monday's periods and no bar: alone, an empty
   // chart. It is still asked for two days past the bell (`twoDays`), and

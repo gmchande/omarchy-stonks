@@ -37,30 +37,30 @@ function dayWindow(cal, date) {
   }
 }
 
-// The day drawn: the last whose open the answers have reached (`reach`),
-// Yahoo's trades or Robinhood's slots, traded or not, so a day takes the
+// The day drawn: the last whose open has come (`edge`), so a day takes the
 // chart at its open, a quiet stock's too, and stays through the weekend or
 // holiday after it. Null past the calendar.
-function drawnWindow(cal, reach) {
-  var date = Overnight.marketDayAt(cal, reach).date
+function drawnWindow(cal, edge) {
+  var date = Overnight.marketDayAt(cal, edge).date
   for (var i = 0; i < 10; i++, date = Calendar.previousDateString(date)) {
     var kind = Calendar.dayKind(cal, date).kind
     if (kind === "unknown") return null
     if (kind !== "open") continue
     var win = dayWindow(cal, date)
-    if (!win || reach >= win.start) return win
+    if (!win || edge >= win.start) return win
   }
   return null
 }
 
-// Once the answers reach past the day's end, tonight and then the coming
-// day's pre-market join it until that day's open, from where the market
-// trades again (`from`): the shut hours between, such as a weekend's,
-// take no room (`skip`). Null while the day runs.
-function joinedHours(cal, win, reach) {
-  var next = reach >= win.end ? Calendar.nextOpen(cal, win.end) : null
-  if (!next) return null
-  var from = Math.max(win.end, Overnight.marketDay(cal, next.dateString).start)
+// Once the market trades again after the day's end, tonight and then the
+// coming day's pre-market join it until that day's open, from where it
+// trades again (`from`): the shut hours between, such as a weekend's, take
+// no room (`skip`). Null while the day runs, and while the market is shut
+// after it.
+function joinedHours(cal, win, edge) {
+  var next = edge >= win.end ? Calendar.nextOpen(cal, win.end) : null
+  var from = next ? Math.max(win.end, Overnight.marketDay(cal, next.dateString).start) : null
+  if (from === null || edge < from) return null
   return { from: from, opens: next.t, date: next.dateString, skip: from > win.end ? { from: win.end, to: from } : null }
 }
 
@@ -99,18 +99,27 @@ function litFrom(points, tonight, over) {
 }
 
 // `day` is shaped as a quote, so the chart and a scrub read it as they
-// read Yahoo's; the day's figures stay the quote's.
-function dayChart(quote, answer, calendars) {
+// read Yahoo's; the day's figures stay the quote's. `now`, the shell's
+// clock five minutes at a time, turns the day at the open and carries
+// joined hours on to now; without it, as where only the newest price is
+// wanted (`Chart.newestTradeOf`) or a harness gives no clock, the newest
+// answer stands in for it.
+function dayChart(quote, answer, calendars, now) {
   var cal = Calendar.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
   var all = Overnight.allTrades(quote, answer.bars)
   var latest = all.length ? all[all.length - 1] : null
   var reach = latest ? Math.max(latest.t, answer.through !== null ? answer.through : latest.t) : quote.session.regular.start
-  var win = drawnWindow(cal, reach)
+  var edge = Math.max(reach, now > 0 ? now : 0)
+  var win = drawnWindow(cal, edge)
   if (!win) return { day: quote, latest: latest }
-  var joined = joinedHours(cal, win, reach)
+  var joined = joinedHours(cal, win, edge)
   var session = windowSession(cal, quote, win)
   var own = session === quote.session
+  // Yahoo's quote, still the day's close after Yahoo's day has turned, says
+  // the close before that day too.
+  var head = Quote.headlineQuote(quote)
+  var closedOn = !!head && head.t !== null && head.t >= win.start && head.t < (joined ? joined.opens : win.end)
   var points = all.filter(function(p) { return p.t >= win.start })
   var opened = Overnight.marketDay(cal, win.date).start
   // Over once Robinhood's bars reach the day's end, or Yahoo's own day is
@@ -119,7 +128,7 @@ function dayChart(quote, answer, calendars) {
   var over = !joined && (reachedEnd || (own && !!quote.wholeDay))
   var axis = {
     start: win.start,
-    end: joined ? reach : over && points.length ? points[points.length - 1].t : win.end,
+    end: joined ? edge : over && points.length ? points[points.length - 1].t : win.end,
     ticks: windowTicks(cal, win, session, joined),
     // When the day's last hour ends (`Figures.dayNote`).
     closes: joined ? joined.opens : win.end
@@ -134,7 +143,7 @@ function dayChart(quote, answer, calendars) {
       // Every trade of the day from its night's open, which its low and high
       // count (`Figures.figuresTrades`), though the chart starts at the open.
       trades: all.filter(function(p) { return p.t >= opened }),
-      prevClose: own ? quote.prevClose : Quote.regularClose(quote),
+      prevClose: own || closedOn ? quote.prevClose : Quote.regularClose(quote),
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
       axis: axis,
@@ -150,23 +159,27 @@ function dayChart(quote, answer, calendars) {
 // once Yahoo's answer holds the coming day's pre-market (`Quote.tailDay`),
 // that joined at its end, the night between taking no room, the axis
 // running on to `now`, the shell's clock five minutes at a time, or without
-// one to the newest trade. A thin listing Robinhood doesn't trade all day
-// has a few night trades, and none is a night's price.
+// one to the newest trade. From the coming day's open by that clock, the
+// coming day. A thin listing Robinhood doesn't trade all day has a few
+// night trades, and none is a night's price.
 function sessionDay(quote, now) {
-  var reg = quote.session.regular
+  var tail = Quote.tailDay(quote)
+  var turned = !!tail && !!tail.session.regular && now >= tail.session.regular.start
+  var day = turned ? tail : quote
+  var reg = day.session.regular
   if (!reg) return quote
-  var all = quote.points
+  var all = day.points
   var points = all.filter(function(p) { return p.t >= reg.start })
   var last = points.length ? points[points.length - 1].t : null
-  var tonight = Quote.tailDay(quote) ? Quote.tailStart(quote) : null
+  var tonight = tail && !turned ? Quote.tailStart(quote) : null
   var axis = { start: reg.start, ticks: [reg.end] }
   if (tonight !== null) {
     var ends = Quote.dayEnd(quote)
     axis.end = Math.max(last, now > 0 ? now : last)
     axis.ticks.push(tonight)
     if (ends < tonight) axis.skip = { from: ends, to: tonight }
-  } else axis.end = quote.wholeDay && last !== null ? last : Math.max(Quote.dayEnd(quote), last !== null ? last : 0)
-  return Object.assign({}, quote, {
+  } else axis.end = day.wholeDay && last !== null ? last : Math.max(Quote.dayEnd(day), last !== null ? last : 0)
+  return Object.assign({}, day, {
     next: null,
     points: points,
     // Every trade of the day, which its low and high count

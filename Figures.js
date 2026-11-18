@@ -233,16 +233,17 @@ function rowModel(quote, scrubT, mode, newest) {
 // A moment of the coming day that a two-day answer holds, once that day has
 // a trade, counts from the quote's own close with no open yet, as the 1D
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
-// reads what the hero does. Once tonight has traded, a moment past the bell
-// counts from the close just gone, where the dashed line steps: the day
-// drawn says so (`Day.nightBell`), and a row's quote by its newest
-// price (`newest.joined`). A day abroad just opened, joined to the day
-// before it, has its own open already (`CarriedClose.heldDay`).
+// reads what the hero does. Once a trade has joined the day that closed,
+// tonight's or the pre-market's, a moment past the bell counts from the
+// close just gone, where the dashed line steps: the day drawn says so
+// (`Day.nightBell`), and a row's quote by its newest price
+// (`newest.stepped`). A day abroad just opened, joined to the day before
+// it, has its own open already (`CarriedClose.heldDay`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
   var nextOpen = Format.isFiniteNumber(quote.nextOpen) ? quote.nextOpen : null
-  if (bell === null && newest && newest.joined && reg) bell = reg.end
+  if (bell === null && newest && newest.stepped && reg) bell = reg.end
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
   if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
@@ -391,14 +392,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
 // A move in money beside a percent names its currency, as the listing's
 // line does (`listingMeta`), so +4.75 USD never reads as a percent.
 function inMoney(quote, text, unit) {
-  var code = moneyName(quote)
-  return unit === "abs" && code ? text + " " + code : text
-}
-
-// The currency a listing's prices are in, as Stonks names it; none for an
-// index, whose level isn't money.
-function moneyName(quote) {
-  return quote.instrumentType === "INDEX" ? "" : currencyLabel(String(quote.currency || ""))
+  return unit === "abs" && quote.currency ? text + " " + currencyLabel(quote.currency) : text
 }
 
 function closeOnly(from) {

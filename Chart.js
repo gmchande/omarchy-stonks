@@ -48,11 +48,12 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 }
 
 // The day the chart, a row's line and the pill's draw, so all three show one.
-// For a US stock or ETF Robinhood trades all day, the newest trade's trading
-// day from its open, with what has traded since its end joined until the
-// next open (`Day.dayChart`); for one it doesn't, or while a failed check
-// leaves that unknown, Yahoo's own from its open, the coming pre-market
-// joined, running on to `dayClock`, the shell's clock five minutes at a time
+// For a US stock or ETF, the trading day whose open has come by `dayClock`,
+// the shell's clock five minutes at a time, from its open, with what has
+// traded since its end joined, running on to that clock, until the next
+// open: from Yahoo's day and Robinhood's trades where Robinhood trades it
+// all day (`Day.dayChart`); for one it doesn't, or while a failed check
+// leaves that unknown, Yahoo's own and its coming pre-market
 // (`Day.sessionDay`); `waiting` until Robinhood says which. Without
 // `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a trade
@@ -66,7 +67,7 @@ function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
   out.allDay = !!tradability && tradability.allDay
   if (tradability && !tradability.allDay) out.day = Day.sessionDay(quote, dayClock)
   else if (tradability && night) {
-    var built = Day.dayChart(quote, night, calendars)
+    var built = Day.dayChart(quote, night, calendars, dayClock)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true
