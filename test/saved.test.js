@@ -2796,6 +2796,10 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   // answer, 09:25's, hasn't reached it.
   const bell = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-10-26", "09:30")).day
   expect([M.chartSpan(bell).start, M.chartSpan(bell).end]).toEqual([at("2026-10-26", "09:30"), at("2026-10-26", "20:00")])
+  // Answers more than a day behind the clock keep their own day: the 09:25
+  // answer read a week on is still Friday, with Monday's pre-market joined.
+  const stale = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-11-02", "12:00")).day
+  expect([M.chartSpan(stale).start, M.chartSpan(stale).end < at("2026-10-26", "09:30")]).toEqual([at("2026-10-23", "09:30"), true])
   // 09:35: Monday's chart from its open to its 20:00, dashed at Friday's
   // close, the dot on the session's trade.
   const open = dayAt("watch-2026-10-26-0935", "nbis")
