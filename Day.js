@@ -1,5 +1,6 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
 
@@ -50,6 +51,16 @@ function drawnWindow(cal, edge) {
     if (!win || edge >= win.start) return win
   }
   return null
+}
+
+// A day later than Yahoo's own still in its first minutes, as Robinhood's
+// trades give them before Yahoo's answer has turned, holds the day before,
+// as `CarriedClose.heldDay` will once that answer comes, so the chart never
+// turns to one trade and back.
+function heldWindow(cal, quote, trades, reach, win) {
+  if (!win || win.start <= quote.session.regular.start || reach >= win.start + CarriedClose.HOLD_LIMIT) return win
+  var session = trades.filter(function(p) { return p.s === "reg" && p.t < win.end })
+  return CarriedClose.firstBars(session, win.start) ? drawnWindow(cal, win.start - 1) : win
 }
 
 // Once the market trades again after the day's end, tonight and then the
@@ -120,7 +131,8 @@ function dayEdge(cal, reach, now) {
 // next open, never before Yahoo's own day has (`quote.next`, the coming
 // day held as a tail until its first trade), and a day held through the
 // next one's first minutes (`CarriedClose.heldDay`) stays, with that day's
-// first trades joined at its end.
+// first trades joined at its end, as it does when Robinhood has those
+// trades before Yahoo's answer has any (`heldWindow`).
 function dayChart(quote, answer, calendars, now) {
   var cal = Calendar.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
@@ -130,7 +142,7 @@ function dayChart(quote, answer, calendars, now) {
   var edge = dayEdge(cal, reach, now)
   var coming = quote.next && quote.next.regular ? quote.next.regular.start : Infinity
   var win = quote.held ? dayWindow(cal, Calendar.dateStringOf(Calendar.localDate(quote.session.regular.start, cal)))
-    : drawnWindow(cal, Math.min(reach, coming - 1))
+    : heldWindow(cal, quote, all, reach, drawnWindow(cal, Math.min(reach, coming - 1)))
   if (!win) return { day: quote, latest: latest }
   var joined = joinedHours(cal, win, edge)
   var session = windowSession(cal, quote, win)

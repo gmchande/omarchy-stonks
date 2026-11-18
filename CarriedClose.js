@@ -130,8 +130,15 @@ function heldDay(quote) {
 var FIRST_BARS = 3
 
 function firstMinutes(quote) {
-  var reg = quote.session.regular
-  var bars = Quote.regularPoints(quote).filter(function(p) { return (p.t - reg.start) % Quote.BAR === 0 })
+  return firstBars(Quote.regularPoints(quote), quote.session.regular.start)
+}
+
+// Whether `trades` of a session opening at `open` are still its first
+// minutes' (`FIRST_BARS`), as Yahoo's or Robinhood's: a 1D chart that has
+// the new session's first trades from Robinhood before Yahoo's two-day
+// answer comes holds the day before as `heldDay` will (`Day.dayChart`).
+function firstBars(trades, open) {
+  var bars = trades.filter(function(p) { return p.t >= open && (p.t - open) % Quote.BAR === 0 })
   return bars.length < FIRST_BARS
 }
 

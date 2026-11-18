@@ -1290,11 +1290,17 @@ test("each trade says its own time across a change of clocks, the 1D's day keeps
   expect(M.chartGeometry(monday).points.map(p => p.dim)).toEqual([true, true, true, false])
   expect([M.nightBell(monday), M.newestTrade(quote, premarket, calendars, monday)])
     .toEqual([at("2026-10-30", "16:00"), expect.objectContaining({ base: 100, joined: false, closed: false, own: false })])
-  // With Monday's first trade of the session, the chart is Monday's, from
-  // its open to its 20:00, the hours to come empty.
-  const opened = chart([sundayTrade, late, premarket, { t: at("2026-11-02", "09:30"), p: 101, s: "reg" }])
+  // Monday's first trade of the session alone, with Yahoo still on Friday,
+  // joins Friday, held as it will be once Yahoo's answer turns; with its
+  // third bar, the chart is Monday's, from its open to its 20:00, the hours
+  // to come empty.
+  const bar = c => ({ t: at("2026-11-02", c), p: 101, s: "reg" })
+  const first = chart([sundayTrade, late, premarket, bar("09:30")])
+  expect([M.chartSpan(first).start, M.chartSpan(first).end, M.nightBell(first)])
+    .toEqual([at("2026-10-30", "09:30"), at("2026-11-02", "09:30"), at("2026-10-30", "16:00")])
+  const opened = chart([sundayTrade, late, premarket, bar("09:30"), bar("09:35"), bar("09:40")])
   expect(M.chartSpan(opened)).toMatchObject({ start: at("2026-11-02", "09:30"), end: at("2026-11-02", "20:00") })
-  expect(opened.points.map(p => p.s)).toEqual(["reg"])
+  expect(opened.points.map(p => p.s)).toEqual(["reg", "reg", "reg"])
   // The day after Thanksgiving closes at 13:00, and its tick says so, by
   // the clock between the 12:55 trade and the 15:00 one. Its after hours
   // end at 17:00, as Robinhood's hours for it say, and so does its chart,
