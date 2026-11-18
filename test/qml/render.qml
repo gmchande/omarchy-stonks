@@ -628,8 +628,12 @@ Harness {
         if (text === "") return null
         var a = JSON.parse(text).chart.result[0]
         var b = answers[s].chart.result[0]
-        var periods = {}
-        Object.keys(a.meta.tradingPeriods).forEach(function(k) { periods[k] = a.meta.tradingPeriods[k].concat(b.meta.tradingPeriods[k]) })
+        // Yahoo sends a listing abroad's periods, and an index's, as one list
+        // of days; a later answer with no periods yet has its current one's.
+        var later = b.meta.tradingPeriods
+        var periods = Array.isArray(a.meta.tradingPeriods) ? a.meta.tradingPeriods.concat(later || [[b.meta.currentTradingPeriod.regular]]) : {}
+        if (!Array.isArray(a.meta.tradingPeriods))
+          Object.keys(a.meta.tradingPeriods).forEach(function(k) { periods[k] = a.meta.tradingPeriods[k].concat(later[k]) })
         var series = {}
         ;["open", "high", "low", "close", "volume"].forEach(function(f) {
           series[f] = a.indicators.quote[0][f].concat((b.timestamp && b.indicators.quote[0][f]) || [])
