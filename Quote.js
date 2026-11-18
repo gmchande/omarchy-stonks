@@ -347,11 +347,18 @@ function dayBefore(timestamps, series, periods, until, tick, index) {
   var kept = filterStrayCloses(bars, periods, tick).bars
   var regular = periodOf(periods.regular)
   var firstRegular = regular ? firstRegularBar(kept, regular) : null
+  // Its session's low and high, from its bars' own, as a chart answer
+  // sends them; a spark answer sends none.
+  var session = regular ? kept.filter(function(b) { return b.t >= regular.start && b.t < regular.end }) : []
+  var lows = session.map(function(b) { return knownPrice(b.l) }).filter(function(v) { return v !== null })
+  var highs = session.map(function(b) { return knownPrice(b.h) }).filter(function(v) { return v !== null })
   return {
     session: { pre: index ? null : periodOf(periods.pre), regular: regular, post: index ? null : periodOf(periods.post) },
     points: dayPoints(kept, null, regular, index),
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
-    openSession: firstRegular ? regular.start : null
+    openSession: firstRegular ? regular.start : null,
+    dayLow: lows.length ? Math.min.apply(null, lows) : null,
+    dayHigh: highs.length ? Math.max.apply(null, highs) : null
   }
 }
 
@@ -697,7 +704,8 @@ function extendedTrade(quote, latest) {
 // bell: the S&P 500's last bar is 15:55's, not its close. Not at the quote's
 // own stamp, which can come later: London's 16:30 close has come stamped
 // 17:20, after its after-hours buckets. The coming day's trades after it
-// (`tailStart`) are no part of the session.
+// (`tailStart`), or those a 1D chart joined to it (`tonight`), are no part
+// of the session.
 function readingAt(quote, t) {
   var pts = quote.points
   if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
@@ -712,7 +720,7 @@ function readingAt(quote, t) {
   }
   var head = headlineQuote(quote)
   var reg = quote.session.regular
-  var tail = tailStart(quote)
+  var tail = tailStart(quote) !== null ? tailStart(quote) : quote.tonight || null
   var inSession = function(p) { return pointSession(quote, p) === "reg" && (tail === null || p.t < tail) }
   if (!quote.crypto && head && head.source === "quote" && reg && head.t >= reg.end
       && inSession(pts[k]) && (k + 1 === pts.length || !inSession(pts[k + 1])))

@@ -206,7 +206,7 @@ Rectangle {
     anchors.rightMargin: root.margin
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
-    text: root.view ? Format.lookSigns(root.view.changeText, root.retro) : ""
+    text: Format.lookSigns(root.lines.move, root.retro)
     color: root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.fontFamily
     font.pixelSize: 64 * root.u

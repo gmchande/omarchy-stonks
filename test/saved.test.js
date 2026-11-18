@@ -206,12 +206,12 @@ test("a day with no bar says nothing against the trade its quote holds, and a th
   expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades today")
   expect(M.dayNote(cvr, M.epochAt(US, "2026-10-17", "12:00"), calendars)).toBe("No trades on Fri")
   // CVR's Monday 26 October at 20:30, its 16:00 trade the session's last,
-  // with a night trade added at 21:00 on Sunday: by then the chart's start
-  // has slid past Sunday's trade, but the day traded twice, so nothing is
+  // with a night trade added at 21:00 on Sunday: the chart starts at the
+  // open, after Sunday's trade, but the day traded twice, so nothing is
   // said. With Sunday's trade alone, the chart draws none of the day and
   // the note says the one trade it had. Once Robinhood's answer reaches
-  // 19:55 the day is over, and its axis still runs from where its start
-  // slid, its midnight, to 20:00: the slid-off trade never sets its end.
+  // 19:55 the day is over, and its axis still runs from its open to 20:00:
+  // the trade before the open never sets its end.
   const monday = M.parseChart(fixture("moments/watch-2026-10-26-1800/cvr.json"))
   const cvrNight = traded("watch-2026-10-26-1800", fixture("moments/watch-2026-10-26-1800/robinhood-day.json").results.map(r => r.symbol)).CVR
   const sundayTrade = { t: at("2026-10-25", "21:00"), p: 10.2, s: "overnight" }
@@ -219,7 +219,7 @@ test("a day with no bar says nothing against the trade its quote holds, and a th
   const evening = at("2026-10-26", "20:30")
   expect([thin(monday.points.slice(-1)), thin([])].map(day => [day.points.length, M.dayNote(day, evening, calendars)]))
     .toEqual([[1, ""], [0, "Traded only at Sun 21:00"]])
-  expect(M.chartSpan(thin([], at("2026-10-26", "19:55")))).toMatchObject({ start: at("2026-10-26", "00:00"), end: at("2026-10-26", "20:00") })
+  expect(M.chartSpan(thin([], at("2026-10-26", "19:55")))).toMatchObject({ start: at("2026-10-26", "09:30"), end: at("2026-10-26", "20:00") })
 })
 
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {
@@ -1967,47 +1967,36 @@ const dayAt = (set, name) => {
 // The line under the price at `now`, as the hero reads it.
 const stripAt = (built, now) => M.extendedStack(built.quote, built.latest, now, built.day)
 
-test("the 1D chart is the trading day: from its night's open the evening before until the open, then from a start that slides to its own midnight by 13:30, to its 20:00, the hours to come empty", () => {
+test("the 1D chart is the trading day from its open to its 20:00, the hours to come empty, and until the next open the day that closed", () => {
   // Wednesday 7 October, 11:53, its newest bar 11:50: the day runs from
-  // Tuesday's 22:20, its start five minutes later for every five since the
-  // open, through the night, the pre-market and the session so far, to
-  // Wednesday's 20:00, each trade at its time.
+  // the open to Wednesday's 20:00, each trade at its time, the night and
+  // the pre-market before it left out.
   const quote = savedDay("2026-10-07-1153", "nest")
   const { day } = dayAt("2026-10-07-1153", "nest")
-  expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "22:20"), end: at("2026-10-07", "20:00") })
-  expect(day.points[0].t).toBeGreaterThanOrEqual(at("2026-10-06", "22:20"))
-  const sessions = day.points.map(p => p.s).filter((s, i, all) => s !== all[i - 1])
-  expect(sessions).toEqual(["overnight", "pre", "reg"])
-  expect(M.chartGeometry(day).points.at(-1).x).toBeCloseTo(13.5 / (21 + 40 / 60), 2)
-  // Ticks at midnight, the night's end, and the close.
-  expect(M.chartGeometry(day).ticks.map(x => M.timeAtFraction(day, x)))
-    .toEqual([at("2026-10-07", "00:00"), at("2026-10-07", "04:00"), at("2026-10-07", "16:00")])
+  expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-07", "09:30"), end: at("2026-10-07", "20:00") })
+  expect([...new Set(day.points.map(p => p.s))]).toEqual(["reg"])
+  expect(M.chartGeometry(day).points.at(-1).x).toBeCloseTo((day.points.at(-1).t - at("2026-10-07", "09:30")) / (10.5 * 3600), 5)
+  expect(day.points.at(-1).t).toBeGreaterThan(at("2026-10-07", "11:50"))
+  // A tick at the close.
+  expect(M.chartGeometry(day).ticks.map(x => M.timeAtFraction(day, x))).toEqual([at("2026-10-07", "16:00")])
   // Measured from Tuesday's close, the quote's previous close.
   expect(day.prevClose).toBe(quote.prevClose)
-  // Nebius on Monday 26 October: from Sunday's 20:00 at 07:00, five minutes
-  // on at 09:35, two and a half hours on at noon, and from Monday's midnight
-  // at 15:00 and 19:55, every one to Monday's 20:00.
-  expect(["0700", "0935", "1200", "1500", "1955"].map(m => M.chartSpan(dayAt(`watch-2026-10-26-${m}`, "nbis").day)).map(a => [a.start, a.end]))
-    .toEqual([["2026-10-25", "20:00"], ["2026-10-25", "20:05"], ["2026-10-25", "22:30"], ["2026-10-26", "00:00"], ["2026-10-26", "00:00"]]
-      .map(([date, clock]) => [at(date, clock), at("2026-10-26", "20:00")]))
-  // A quiet night leaves the left five minutes at a time: SILK's first two
-  // trades of Thursday night came at 20:00 and 20:20, and with its trades
-  // held at the open, one bar past it the chart starts at 20:05, not at its
-  // next trade.
-  const silk = savedDay("day", "silk")
-  const silkOpen = silk.session.regular.start
-  const silkNight = traded("day", fixture("moments/day/robinhood-day.json").results.map(r => r.symbol)).SILK
-  const startAt = through => M.chartSpan(M.dayChart({ ...silk, points: silk.points.filter(p => p.t <= silkOpen) },
-    { bars: silkNight.bars.filter(b => b.t <= silkOpen), through }, calendars).day).start
-  expect([startAt(silkOpen), startAt(silkOpen + 300)]).toEqual([at("2026-10-01", "20:00"), at("2026-10-01", "20:05")])
-  // A quiet day and night slide by the clock, five minutes at a time. Nebius
-  // on Monday 26 October, thinned to five trades by day and three by night,
-  // read as a running shell holds it every five minutes from 04:10 to 03:55
-  // on Tuesday: by day Robinhood answered once, after 04:00, so its newest
-  // slot stays 04:05; by night it answers every five minutes, its newest slot
-  // five minutes old, quiet ones included. The left edge never moves more
-  // than five minutes at a time: at noon it is 22:30 though the last trade
-  // came at 09:35, never jumping when the 14:00 trade comes.
+  // Nebius on Monday 26 October: at 07:00 Friday's day, from its open,
+  // with the night and the pre-market joined at its end; from the open,
+  // Monday's, from its open to its 20:00, at 09:35, noon, 15:00 and 19:55.
+  const spans = ["0700", "0935", "1200", "1500", "1955"].map(m => M.chartSpan(dayAt(`watch-2026-10-26-${m}`, "nbis").day))
+  expect(spans[0]).toMatchObject({ start: at("2026-10-23", "09:30"), skip: { from: at("2026-10-23", "20:00"), to: at("2026-10-25", "20:00") } })
+  expect(spans[0].end).toBeGreaterThan(at("2026-10-26", "06:45"))
+  expect(spans.slice(1).map(a => [a.start, a.end])).toEqual(Array(4).fill([at("2026-10-26", "09:30"), at("2026-10-26", "20:00")]))
+  // The open stays in its place. Nebius on Monday 26 October, thinned to
+  // five trades by day and three by night, read as a running shell holds
+  // it every five minutes from 04:10 to 03:55 on Tuesday: by day Robinhood
+  // answered once, after 04:00, so its newest slot stays 04:05; by night it
+  // answers every five minutes, its newest slot five minutes old, quiet
+  // ones included. The chart starts at Friday's open until Monday's first
+  // price of the session, then at Monday's, which it keeps; Monday's axis
+  // ends at its 20:00 until tonight joins it, then at the newest slot,
+  // never stepping back.
   const quiet = savedDay("watch-2026-10-27-0130", "nbis")
   const sparse = ["04:30", "09:35", "14:00", "16:00", "18:00"].map(c => at("2026-10-26", c))
   const quietDay = quiet.points.filter(p => sparse.includes(p.t))
@@ -2015,35 +2004,41 @@ test("the 1D chart is the trading day: from its night's open the evening before 
   const joinedNights = [robinhood("watch-2026-10-26-2005"), robinhood("watch-2026-10-27-0130")].flatMap(n => n.bars)
   const quietNight = [at("2026-10-25", "21:00"), at("2026-10-26", "22:00"), at("2026-10-27", "00:30")].map(t => joinedNights.find(b => b.t === t))
   expect([quietDay.length, quietNight.every(Boolean)]).toEqual([5, true])
-  const starts = []
+  const axes = []
   for (let t = at("2026-10-26", "04:10"); t <= at("2026-10-27", "03:55"); t += 300) {
     const through = t < at("2026-10-26", "20:00") ? at("2026-10-26", "04:05") : t - 300
-    const day = M.dayChart({ ...quiet, points: quietDay.filter(p => p.t + 300 <= t) }, { bars: quietNight.filter(b => b.t <= through), through }, calendars, t).day
-    starts.push([t, M.chartSpan(day).start])
+    const day = M.dayChart({ ...quiet, wholeDay: false, points: quietDay.filter(p => p.t + 300 <= t) }, { bars: quietNight.filter(b => b.t <= through), through }, calendars).day
+    axes.push([t, M.chartSpan(day)])
   }
-  const steps = starts.slice(1).map(([t, start], k) => [t, start - starts[k][1]]).filter(([, step]) => step < 0 || step > 300)
-  expect(steps).toEqual([])
-  expect([at("2026-10-26", "12:00"), at("2026-10-26", "15:00"), at("2026-10-27", "01:30")].map(t => starts.find(s => s[0] === t)[1]))
-    .toEqual([at("2026-10-25", "22:30"), at("2026-10-26", "00:00"), at("2026-10-26", "05:30")])
+  const opened = axes.findIndex(([, a]) => a.start === at("2026-10-26", "09:30"))
+  expect(axes[opened][0]).toBe(at("2026-10-26", "09:40"))
+  expect(axes.slice(0, opened).every(([, a]) => a.start === at("2026-10-23", "09:30"))).toBe(true)
+  expect(axes.slice(opened).every(([, a]) => a.start === at("2026-10-26", "09:30"))).toBe(true)
+  expect(axes.filter(([t]) => t >= at("2026-10-26", "09:40") && t < at("2026-10-26", "20:00")).every(([, a]) => a.end === at("2026-10-26", "20:00"))).toBe(true)
+  const night = axes.filter(([t]) => t > at("2026-10-26", "20:00")).map(([t, a]) => [t, a.end])
+  expect(night.every(([t, end], k) => end === t - 300 && (k === 0 || end > night[k - 1][1]))).toBe(true)
 })
 
-test("through a night, until 04:00, the chart keeps the day that closed with tonight at its end, and tonight counts from the close just gone", () => {
+test("through a night the chart keeps the day that closed with tonight at its end, and tonight counts from the close just gone", () => {
   // Wednesday 00:05: Robinhood's newest bar is Tuesday 23:55. The chart is
-  // Tuesday's, as wide as it ended its day, from its midnight to its 20:00:
-  // the last 20 hours of trading up to that bar, dashed at Monday's close
-  // until the bell, then at Tuesday's. The price on top counts from
-  // Tuesday's close; Tuesday's close and its day are under the price, and
-  // the night's move in money under the change.
+  // Tuesday's, from its open to that bar, dashed at Monday's close until
+  // the bell, then at Tuesday's. The price on top counts from Tuesday's
+  // close; Tuesday's close and its day are under the price, and the
+  // night's move in money under the change.
   const built = dayAt("2026-10-07-0005", "nest")
   const { day, latest, quote } = built
-  expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "04:00"), end: at("2026-10-06", "23:55") })
+  expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "09:30"), end: at("2026-10-06", "23:55") })
   expect(M.lastTradeTime(day)).toBe(at("2026-10-06", "23:55"))
+  // By the shell's clock, five minutes on, the axis runs on to now, the
+  // closed day narrowing.
+  const nestNight = traded("2026-10-07-0005", fixture("moments/2026-10-07-0005/robinhood-day.json").results.map(r => r.symbol)).NEST
+  expect(M.chartSpan(M.dayChart(quote, nestNight, calendars, at("2026-10-07", "00:10")).day).end).toBe(at("2026-10-07", "00:10"))
   const newest = M.newestTrade(quote, latest, calendars, day)
   expect([M.money(newest.base), M.money(M.dayBase(day)), newest.closed, newest.joined]).toEqual(["249.87", "232.57", true, true])
   const top = M.rowModel(quote, 0, "pct", newest)
   const lines = M.heroLines(quote, top, latest, at("2026-10-07", "00:05"), day, calendars, "pct", false)
   expect([top.changeText, lines.close.label, lines.close.price, lines.close.changeText, lines.caption.label, lines.caption.changeText])
-    .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64"])
+    .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64 USD"])
   const geometry = M.chartGeometry(day, calendars)
   expect([geometry.step.x, geometry.step.y < geometry.baselineY]).toEqual([M.axisFraction(M.chartSpan(day), day.session.regular.end), true])
   // Yahoo can send the close without the one before it: the night keeps its
@@ -2093,13 +2088,13 @@ test("once a listing trades after its close, its newest price is on top, measure
   const { day, latest } = built
   const one = at("2026-10-07", "01:00")
   const newest = M.newestTrade(quote, latest, calendars, day)
-  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.price, own: false, closed: true, joined: true, dayStart: at("2026-10-06", "09:30") })
+  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.price, own: false, closed: true, joined: true, stepped: true, dayStart: at("2026-10-06", "09:30") })
   const top = M.rowModel(quote, 0, "pct", newest)
   expect([top.priceText, top.changeText, M.animalKind(top)]).toEqual(["248.04", "\u22120.73%", "bear"])
   expect(M.newestNote(quote, newest, one, calendars)).toBe("Overnight 00:50")
   expect(M.heroLines(quote, top, latest, one, day, calendars, "pct", false)).toEqual({
     close: { label: "TUE CLOSE", time: "", price: "249.87", changeText: "+7.44%", tone: "up", stale: false },
-    caption: { label: "OVERNIGHT", changeText: "\u22121.83", tone: "down" } })
+    caption: { label: "OVERNIGHT", changeText: "\u22121.83 USD", tone: "down" }, move: "\u22120.73%" })
   expect(M.rowModel(day, latest.t, "pct", newest)).toMatchObject({ changeText: "\u22120.73%", dayUp: false })
   const morning = at("2026-10-06", "11:00")
   expect([M.scrubBaselineText(day, latest.t, M.exchangeDay(day, one), calendars), M.scrubBaselineText(day, morning, M.exchangeDay(day, one), calendars)])
@@ -2191,26 +2186,26 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // the price on top is the close itself, the close it counts from. Under
   // the move, its name and its amount.
   const phases = {
-    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% | THU CLOSE 159.17 | FRI −0.43",
-      "JNJ 263.16 −1.66% | FRI CLOSE 263.81 −1.42% · AFTER HOURS −0.25% | FRI −4.45",
-      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48"],
-    "watch-2026-10-25-2335": ["NBIS 152.51 −3.92% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −6.23",
-      "JNJ 264.11 +0.11% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.30",
-      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48"],
-    "watch-2026-10-26-0100": ["NBIS 153.07 −3.57% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −5.67",
-      "JNJ 264.05 +0.09% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.24"],
-    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −7.46",
-      "JNJ 264.55 +0.28% | FRI CLOSE 263.81 −1.42% | PRE-MARKET +0.74"],
-    "watch-2026-10-26-0700": ["NBIS 153.00 −3.62% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −5.74"],
-    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88% | FRI CLOSE 158.74 | TODAY +4.57", "JNJ 265.78 +0.75% | FRI CLOSE 263.81 | TODAY +1.97"],
-    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% | CLOSE 153.27 −3.45% · AFTER HOURS +1.35% | TODAY −3.40",
-      "JNJ 266.42 +0.99% | CLOSE 266.30 +0.94% · AFTER HOURS +0.05% | TODAY +2.61", "PSIX 47.15 +3.33% | FRI CLOSE 45.63 | TODAY +1.52",
-      "CVR 9.82 −6.48% | FRI CLOSE 10.50 | TODAY −0.68"],
-    "watch-2026-10-26-2005": ["NBIS 156.80 +2.30% | CLOSE 153.27 −3.45% | OVERNIGHT +3.53", "JNJ 266.30 +0.94% | FRI CLOSE 263.81 | TODAY +2.49"],
-    "watch-2026-10-27-0350": ["NBIS 153.03 −0.16% | MON CLOSE 153.27 −3.45% | OVERNIGHT −0.24",
-      "JNJ 266.89 +0.22% | MON CLOSE 266.30 +0.94% | OVERNIGHT +0.59"],
-    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% | MON CLOSE 153.27 −3.45% | PRE-MARKET +0.77",
-      "JNJ 266.60 +0.11% | MON CLOSE 266.30 +0.94% | PRE-MARKET +0.30"]
+    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% | THU CLOSE 159.17 | FRI −0.43 USD",
+      "JNJ 263.16 −1.66% | FRI CLOSE 263.81 −1.42% · AFTER HOURS −0.25% | FRI −4.45 USD",
+      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48 USD"],
+    "watch-2026-10-25-2335": ["NBIS 152.51 −3.92% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −6.23 USD",
+      "JNJ 264.11 +0.11% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.30 USD",
+      "PSIX 45.69 −3.14% | FRI CLOSE 45.63 −3.26% · AFTER HOURS +0.13% | FRI −1.48 USD"],
+    "watch-2026-10-26-0100": ["NBIS 153.07 −3.57% | FRI CLOSE 158.74 −0.27% | OVERNIGHT −5.67 USD",
+      "JNJ 264.05 +0.09% | FRI CLOSE 263.81 −1.42% | OVERNIGHT +0.24 USD"],
+    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −7.46 USD",
+      "JNJ 264.55 +0.28% | FRI CLOSE 263.81 −1.42% | PRE-MARKET +0.74 USD"],
+    "watch-2026-10-26-0700": ["NBIS 153.00 −3.62% | FRI CLOSE 158.74 −0.27% | PRE-MARKET −5.74 USD"],
+    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88% | FRI CLOSE 158.74 | TODAY +4.57 USD", "JNJ 265.78 +0.75% | FRI CLOSE 263.81 | TODAY +1.97 USD"],
+    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% | CLOSE 153.27 −3.45% · AFTER HOURS +1.35% | TODAY −3.40 USD",
+      "JNJ 266.42 +0.99% | CLOSE 266.30 +0.94% · AFTER HOURS +0.05% | TODAY +2.61 USD", "PSIX 47.15 +3.33% | FRI CLOSE 45.63 | TODAY +1.52 USD",
+      "CVR 9.82 −6.48% | FRI CLOSE 10.50 | TODAY −0.68 USD"],
+    "watch-2026-10-26-2005": ["NBIS 156.80 +2.30% | CLOSE 153.27 −3.45% | OVERNIGHT +3.53 USD", "JNJ 266.30 +0.94% | FRI CLOSE 263.81 | TODAY +2.49 USD"],
+    "watch-2026-10-27-0350": ["NBIS 153.03 −0.16% | MON CLOSE 153.27 −3.45% | OVERNIGHT −0.24 USD",
+      "JNJ 266.89 +0.22% | MON CLOSE 266.30 +0.94% | OVERNIGHT +0.59 USD"],
+    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% | MON CLOSE 153.27 −3.45% | PRE-MARKET +0.77 USD",
+      "JNJ 266.60 +0.11% | MON CLOSE 266.30 +0.94% | PRE-MARKET +0.30 USD"]
   }
   for (const [set, expected] of Object.entries(phases)) {
     const at = topsAt(set)
@@ -2284,7 +2279,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // the close, which isn't the open's; in money, the close's lines in money.
   {
     const at = topsAt("watch-2026-10-26-1800")
-    expect(at.lines("NBIS", "open")).toEqual(["CLOSE 153.27 \u22123.45%", "SINCE OPEN +1.37"])
+    expect(at.lines("NBIS", "open")).toEqual(["CLOSE 153.27 \u22123.45%", "SINCE OPEN +1.37 USD"])
     expect(at.lines("NBIS", "abs")).toEqual(["CLOSE 153.27 \u22125.47 · AFTER HOURS +2.07", "TODAY \u22122.14%"])
     expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
   }
@@ -2302,45 +2297,47 @@ test("in every phase, a stock that has traded since its close shows that newest 
   {
     const noon = topsAt("watch-2026-10-26-1200")
     expect(under(noon, "NBIS")).toEqual({ close: { label: "FRI CLOSE", time: "", price: "158.74", changeText: "", tone: "flat", stale: false },
-      caption: { label: "TODAY", changeText: "+4.57", tone: "up" } })
+      caption: { label: "TODAY", changeText: "+4.57 USD", tone: "up" }, move: "+2.88%" })
     expect(said(under(noon, "NBIS", "abs"))).toEqual(["FRI CLOSE 158.74", "TODAY +2.88%"])
-    expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34"])
-    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42"])
-    expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00"])
-    expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57"])
+    expect(under(noon, "NBIS", "abs").move).toBe("+4.57 USD")
+    expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34 USD"])
+    // An index's points name the currency its listing's line names.
+    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42 USD"])
+    expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00 JPY"])
+    expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57 AUD"])
     const evening = topsAt("watch-2026-10-26-1605")
-    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09"])
+    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09 USD"])
     // Power Solutions' only after-hours trade repeats its close, so the
     // close it counts from stands under it; J&J's moved the price, so that
     // close and its day's move go under the price, then the part since it,
     // and the day's whole move under the change.
-    expect(said(under(evening, "PSIX"))).toEqual(["FRI CLOSE 45.63", "TODAY +1.52"])
-    expect(evening.lines("JNJ")).toEqual(["CLOSE 266.35 +0.96% · AFTER HOURS \u22120.02%", "TODAY +2.49"])
+    expect(said(under(evening, "PSIX"))).toEqual(["FRI CLOSE 45.63", "TODAY +1.52 USD"])
+    expect(evening.lines("JNJ")).toEqual(["CLOSE 266.35 +0.96% · AFTER HOURS \u22120.02%", "TODAY +2.49 USD"])
     // Sunday: Friday's close on top for the S&P 500, and for Nebius, whose
     // last after-hours trade was at its close; the move is Friday's, from
     // Thursday's close, and named so.
     const saturday = topsAt("watch-2026-10-25-1000")
-    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75"])
-    expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43"])
+    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75 USD"])
+    expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43 USD"])
     // Monday 07:00, the pre-market: Friday's close and its day's move, as
     // before, and the pre-market's move from that close under the change.
-    expect(said(under(topsAt("watch-2026-10-26-0700"), "NBIS"))).toEqual(["FRI CLOSE 158.74 \u22120.27%", "PRE-MARKET \u22125.74"])
+    expect(said(under(topsAt("watch-2026-10-26-0700"), "NBIS"))).toEqual(["FRI CLOSE 158.74 \u22120.27%", "PRE-MARKET \u22125.74 USD"])
     // From a new day's first answer until its first trade, the price on top
     // is still the last day's close and its move: Berkshire at 04:05 Monday,
     // Friday's close counted from Thursday's, and Toyota at 09:05 Monday in
     // Tokyo, before Yahoo's first bar, Friday's close counted from Thursday's.
-    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905.00"])
-    expect(said(under(topsAt("watch-2026-10-25-2005"), "7203.T"))).toEqual(["THU CLOSE 3,084.00", "FRI +21.00"])
+    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905.00 USD"])
+    expect(said(under(topsAt("watch-2026-10-25-2005"), "7203.T"))).toEqual(["THU CLOSE 3,084.00", "FRI +21.00 JPY"])
     // A coin's day is its last 24 hours: the price 24 hours ago, and the
     // move in dollars under the 24H its row says.
     const coin = savedDay("coin-2026-10-25-2005", "btc-usd")
     expect(said(M.heroLines(coin, M.rowModel(coin, 0, "pct"), null, at("2026-10-25", "20:05"), null, calendars, "pct", false)))
-      .toEqual(["24H AGO 80,711", "24H \u2212795.72"])
+      .toEqual(["24H AGO 80,711", "24H \u2212795.72 USD"])
   }
   // Wherever those lines show, at every saved watch moment: the close plus
   // the move under the change is the price on top, to its last digit where
   // the price shows cents, and a price from a past day never says TODAY.
-  const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
+  const number = text => Number(text.split(" ")[0].replace(/,/g, "").replace("\u2212", "-"))
   const addsUp = (close, move, price, digits) => Math.abs(number(close) + number(move) - number(price)) < (digits >= 2 ? 1e-9 : 2 * Math.pow(10, -digits))
   {
     const off = []
@@ -2570,31 +2567,33 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const model = M.historyRowModel(chart.history, at.quotes.NBIS, 0)
     const lines = M.heroLines(at.quotes.NBIS, model, chart.latest, at.now, chart.day, calendars, "pct", false)
     expect([lines.close.label, lines.close.changeText, lines.close.since, lines.caption.label, lines.caption.changeText])
-      .toEqual(["CLOSE", "\u22123.45%", undefined, "1W", M.signedMoney(model.abs)])
+      .toEqual(["CLOSE", "\u22123.45%", undefined, "1W", M.signedMoney(model.abs) + " USD"])
   }
 })
 
-test("before the open the day is measured from the last session's close, though Yahoo's previous close is the one before", () => {
-  // Friday 23 October, 06:22: Yahoo's day is Friday's, its pre-market from
-  // 04:00, while its quote is Thursday's close and its previous close
-  // Wednesday's. The chart and its scrub must not measure AAPL's pre-market
-  // from Wednesday's 343.99, green above it, while the line under the price
-  // says it is down from Thursday's.
-  const quote = savedDay("premarket-2026-10-23-0622", "aapl")
+test("before the open the pre-market is measured from the last session's close, though Yahoo's previous close is the one before", () => {
+  // Friday 23 October, 06:00: Yahoo's answer holds Thursday and Friday's
+  // pre-market from 04:00, its quote Thursday's close and its previous
+  // close Wednesday's. The chart is Thursday's with the pre-market joined,
+  // and past Thursday's bell its line and a scrub must not measure AAPL's
+  // pre-market from Wednesday's 343.99, green above it, while the line
+  // under the price says it is down from Thursday's.
+  const quote = savedDay("night-2026-10-23-0600", "aapl")
   expect([quote.price, quote.prevClose]).toEqual([348.22, 343.99])
   const fourFortyFive = at("2026-10-23", "04:45")
   const days = [M.dayChart(quote, { bars: [], through: null }, calendars).day, M.sessionDay(quote)]
-  for (const day of [quote, ...days]) {
+  for (const day of days) {
     const line = M.chartGeometry(day)
-    expect(line.points.at(-1).y).toBeGreaterThan(line.baselineY)
-    expect(M.rowModel(day, fourFortyFive, "pct")).toMatchObject({ priceText: "345.92", changeText: "\u22120.66%", dayUp: false })
+    expect(line.points.at(-1).y).toBeGreaterThan(line.step.y)
   }
-  for (const day of days) expect(M.dayBaselineText(day, M.exchangeDay(day, fourFortyFive), calendars)).toBe("THU CLOSE 348.22")
+  // A row scrubbed there reads the same.
+  for (const day of [quote, ...days]) expect(M.rowModel(day, fourFortyFive, "pct")).toMatchObject({ priceText: "345.92", changeText: "\u22120.66%", dayUp: false })
+  for (const day of days) expect(M.scrubBaselineText(day, fourFortyFive, M.exchangeDay(day, fourFortyFive), calendars)).toBe("THU CLOSE 348.22")
   // The headline is still Thursday's close and Thursday's move.
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+1.23%")
   // NVDA the other way round: down on Thursday, up since.
-  const nvda = savedDay("premarket-2026-10-23-0622", "nvda")
-  expect(M.rowModel(nvda, fourFortyFive, "pct").changeText).toBe("+1.19%")
+  const nvda = savedDay("night-2026-10-23-0600", "nvda")
+  expect(M.rowModel(M.sessionDay(nvda), fourFortyFive, "pct").changeText).toBe("+1.19%")
   expect(M.rowModel(nvda, 0, "pct").changeText).toBe("\u22124.40%")
 })
 
@@ -2677,9 +2676,8 @@ test("a night's trades join the day that closed, dashed at the close before it u
     `MON CLOSE ${M.money(close)}`, `5 OCT CLOSE ${M.money(close)}`, `5 OCT CLOSE ${M.money(close)}`])
   expect(M.scrubBaselineText(day, built.latest.t, today, calendars)).toBe(`CLOSE ${M.money(quote.price)}`)
   // Before 20:00 the day runs to its own end: Monday 19:55, NBIS's after
-  // hours on Monday's chart, from its midnight, where its start slid by
-  // 13:30, to its own 20:00.
-  expect(M.chartSpan(dayAt("watch-2026-10-26-1955", "nbis").day)).toMatchObject({ start: at("2026-10-26", "00:00"), end: at("2026-10-26", "20:00") })
+  // hours on Monday's chart, from its open to its own 20:00.
+  expect(M.chartSpan(dayAt("watch-2026-10-26-1955", "nbis").day)).toMatchObject({ start: at("2026-10-26", "09:30"), end: at("2026-10-26", "20:00") })
   // Tuesday 18:00: NEST's after hours is bright from the bell.
   expect(dayAt("2026-10-06-1800", "nest").day.litFrom).toBe(at("2026-10-06", "16:00"))
 })
@@ -2704,28 +2702,27 @@ const joined = (earlier, later) => {
   }] } }
 }
 
-test("a weekend shows Friday from its midnight to its last trade, then Monday from Sunday's first night trade, each trade at its time", () => {
+test("a weekend shows Friday from its open to its last trade, then Sunday's night and Monday's pre-market joined to it, then Monday from its open, each trade at its time", () => {
   // Saturday noon: Friday's day is over, Robinhood's answer reaching its
-  // 19:55 slot: from its midnight, where its start slid by 13:30, to its
-  // last trade, 19:55, edge to edge; ticks at 04:00 and the close.
+  // 19:55 slot: from its open to its last trade, 19:55, edge to edge; a
+  // tick at the close.
   const saturday = dayAt("2026-10-03-1200", "nest").day
-  expect(M.chartSpan(saturday)).toMatchObject({ start: at("2026-10-02", "00:00"), end: at("2026-10-02", "19:55") })
+  expect(M.chartSpan(saturday)).toMatchObject({ start: at("2026-10-02", "09:30"), end: at("2026-10-02", "19:55") })
   expect(M.lastTradeTime(saturday)).toBe(at("2026-10-02", "19:55"))
   expect(M.chartGeometry(saturday).points.at(-1).x).toBe(1)
-  expect(M.chartGeometry(saturday).ticks.map(x => M.timeAtFraction(saturday, x)))
-    .toEqual([at("2026-10-02", "04:00"), at("2026-10-02", "16:00")])
+  expect(M.chartGeometry(saturday).ticks.map(x => M.timeAtFraction(saturday, x))).toEqual([at("2026-10-02", "16:00")])
   // A thin feed: SHOP's Friday 23 October, its after hours ending with a
   // 19:05 bar, as Robinhood's answer stood at 20:30 that evening (cut from
-  // its week, fetched Monday 00:12). Over, its day runs from its first
-  // trade, 04:00, to its last, 19:05, on the right edge, where a scrub says
-  // its own time: nothing made up after it.
+  // its week, fetched Monday 00:12). Over, its day runs from its open to
+  // its last trade, 19:05, on the right edge, where a scrub says its own
+  // time: nothing made up after it.
   const shopRaw = fixture("moments/shop-2026-10-26-0013/robinhood-week.json")
   const week = overnight(shopRaw, ["SHOP"]).SHOP
   const fridayNight = { bars: week.bars.filter(b => b.t < at("2026-10-23", "20:00")), through: at("2026-10-23", "19:55") }
   const shopQuote = M.parseChart(fixture("moments/shop-2026-10-26-0013/shop.json"), cents, at("2026-10-23", "20:30"))
   const thinFeed = M.dayChart(shopQuote, fridayNight, calendars).day
   const shopLast = M.lastTradeTime(thinFeed)
-  expect(M.chartSpan(thinFeed)).toMatchObject({ start: at("2026-10-23", "04:00"), end: shopLast })
+  expect(M.chartSpan(thinFeed)).toMatchObject({ start: at("2026-10-23", "09:30"), end: shopLast })
   expect(Math.abs(shopLast - at("2026-10-23", "19:05"))).toBeLessThan(60)
   expect(M.chartGeometry(thinFeed).points.at(-1).x).toBe(1)
   expect(marketStatus(thinFeed, at("2026-10-23", "20:30"), shopLast, calendars)).toBe("At 19:05 · After hours")
@@ -2733,21 +2730,20 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   // Yahoo answered after the day, so it is over, edge to edge, though Robinhood's answer stopped at 18:55.
   const short = { bars: fridayNight.bars.filter(b => b.t <= at("2026-10-23", "18:55")), through: at("2026-10-23", "18:55") }
   expect(M.chartSpan(M.dayChart(shopQuote, short, calendars).day).end).toBe(shopLast)
-  // Sunday 10:00, NBIS: the same, from Friday's midnight to its last trade,
+  // Sunday 10:00, NBIS: the same, from Friday's open to its last trade,
   // 19:59, Thursday's close dashed, the dot on Friday's last regular trade.
   const sunday = dayAt("watch-2026-10-25-1000", "nbis")
   const friday = M.chartGeometry(sunday.day)
-  expect(M.chartSpan(sunday.day)).toMatchObject({ start: at("2026-10-23", "00:00"), end: M.lastTradeTime(sunday.day) })
+  expect(M.chartSpan(sunday.day)).toMatchObject({ start: at("2026-10-23", "09:30"), end: M.lastTradeTime(sunday.day) })
   expect(Math.abs(M.lastTradeTime(sunday.day) - at("2026-10-23", "19:59"))).toBeLessThan(60)
   expect(M.dayBase(sunday.day)).toBe(sunday.quote.prevClose)
   expect(sunday.day.points[friday.points.indexOf(M.lastLitPoint(friday))].t).toBe(at("2026-10-23", "15:55"))
-  // Sunday 19:50, no trade of the night yet: still Friday, from its
-  // midnight. By 20:05 Robinhood has sent the night's 20:00 bar, which joins
-  // Friday's right end as five minutes of Friday leave its left, the
-  // weekend taking no room.
-  expect(M.chartSpan(dayAt("watch-2026-10-25-1950", "nbis").day).start).toBe(at("2026-10-23", "00:00"))
+  // Sunday 19:50, no trade of the night yet: still Friday, from its open.
+  // By 20:05 Robinhood has sent the night's 20:00 bar, which joins
+  // Friday's right end, the weekend taking no room.
+  expect(M.chartSpan(dayAt("watch-2026-10-25-1950", "nbis").day).start).toBe(at("2026-10-23", "09:30"))
   const lone = dayAt("watch-2026-10-25-2005", "nbis").day
-  expect(M.chartSpan(lone)).toMatchObject({ start: at("2026-10-23", "00:05"), end: at("2026-10-25", "20:00"),
+  expect(M.chartSpan(lone)).toMatchObject({ start: at("2026-10-23", "09:30"), end: at("2026-10-25", "20:00"),
     skip: { from: at("2026-10-23", "20:00"), to: at("2026-10-25", "20:00") } })
   expect([lone.litFrom, M.lastLitPoint(M.chartGeometry(lone)).x]).toEqual([at("2026-10-25", "20:00"), 1])
   // Sunday 23:35: Friday and tonight, dashed at Thursday's close until
@@ -2769,32 +2765,60 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   const ten = night.day.points.find(p => p.t === at("2026-10-25", "21:10")).t
   expect(marketStatus(night.day, at("2026-10-25", "23:35"), ten, calendars)).toBe("At 21:10 · Overnight")
   expect(marketStatus(night.day, at("2026-10-26", "01:00"), ten, calendars)).toBe("At Sun 21:10 · Overnight")
-  // Monday 01:00: still Friday and the night, its first hours gone off the
-  // left, ticked at Friday's close, the night's open and its midnight.
-  // 04:20 and 09:35: Monday's chart from Sunday's 20:00, five minutes on by
-  // 09:35 as its start begins to slide, the night, the pre-market and the
-  // session as they come, dashed at Friday's close; the pre-market bright at
-  // 04:20, the dot on its newest trade, then on the session's. JNJ's 04:00
-  // bar hadn't come at 04:05: Robinhood's answer had reached 04:00, so it
-  // turned with the rest.
+  // Monday 01:00: still Friday and the night, ticked at Friday's close,
+  // the night's open and its midnight. 04:20: still Friday, the night and
+  // now the pre-market joined, bright, the dot on its newest trade, the
+  // dashed line stepping at Friday's bell to the close the pre-market
+  // counts from. JNJ at 04:05 too: nothing turns at 04:00.
   const one = dayAt("watch-2026-10-26-0100", "nbis").day
   expect(M.chartGeometry(one).ticks).toEqual([at("2026-10-23", "16:00"), at("2026-10-25", "20:00"), at("2026-10-26", "00:00")]
     .map(t => M.fractionAtTime(one, t)))
-  for (const [set, start] of [["watch-2026-10-26-0420", "20:00"], ["watch-2026-10-26-0935", "20:05"]]) {
-    const monday = dayAt(set, "nbis")
-    expect([set, M.chartSpan(monday.day).start, M.chartSpan(monday.day).end, M.dayBase(monday.day)])
-      .toEqual([set, at("2026-10-25", start), at("2026-10-26", "20:00"), M.regularClose(sunday.quote)])
-    // Yahoo still on Friday, with no price: Monday is dashed at Friday's last regular trade, never Thursday's close.
-    const priceless = { ...sunday.quote, price: null }
-    expect(M.dayBase(M.dayChart(priceless, traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS, calendars).day))
-      .toBe(M.regularClose(priceless))
-  }
-  const early = M.chartGeometry(dayAt("watch-2026-10-26-0420", "nbis").day)
+  const robinhood = set => traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS
+  const dawn = dayAt("watch-2026-10-26-0420", "nbis")
+  const early = M.chartGeometry(dawn.day)
+  // Its Yahoo answer is one day, Monday's, its quote still Friday's close
+  // and its previous close Thursday's: Friday is dashed at Thursday's close
+  // until its bell, never at its own.
+  expect([M.chartSpan(dawn.day).start, M.dayBase(dawn.day), M.nightBell(dawn.day), dawn.day.points.at(-1).s, M.newestTrade(dawn.quote, dawn.latest, calendars, dawn.day).base])
+    .toEqual([at("2026-10-23", "09:30"), sunday.quote.prevClose, at("2026-10-23", "16:00"), "pre", M.regularClose(sunday.quote)])
   expect(M.lastLitPoint(early)).toBe(early.points.at(-1))
-  expect(M.chartSpan(dayAt("watch-2026-10-26-0405", "jnj").day).start).toBe(at("2026-10-25", "20:00"))
+  expect(M.chartSpan(dayAt("watch-2026-10-26-0405", "jnj").day).start).toBe(at("2026-10-23", "09:30"))
+  // 07:00 from Yahoo's two-day answer: a scrub of Friday's after hours
+  // reads the same in the panel and in the row, both from Friday's close,
+  // where the dashed line steps.
+  const twoDay = M.parseChart(fixture("moments/watch-2026-10-26-0700/2d/nbis.json"), cents)
+  const seven = M.dayChart(twoDay, robinhood("watch-2026-10-26-0700"), calendars)
+  const sevenNewest = M.newestTrade(twoDay, seven.latest, calendars, seven.day)
+  const evening = seven.day.points.find(p => p.t >= at("2026-10-23", "18:00")).t
+  expect(M.listRow(twoDay, evening, "pct", sevenNewest).changeText).toBe(M.rowModel(seven.day, evening, "pct", sevenNewest).changeText)
+  expect(M.rowModel(seven.day, evening, "pct", sevenNewest).close).toBe(M.regularClose(twoDay))
+  // At the bell by the shell's clock, with the newest answer 09:25's, still
+  // Friday, its joined hours running on to now: the day turns with the new
+  // session's first trade, and is held through its first minutes.
+  const bell = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-10-26", "09:30")).day
+  expect([M.chartSpan(bell).start, M.chartSpan(bell).end]).toEqual([at("2026-10-23", "09:30"), at("2026-10-26", "09:30")])
+  // Answers more than a day behind the clock keep their own day: the 09:25
+  // answer read a week on is still Friday, with Monday's pre-market joined.
+  const stale = M.dayChart(savedDay("watch-2026-10-26-0925", "nbis"), robinhood("watch-2026-10-26-0925"), calendars, at("2026-11-02", "12:00")).day
+  expect([M.chartSpan(stale).start, M.chartSpan(stale).end < at("2026-10-26", "09:30")]).toEqual([at("2026-10-23", "09:30"), true])
+  // 09:35: Monday's chart from its open to its 20:00, dashed at Friday's
+  // close, the dot on the session's trade.
   const open = dayAt("watch-2026-10-26-0935", "nbis")
+  expect([M.chartSpan(open.day).start, M.chartSpan(open.day).end, M.dayBase(open.day)])
+    .toEqual([at("2026-10-26", "09:30"), at("2026-10-26", "20:00"), M.regularClose(sunday.quote)])
   const first = M.chartGeometry(open.day)
   expect(open.day.points[first.points.indexOf(M.lastLitPoint(first))].t).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
+  // Yahoo still on Friday, with no price: Monday's pre-market counts from
+  // Friday's last regular trade, never Thursday's close. At 09:35, Yahoo's
+  // cached Friday answer still out while Robinhood's has Monday's first
+  // trade, the chart holds Friday with that trade at its end, as it will
+  // once Yahoo's two-day answer comes, never Monday with one trade.
+  const priceless = { ...sunday.quote, price: null }
+  const pricelessDawn = M.dayChart(priceless, robinhood("watch-2026-10-26-0420"), calendars)
+  expect(M.newestTrade(priceless, pricelessDawn.latest, calendars, pricelessDawn.day).base).toBe(M.regularClose(priceless))
+  const outOfOrder = M.dayChart(priceless, robinhood("watch-2026-10-26-0935"), calendars, at("2026-10-26", "09:35")).day
+  expect([M.chartSpan(outOfOrder).start, outOfOrder.points.at(-1).t >= at("2026-10-26", "09:30"), M.nightBell(outOfOrder), M.regularClose(outOfOrder)])
+    .toEqual([at("2026-10-23", "09:30"), true, at("2026-10-23", "16:00"), M.regularClose(priceless)])
 })
 
 test("every price stands at its time from its day's first trade, a quiet night a line through its few trades, and Robinhood's trades fill an hour Yahoo lost", () => {
@@ -2820,13 +2844,13 @@ test("every price stands at its time from its day's first trade, a quiet night a
   const top = M.rowModel(quote, 0, "pct", M.newestTrade(quote, built.latest, calendars, day))
   expect(M.rowModel(day, built.latest.t, "pct").changeLine).toBe(top.changeLine)
   expect(againstDashedLine(day, "SILK")).toBe(`SILK all against ${M.money(quote.prevClose)} then ${M.money(quote.price)}`)
-  // Friday 13:42: Friday's own day, its start slid to its midnight by
-  // 13:30, Thursday night's 13 trades slid off its left; every trade at its
-  // time, a quiet hour as wide as a busy one.
+  // Friday 13:42: Friday's own day from its open, Thursday night's 13
+  // trades and the pre-market left out; every trade at its time, a quiet
+  // hour as wide as a busy one.
   const friday = dayAt("day", "silk").day
   const fridaySpan = M.chartSpan(friday)
   const fridayLine = M.chartGeometry(friday).points
-  expect([fridaySpan.start >= at("2026-10-02", "00:00"), friday.points.filter(p => p.t < at("2026-10-02", "00:00")).length]).toEqual([true, 0])
+  expect([fridaySpan.start, friday.points.filter(p => p.t < at("2026-10-02", "09:30")).length]).toEqual([at("2026-10-02", "09:30"), 0])
   expect(friday.points.map((p, k) => Math.abs(fridayLine[k].x - (p.t - fridaySpan.start) / (fridaySpan.end - fridaySpan.start)) < 1e-9).every(Boolean)).toBe(true)
   // Sunday 22:30, SILK, and Sunday 23:35, JNJ: Friday, then the night's
   // trades where the clock puts them, the weekend taking no room: the line
@@ -2858,34 +2882,35 @@ test("every price stands at its time from its day's first trade, a quiet night a
   expect([M.stepTime(shop, nightOpen, -1, M.lastTradeTime(shop)), M.stepTime(shop, fridayLast, 1, M.lastTradeTime(shop))])
     .toEqual([fridayLast, nightOpen])
   expect(dayAt("watch-2026-10-25-2335", "jnj").day.points.filter(p => p.t >= at("2026-10-25", "20:00")).length).toBe(19)
-  // REED had no trade on Sunday night: Friday from its first trade, the
-  // night's hours after it to Robinhood's newest slot, as every chart's
-  // that night, its line ending at its last trade, its session bright.
+  // REED had no trade on Sunday night: Friday from its open, the night's
+  // hours after it to Robinhood's newest slot, as every chart's that
+  // night, its line ending at its last trade, its session bright.
   const reed = dayAt("sunday", "reed").day
-  expect(M.chartSpan(reed)).toMatchObject({ start: at("2026-09-25", "04:00"), end: at("2026-09-27", "22:20") })
+  expect(M.chartSpan(reed)).toMatchObject({ start: at("2026-09-25", "09:30"), end: at("2026-09-27", "22:20") })
   expect([M.lastTradeTime(reed), reed.litFrom]).toEqual([at("2026-09-25", "19:20"), null])
   // Monday 2 November at 09:41, the first trading day after the clocks
   // went back: Yahoo sent no bar from 08:30 to 09:29 for any US listing,
   // and Stonks drew a straight line across the hour, a path no trade took.
   // Robinhood traded through it, and its trades fill the hour, each at its
-  // time and read as the pre-market: NBIS rose to 157.70 at 08:40. Yahoo's
-  // every bar stays as it came, and the price on top and the close the
-  // move counts from stay Yahoo's. SHOP's last bar before the hour was
-  // 08:20, so its stretch is the 13 slots from 08:25 to 09:25, and
-  // Robinhood traded in 8 of them.
+  // time and read as the pre-market, among the day's trades its low and
+  // high count, though the chart starts at the open: NBIS rose to
+  // 157.70 at 08:40. Yahoo's every bar stays as it came, and the price on
+  // top and the close the move counts from stay Yahoo's. SHOP's last bar
+  // before the hour was 08:20, so its stretch is the 13 slots from 08:25 to
+  // 09:25, and Robinhood traded in 8 of them.
   for (const [name, filled] of [["nbis", 12], ["crwv", 12], ["shop", 8]]) {
     const built = dayAt("open-2026-11-02-0941", name)
     const yahoo = built.quote.points
-    const hour = built.day.points.filter(p => p.t > yahoo.findLast(y => y.t < at("2026-11-02", "09:00")).t && p.t < at("2026-11-02", "09:30"))
+    const hour = built.day.trades.filter(p => p.t > yahoo.findLast(y => y.t < at("2026-11-02", "09:00")).t && p.t < at("2026-11-02", "09:30"))
     expect([name, hour.length, hour.every(p => p.s === "pre")]).toEqual([name, filled, true])
-    expect([name, yahoo.every(y => built.day.points.some(p => p.t === y.t && p.p === y.p))]).toEqual([name, true])
+    expect([name, yahoo.every(y => built.day.trades.some(p => p.t === y.t && p.p === y.p))]).toEqual([name, true])
     expect([name, built.latest.t, built.latest.p, built.day.prevClose]).toEqual([name, yahoo.at(-1).t, yahoo.at(-1).p, built.quote.prevClose])
   }
-  expect(dayAt("open-2026-11-02-0941", "nbis").day.points.find(p => p.t === at("2026-11-02", "08:40")).p).toBe(157.7)
+  expect(dayAt("open-2026-11-02-0941", "nbis").day.trades.find(p => p.t === at("2026-11-02", "08:40")).p).toBe(157.7)
   // Read by Yahoo's periods as the pre-market, whatever session Robinhood names its bars.
   const nbisNight = traded("open-2026-11-02-0941", fixture("moments/open-2026-11-02-0941/robinhood-day.json").results.map(r => r.symbol)).NBIS
   const misnamed = { ...nbisNight, bars: nbisNight.bars.map(b => ({ ...b, s: "overnight" })) }
-  expect(M.dayChart(savedDay("open-2026-11-02-0941", "nbis"), misnamed, calendars).day.points
+  expect(M.dayChart(savedDay("open-2026-11-02-0941", "nbis"), misnamed, calendars).day.trades
     .filter(p => p.t > at("2026-11-02", "08:25") && p.t < at("2026-11-02", "09:30")).map(p => p.s)).toEqual(Array(12).fill("pre"))
   // Yahoo's 5-minute history ended NEST's after hours on 6 October at
   // 19:00: its trades to 19:55 fill the hour up to the night's first, at
@@ -2930,7 +2955,7 @@ const chartsAt = (set, names) => {
 // The New York date of a day's regular session.
 const sessionDate = q => M.dateStringOf(M.localDate(q.session.regular.start, US))
 
-test("until 04:00 a listing Robinhood trades all day shows the day that closed with its night, then the coming day; one it doesn't, and an index, their last session", () => {
+test("until the next open a listing Robinhood trades all day shows the day that closed with its night and pre-market joined; one it doesn't with its pre-market; an index its last session", () => {
   // Friday 23 October at 01:00 and 02:30: every headline is Thursday's
   // close and move. NVDA, AAPL and JNJ (a thin night) have traded since
   // Thursday's 20:00: their charts are Thursday's, the night so far joined
@@ -2967,20 +2992,20 @@ test("until 04:00 a listing Robinhood trades all day shows the day that closed w
       expect([lines.close.label, lines.close.changeText, lines.caption.label]).toEqual(["THU CLOSE", "\u22124.40%", "OVERNIGHT"])
     }
   }
-  // 06:00, a two-day answer holding Thursday and Friday's pre-market: the
-  // Friday charts, their night, then the pre-market, bright, the dot on its
-  // newest trade, dashed at Thursday's close. WREN, which Robinhood doesn't
-  // trade all day, has no trade since 04:00: still Thursday. The headline
-  // is still Thursday's close and move, and the index's chart still
-  // Thursday's.
+  // 06:00, a two-day answer holding Thursday and Friday's pre-market: still
+  // Thursday's charts, from its open, with the night and then the
+  // pre-market joined, bright, the dot on its newest trade, dashed at
+  // Wednesday's close until Thursday's bell and at Thursday's after it.
+  // WREN, which Robinhood doesn't trade all day, has no trade since 04:00:
+  // Thursday alone. The headline is still Thursday's close and move, and
+  // the index's chart still Thursday's.
   const [nvda, aapl, jnj, wren, gspc] = chartsAt("night-2026-10-23-0600", ["nvda", "aapl", "jnj", "wren", "gspc"])
   for (const { quote, day, symbol } of [nvda, aapl, jnj]) {
-    const close = M.regularClose(quote)
     const geometry = M.chartGeometry(day)
-    expect([symbol, sessionDate(day), sessionDate(quote), M.dayBase(day)]).toEqual([symbol, "2026-10-23", "2026-10-22", close])
+    expect([symbol, sessionDate(day), sessionDate(quote), M.dayBase(day)]).toEqual([symbol, "2026-10-22", "2026-10-22", quote.prevClose])
     expect([symbol, M.lastLitPoint(geometry)]).toEqual([symbol, geometry.points.at(-1)])
-    expect(againstDashedLine(day, symbol)).toBe(`${symbol} all against ${M.money(close)}`)
-    expect([symbol, M.chartSpan(day).start, day.points[0].s, day.points.at(-1).s]).toEqual([symbol, at("2026-10-22", "20:00"), "overnight", "pre"])
+    expect(againstDashedLine(day, symbol)).toBe(`${symbol} all against ${M.money(quote.prevClose)} then ${M.money(quote.price)}`)
+    expect([symbol, M.chartSpan(day).start, day.points[0].s, day.points.at(-1).s]).toEqual([symbol, at("2026-10-22", "09:30"), "reg", "pre"])
   }
   expect([sessionDate(wren.day), wren.quote.points.at(-1).t < at("2026-10-23", "04:00")]).toEqual(["2026-10-22", true])
   const top = M.rowModel(aapl.quote, 0, "pct", M.newestTrade(aapl.quote, aapl.latest, calendars, aapl.day))
@@ -2996,11 +3021,64 @@ test("until 04:00 a listing Robinhood trades all day shows the day that closed w
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart moves to the new session, and a listing abroad shows its last session and its move until its new one has a bar, and that session's chart until three", () => {
-  // Friday 09:31: AAPL's chart is Friday from midnight, the S&P 500's Friday's
+test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York as abroad", () => {
+  // Friday 09:31, from answers Stonks no longer asks for one day at the
+  // open: AAPL's chart is Friday from its open, the S&P 500's Friday's
   // session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
     expect([symbol, sessionDate(day)]).toEqual([symbol, "2026-10-23"])
+  // Nebius at 09:35 on Monday 26 October, asked for two days through its
+  // first minutes: Monday's first bars alone would draw a spike, so the
+  // chart holds Friday from its open, with the night, the pre-market and
+  // Monday's first trades at its end, bright, dashed at Thursday's close
+  // until Friday's bell, then at Friday's close, which they count from; a
+  // stock Robinhood doesn't trade all day holds Friday too. By noon,
+  // Monday's.
+  const nbisAt = (set, at) => M.carryClose(savedDay("watch-2026-10-25-1000", "nbis"),
+    M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/nbis.json"), fixture(`moments/${set}/nbis.json`)), cents), calendars, at)
+  const nbisNight = set => ({ status: "ok", ...traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS })
+  const nbisDay = (set, at, allDay) => M.viewChart("NBIS", "1D", { NBIS: nbisAt(set, at) }, {}, {}, { NBIS: nbisNight(set) },
+    { NBIS: { status: "ok", allDay, at: 0 } }, calendars, at).day
+  const nineThirtyFive = at("2026-10-26", "09:35")
+  expect(M.twoDays(nbisAt("watch-2026-10-26-0935", nineThirtyFive), nineThirtyFive, calendars)).toBe(true)
+  const carried = nbisAt("watch-2026-10-26-0935", nineThirtyFive)
+  for (const allDay of [true, false]) {
+    const held = nbisDay("watch-2026-10-26-0935", nineThirtyFive, allDay)
+    expect([allDay, sessionDate(held), M.chartSpan(held).start, M.pointSession(held, held.points.at(-1)), held.points.at(-1).t >= at("2026-10-26", "09:30")])
+      .toEqual([allDay, "2026-10-23", at("2026-10-23", "09:30"), "reg", true])
+    expect([allDay, M.dayBase(held), M.nightBell(held), M.regularClose(held)])
+      .toEqual([allDay, savedDay("watch-2026-10-25-1000", "nbis").prevClose, at("2026-10-23", "16:00"), savedDay("watch-2026-10-25-1000", "nbis").price])
+    // A scrub of Monday's newest trade, or of Friday's 15:00 trade, reads
+    // it, as its row does, which follows the scrub there, never Friday's
+    // close at 0% nor the price on top.
+    for (const t of [held.points.at(-1).t, held.points.find(p => p.t >= at("2026-10-23", "15:00")).t]) {
+      const scrubbed = M.rowModel(held, t, "pct")
+      const row = M.listRow(carried, M.rowsScrub(carried, held, t), "pct", null)
+      expect([allDay, scrubbed.priceText, scrubbed.changeText]).toEqual([allDay, row.priceText, row.changeText])
+      expect([allDay, scrubbed.priceText]).toEqual([allDay, M.money(held.points.findLast(p => p.t <= t).p)])
+    }
+    // The figures under the chart are the held day's, Friday's: its low and
+    // high hold every trade of its own drawn, and Yahoo gives only Monday's
+    // volume, so none.
+    const line = M.dayLine(carried, M.exchangeDay(carried, nineThirtyFive), held)
+    const friday = held.points.filter(p => p.t < M.nightBell(held) + 4 * 3600).map(p => p.p)
+    expect([allDay, line.title, line.range.low <= Math.min(...friday), line.range.high >= Math.max(...friday), line.facts[1].value])
+      .toEqual([allDay, "FRI", true, true, ""])
+    // Read weeks later, before a refresh, the held chart ends at its last trade.
+    const late = nbisDay("watch-2026-10-26-0935", at("2026-11-18", "12:00"), allDay)
+    expect([allDay, M.chartSpan(late).end]).toEqual([allDay, M.lastTradeTime(late)])
+  }
+  // Robinhood's first three bars of Monday, 09:30 to 09:40, end the hold
+  // as Yahoo's would: with Friday's quote cached the chart is Monday's, and
+  // it stays Monday's when Yahoo's two-day answer, one bar of its own, comes.
+  const noonNight = nbisNight("watch-2026-10-26-1200")
+  const threeBars = { ...noonNight, bars: noonNight.bars.filter(b => b.t <= at("2026-10-26", "09:40")), through: at("2026-10-26", "09:40") }
+  const threeDay = quote => M.viewChart("NBIS", "1D", { NBIS: quote }, {}, {}, { NBIS: threeBars }, { NBIS: { status: "ok", allDay: true, at: 0 } },
+    calendars, at("2026-10-26", "09:45")).day
+  expect([sessionDate(threeDay(savedDay("watch-2026-10-25-1000", "nbis"))), sessionDate(threeDay(carried))]).toEqual(["2026-10-26", "2026-10-26"])
+  expect(nbisDay("watch-2026-10-26-0935", nineThirtyFive, true).litFrom).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
+  const noon = nbisDay("watch-2026-10-26-1200", at("2026-10-26", "12:00"), true)
+  expect([sessionDate(noon), M.chartSpan(noon).start]).toEqual(["2026-10-26", at("2026-10-26", "09:30")])
   // London before its session opens, its answer still the last session's:
   // the chart, the headline and its day are that session's.
   const london = M.parseChart(fixture("shel-l-day.json"), cents)
@@ -3095,7 +3173,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // no move to cheer or mourn.
   const started1915 = M.carryClose(null, open("1915", "2d/7203.t.json"), calendars, nyAt("1915"))
   expect(M.heroLines(started1915, M.rowModel(started1915, 0, "pct"), null, nyAt("1915"), null, calendars, "pct", false))
-    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" } })
+    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" }, move: "\u2014" })
   expect(M.headerAnimal(M.rowModel(started1915, 0, "pct"))).toBe("plain")
   let started = null
   const startedRows = []
@@ -3267,12 +3345,14 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
   expect([startedAt("tokyo", "7203.t", "1915", "open"), startedAt("tokyo", "7203.t", "1920", "open")]).toEqual(["\u2014", "\u2014"])
-  // Nor its high: an echo is no trade, so the 1D line keeps Yahoo's 3,030
-  // to 3,040, the session's own, though the chart draws the echo at 3,051.
+  // Nor its high: an echo is no trade. While the chart holds Monday, the
+  // day before, which it draws with the echo at 3,051 joined, the 1D line
+  // is Monday's own, its low and high from its bars, named by its day.
   const echo = answerAt("tokyo", "1915", "2d/7203.t.json")
   const echoDay = M.viewChart("7203.T", "1D", { "7203.T": echo }, {}, {}, {}, {}, calendars).day
-  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay).range
-  expect([M.money(echoDay.points.at(-1).p), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
+  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay)
+  expect([M.money(echoDay.points.at(-1).p), echoLine.title, echoLine.range.lowText, echoLine.range.highText])
+    .toEqual(["3,051.00", "MON", "3,019.00", "3,094.00"])
   // Friday 30 October at 09:26 there, with Friday's first two bars: Friday's
   // move, from Thursday's close, over Thursday's chart, Friday's trades
   // joined after it.
@@ -3331,8 +3411,8 @@ test("an overnight trade is its own line under the price, measured from the clos
   // REED has not traded tonight: no overnight line, its after-hours stays.
   expect(strip("reed")).toMatchObject({ label: "AFTER HOURS", time: "" })
   // The 1D row's low and high take in every trade of the day from its
-  // night's open, as the 52W row does, though by 23:00 the chart's start has
-  // slid past some: REED's one trade at 21.00, at 23:25 the night before, is
+  // night's open, as the 52W row does, though the chart starts at the open:
+  // REED's one trade at 21.00, at 23:25 the night before, is
   // the day's low under Yahoo's 21.27, so both rows end at it in the 52-week
   // low's tone. Tonight's trades, joined at the chart's end, are the next
   // day's.
@@ -3422,29 +3502,47 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   const cvrFriday = notAllDay("watch-2026-10-25-1000", "cvr", "CVR", answeredAt("watch-2026-10-25-1000")).day
   expect([M.chartSpan(cvrFriday).end, M.chartGeometry(cvrFriday).ticks]).toEqual([at("2026-10-23", "15:35"), []])
   // Friday 06:00, AAPL read as a listing Robinhood doesn't trade all day:
-  // its two-day answer holds Friday's pre-market, so the chart is Friday's
-  // day from its first trade, dashed at Thursday's close, with no dot.
-  // WREN, with no trade since 04:00, keeps Thursday (above).
+  // its two-day answer holds Friday's pre-market, so the chart is
+  // Thursday's from its open with the pre-market joined, the night between
+  // taking no room, dashed at Wednesday's close until Thursday's bell and
+  // at Thursday's after it; its session bright and the pre-market dim, as
+  // the hours around a session are. WREN, with no trade since 04:00, keeps
+  // Thursday alone (above).
   const aapl = notAllDay("night-2026-10-23-0600", "aapl", "AAPL")
-  expect(M.chartSpan(aapl.day)).toMatchObject({ start: at("2026-10-23", "04:00"), end: at("2026-10-23", "20:00") })
-  expect([...new Set(aapl.day.points.map(p => p.s))]).toEqual(["pre"])
-  expect([M.dayBase(aapl.day), M.lastLitPoint(M.chartGeometry(aapl.day))]).toEqual([M.regularClose(aapl.quote), null])
+  expect(M.chartSpan(aapl.day)).toMatchObject({ start: at("2026-10-22", "09:30"), end: M.lastTradeTime(aapl.day),
+    skip: { from: at("2026-10-22", "20:00"), to: at("2026-10-23", "04:00") } })
+  expect([...new Set(aapl.day.points.map(p => M.pointSession(aapl.day, p)))]).toEqual(["reg", "post", "pre"])
+  expect([M.dayBase(aapl.day), M.nightBell(aapl.day), M.regularClose(aapl.day)])
+    .toEqual([aapl.quote.prevClose, at("2026-10-22", "16:00"), M.regularClose(aapl.quote)])
+  expect(M.chartGeometry(aapl.day).points.filter(g => !g.dim).length).toBe(aapl.day.points.filter(p => M.pointSession(aapl.day, p) === "reg").length)
+  // The shell's clock carries the axis on to now, five minutes at a time,
+  // the hours to come empty.
+  const sixFive = at("2026-10-23", "06:05")
+  expect(M.chartSpan(M.sessionDay(aapl.quote, sixFive)).end).toBe(sixFive)
+  // At the bell by that clock, the answer still the two-day one, still
+  // Thursday with the pre-market joined, running on to now.
+  const bellDay = M.sessionDay(aapl.quote, at("2026-10-23", "09:30"))
+  expect([M.chartSpan(bellDay).start, M.chartSpan(bellDay).end, M.dayBase(bellDay)])
+    .toEqual([at("2026-10-22", "09:30"), at("2026-10-23", "09:30"), aapl.quote.prevClose])
   // CVR at 09:35 on Monday 26 October hadn't traded since Friday, and
   // Yahoo's day answer held Monday's periods and no bar: alone, an empty
   // chart. It is still asked for two days past the bell (`twoDays`), and
-  // the chart stays on Friday until Monday's first trade, 13:10's.
+  // the chart stays on Friday until Monday's first trade, 13:10's. By 15:00,
+  // more than an hour past the open, it is asked for one day, and the chart
+  // is Monday's from that trade, as it trades.
   const cvrAt = (set, received) => M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/cvr.json"), fixture(`moments/${set}/cvr.json`)), cents, received)
   const opened = cvrAt("watch-2026-10-26-0935", at("2026-10-26", "09:35"))
   expect(M.twoDays(opened, at("2026-10-26", "09:35"), calendars)).toBe(true)
   const cvrDay = q => M.viewChart("CVR", "1D", { CVR: q }, {}, {}, {}, { CVR: { status: "ok", allDay: false, at: 0 } }, calendars).day
   expect([sessionDate(cvrDay(opened)), cvrDay(opened).points.length]).toEqual(["2026-10-23", 2])
-  const traded = cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00"))
-  expect([sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t, M.twoDays(traded, at("2026-10-26", "15:00"), calendars)])
-    .toEqual(["2026-10-26", at("2026-10-26", "13:10"), false])
-  // 01:00: KILN's Tuesday from its first trade, 07:50, and BOLT's from 04:00.
-  for (const [file, symbol, first] of [["kiln", "KILN", "07:50"], ["bolt", "BOLT", "04:00"]]) {
+  const traded = M.parseChart(fixture("moments/watch-2026-10-26-1500/cvr.json"), cents, at("2026-10-26", "15:00"))
+  expect([M.twoDays(cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00")), at("2026-10-26", "15:00"), calendars), sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t])
+    .toEqual([false, "2026-10-26", at("2026-10-26", "13:10")])
+  // 01:00: KILN's Tuesday and BOLT's from the open, though KILN first
+  // traded at 07:50 and BOLT at 04:00.
+  for (const [file, symbol] of [["kiln", "KILN"], ["bolt", "BOLT"]]) {
     const chart = notAllDay("listings-2026-10-07-0100", file, symbol)
-    expect(M.chartSpan(chart.day)).toMatchObject({ start: at("2026-10-06", first), end: at("2026-10-06", "20:00") })
+    expect(M.chartSpan(chart.day)).toMatchObject({ start: at("2026-10-06", "09:30"), end: at("2026-10-06", "20:00") })
     const line = M.extendedStack(chart.quote, chart.latest, at("2026-10-07", "01:00"), chart.day)
     expect(line && line.label).not.toBe("OVERNIGHT")
   }
@@ -3459,10 +3557,15 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
 })
 
 test("a thin US day's quiet spans take their hours, the line holding its last trade across them", () => {
+  // VANE's night and pre-market on Wednesday 21 October, as the chart drew
+  // them at 09:25, joined to Tuesday.
   const set = "gaps-2026-10-21-1006"
-  const q = savedDay(set, "vane")
+  const open = at("2026-10-21", "09:30")
+  const vane = savedDay(set, "vane")
+  const q = { ...vane, points: vane.points.filter(p => p.t < open) }
   const allDay = M.parseAllDay(fixture(`moments/${set}/robinhood-instruments.json`), ["VANE"])
-  const nights = { VANE: { status: "ok", ...traded(set, ["VANE"]).VANE } }
+  const night = traded(set, ["VANE"]).VANE
+  const nights = { VANE: { status: "ok", ...night, bars: night.bars.filter(b => b.t < open), through: open - 300 } }
   const day = M.viewChart("VANE", "1D", { VANE: q }, {}, {}, nights, { VANE: { status: "ok", allDay: allDay.VANE, at: 0 } }, calendars).day
   const line = M.chartGeometry(day, calendars).points
   const span = M.chartSpan(day)
@@ -3471,13 +3574,14 @@ test("a thin US day's quiet spans take their hours, the line holding its last tr
     const [a, b] = [from, to].map(t => line[day.points.findIndex(p => p.t === t)].x)
     expect(b - a).toBeCloseTo((to - from) / (span.end - span.start), 9)
   }
-  // A thin night, weekend or pre-market: across a stretch of more than half
-  // an hour with no trade, the line, and a scrub's dot on it, stand at the
-  // price the scrub reads, the trade before it, and retro lights no column:
-  // a slope would draw trading that never happened. EZ's Friday 19:59 to
-  // Sunday 22:40, TOY's few trades on Sunday night, REED's pre-markets.
+  // A thin night, weekend or after hours: across a stretch of more than
+  // half an hour with no trade, the line, and a scrub's dot on it, stand at
+  // the price the scrub reads, the trade before it, and retro lights no
+  // column: a slope would draw trading that never happened. EZ's Friday
+  // 19:59 to Sunday 22:40, TOY's few trades on Sunday night, REED's after
+  // hours.
   const sloped = []
-  for (const [set, name] of [["live-2026-10-05", "ez"], ["live-2026-10-05", "toy"], ["night", "reed"], ["day", "reed"]]) {
+  for (const [set, name] of [["live-2026-10-05", "ez"], ["live-2026-10-05", "toy"], ["night", "reed"]]) {
     const thin = dayAt(set, name).day
     const geometry = M.chartGeometry(thin, calendars)
     const axis = M.chartSpan(thin)
@@ -3499,16 +3603,17 @@ test("a thin US day's quiet spans take their hours, the line holding its last tr
 
 test("a night's chart on each saved moment: its span, its trades, and what a scrub of it reads", () => {
   // Sunday 22:30: a scrub at the left edge reads the first trade the chart
-  // holds, Friday's own night after its midnight, never the previous close.
+  // holds, Friday's at its open, never the previous close.
   const sunday = dayAt("sunday", "nest")
   const edge = M.timeAtFraction(sunday.day, 0.03)
-  expect(marketStatus(sunday.day, at("2026-09-27", "22:30"), edge, calendars)).toMatch(/^At Fri 0\d:\d\d · Overnight$/)
+  expect(marketStatus(sunday.day, at("2026-09-27", "22:30"), edge, calendars)).toMatch(/^At Fri 09:\d\d · /)
   expect(M.rowModel(sunday.day, edge, "pct").priceText).not.toBe("243.48")
-  // Monday 08:00: Monday from Sunday's 20:00, a scrub a quarter in reading
-  // the night after midnight against Friday's close.
+  // Monday 08:00: still Friday, with the night and the pre-market joined, a
+  // scrub three quarters in reading the night after midnight against
+  // Friday's close.
   const monday = dayAt("monday", "nest")
-  expect(M.chartSpan(monday.day)).toMatchObject({ start: at("2026-09-27", "20:00"), end: at("2026-09-28", "20:00") })
-  const dawn = M.timeAtFraction(monday.day, 0.27)
+  expect(M.chartSpan(monday.day).start).toBe(at("2026-09-25", "09:30"))
+  const dawn = M.timeAtFraction(monday.day, 0.75)
   expect(marketStatus(monday.day, at("2026-09-28", "08:00"), dawn, calendars)).toMatch(/^At 02:\d\d · Overnight$/)
   expect(M.rowModel(monday.day, dawn, "pct").priceText).not.toBe("237.33")
   // Thursday 23:00: NEST's night joins Thursday's chart up to Robinhood's
@@ -3527,10 +3632,11 @@ test("a night's chart on each saved moment: its span, its trades, and what a scr
   expect([sundayNight(ez.day).map(p => p.t), ez.day.litFrom]).toEqual([[at("2026-10-04", "22:40")], at("2026-10-04", "22:40")])
   expect(stripAt(ez, at("2026-10-05", "00:36"))).toMatchObject({ label: "OVERNIGHT", time: "22:40", price: "19.71", changeText: "\u22123.71%" })
   expect(sundayNight(dayAt("live-2026-10-05", "toy").day).length).toBe(5)
-  // Wednesday 06:00: Wednesday from Tuesday's 20:00, from Tuesday's close.
+  // Wednesday 06:00: Tuesday from its open with the night and the
+  // pre-market joined, read past Tuesday's bell from Tuesday's close.
   const six = dayAt("2026-10-07-0600", "nest").day
-  expect(M.chartSpan(six).start).toBe(at("2026-10-06", "20:00"))
-  expect(M.dayBaselineText(six, M.exchangeDay(six, at("2026-10-07", "06:00")), calendars)).toBe("TUE CLOSE 249.87")
+  expect(M.chartSpan(six).start).toBe(at("2026-10-06", "09:30"))
+  expect(M.scrubBaselineText(six, M.lastTradeTime(six), M.exchangeDay(six, at("2026-10-07", "06:00")), calendars)).toBe("TUE CLOSE 249.87")
 })
 
 test("on 1M at night the line ends on the night's price, the one on top", () => {

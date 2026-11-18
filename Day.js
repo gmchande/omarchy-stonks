@@ -1,29 +1,31 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
 
-// The day a 1D chart draws for a stock that trades at night: where it
-// starts and how its start slides toward midnight, the evening when tonight
-// joins the day that closed, its ticks, and the hours drawn bright. Built
-// from Yahoo's day and Robinhood's trades (`Overnight.allTrades`). Knows
-// nothing of how the chart draws it.
+// The day a US stock's or ETF's 1D chart draws: from its open, on an axis
+// that runs by the clock to its 20:00, and until the next open the day that
+// closed with what has traded since joined at its end. For one Robinhood
+// trades all day, built from Yahoo's day and Robinhood's trades
+// (`Overnight.allTrades`, `dayChart`); for one it doesn't, from Yahoo's
+// alone (`sessionDay`). Knows nothing of how the chart draws it.
 
-// Where tonight's trades, joined to the day that closed, start counting
-// from its close: its bell, so its after hours read against that close too.
-// So do a day abroad's first trades joined to the day before it, where that
-// close is known (`CarriedClose.heldDay`). Null before the first trade
-// joined, and on any other day.
+// Where the trades joined to the day that closed, tonight's or the coming
+// day's pre-market, start counting from its close: its bell, so its after
+// hours read against that close too. So do a day abroad's first trades
+// joined to the day before it, where that close is known
+// (`CarriedClose.heldDay`). Null before the first trade joined, and on any
+// other day.
 function nightBell(day) {
   var pts = day && day.points ? day.points : []
   var last = pts.length ? pts[pts.length - 1] : null
-  if (!last || !day.tonight || !day.session.regular || (last.s !== "overnight" && !day.held) || last.t < day.tonight) return null
+  if (!last || !day.tonight || !day.session.regular || last.t < day.tonight) return null
   return day.session.regular.end
 }
 
-// From the night's open the evening before to the next night's open, or
-// with no night after it, to the post-market's close; `midnight` is where
-// its start has slid to by the afternoon (`slidWindow`). Null past the
+// From the open to the next night's open, or with no night after it, to
+// the post-market's close. Null on a day the market is shut, or past the
 // calendar.
 function dayWindow(cal, date) {
   var next = Calendar.nextDateString(date)
@@ -31,52 +33,46 @@ function dayWindow(cal, date) {
   if (Calendar.dayKind(cal, date).kind !== "open" || nextKind === "unknown") return null
   return {
     date: date,
-    start: Overnight.marketDay(cal, date).start,
-    midnight: Calendar.epochAt(cal, date, "00:00"),
+    start: Calendar.segmentsOn(cal, date)[0].start,
     end: nextKind === "open" ? Calendar.epochAt(cal, date, cal.overnight.open) : Calendar.postClose(cal, date)
   }
 }
 
-// Until the open the day starts with its night, at 20:00 the evening before.
-// From the open its start slides toward its own midnight by the shell's clock
-// (`slideAt`, five minutes at a time), as tonight slides in at night,
-// reaching it as many hours after the open as the night held before
-// midnight: at 13:30. A quiet stock's trades come when they come, so the
-// clock, not its newest trade, moves the start.
-function slidWindow(win, open, slideAt) {
-  var slid = slideAt > open ? Math.floor((slideAt - open) / Overnight.SLOT) * Overnight.SLOT : 0
-  return Object.assign({}, win, { start: Math.min(win.midnight, win.start + slid) })
+// The day drawn: the last whose open has come (`edge`), so a day takes the
+// chart at its open, a quiet stock's too, and stays through the weekend or
+// holiday after it. Null past the calendar.
+function drawnWindow(cal, edge) {
+  var date = Overnight.marketDayAt(cal, edge).date
+  for (var i = 0; i < 10; i++, date = Calendar.previousDateString(date)) {
+    var kind = Calendar.dayKind(cal, date).kind
+    if (kind === "unknown") return null
+    if (kind !== "open") continue
+    var win = dayWindow(cal, date)
+    if (!win || edge >= win.start) return win
+  }
+  return null
 }
 
-// A day stays on through the weekend or holiday after it, until the next
-// trade.
-function chartWindow(cal, quote, latest) {
-  return dayWindow(cal, Overnight.marketDayAt(cal, latest ? latest.t : quote.session.regular.start).date)
+// A day later than Yahoo's own still in its first minutes, as Robinhood's
+// trades give them before Yahoo's answer has turned, holds the day before,
+// as `CarriedClose.heldDay` will once that answer comes, so the chart never
+// turns to one trade and back.
+function heldWindow(cal, quote, trades, reach, win) {
+  if (!win || win.start <= quote.session.regular.start || reach >= win.start + CarriedClose.HOLD_LIMIT) return win
+  var session = trades.filter(function(p) { return p.s === "reg" && p.t < win.end })
+  return CarriedClose.firstBars(session, win.start) ? drawnWindow(cal, win.start - 1) : win
 }
 
-// The day that closed, then tonight, the shut hours between them taking no
-// room (`skip`). It keeps the width the closed day ended with, from its
-// midnight to its end, so from 20:00 five minutes leave the left as five
-// arrive on the right. A listing with no trade since before the closed day
-// keeps its own.
-function eveningWindow(cal, latestT, reach) {
-  var night = Overnight.nightAt(cal, reach)
-  if (!night || !night.open) return null
-  var date = Overnight.marketDayAt(cal, reach).date
-  var closed = null
-  for (var i = 0; i < 10 && !closed; i++) {
-    date = Calendar.previousDateString(date)
-    closed = dayWindow(cal, date)
-  }
-  if (!closed || latestT < closed.start) return null
-  var skip = closed.end < night.start ? { from: closed.end, to: night.start } : null
-  return {
-    date: closed.date,
-    start: Math.max(closed.midnight, reach - (closed.end - closed.midnight) + Overnight.SLOT - (skip ? skip.to - skip.from : 0)),
-    end: reach,
-    skip: skip,
-    night: night
-  }
+// Once the market trades again after the day's end, tonight and then the
+// coming day's pre-market join it until that day's open, from where it
+// trades again (`from`): the shut hours between, such as a weekend's, take
+// no room (`skip`). Null while the day runs, and while the market is shut
+// after it.
+function joinedHours(cal, win, edge) {
+  var next = edge >= win.end ? Calendar.nextOpen(cal, win.end) : null
+  var from = next ? Math.max(win.end, Overnight.marketDay(cal, next.dateString).start) : null
+  if (from === null || edge < from) return null
+  return { from: from, opens: next.t, date: next.dateString, skip: from > win.end ? { from: win.end, to: from } : null }
 }
 
 function windowSession(cal, quote, win) {
@@ -90,101 +86,137 @@ function windowSession(cal, quote, win) {
     post: { start: close, end: Calendar.postClose(cal, win.date) } }
 }
 
-// Hours before the first trade drawn and after the last take no room, so a
-// finished day runs edge to edge. Where the chart's start has slid past some
-// of the day's trades (`slid`), the axis starts there instead, five minutes
-// at a time, so a quiet hour leaves the left as the start passes it, never
-// in one step.
-function tradedAxis(session, points, end, over, ticks, slid) {
-  var open = session.regular.start
-  return {
-    start: slid !== undefined ? slid : points.length ? Math.min(points[0].t, open) : open,
-    end: over && points.length ? points[points.length - 1].t : end,
-    ticks: ticks
-  }
-}
-
-function windowTicks(cal, win, session) {
-  var ticks = [Calendar.epochAt(cal, win.date, "00:00"), Calendar.epochAt(cal, win.date, cal.overnight.close)]
+// The day's bell, and where joined hours begin: tonight's open, and the
+// coming day's midnight, pre-market and open.
+function windowTicks(cal, win, session, joined) {
+  var ticks = []
   var segs = Calendar.segmentsOn(cal, win.date)
   if (segs.length && segs[0].start === session.regular.start) ticks.push(session.regular.end)
   else for (var i = 0; i < segs.length; i++) ticks.push(segs[i].end)
-  if (win.night) ticks.push(win.night.start, Calendar.epochAt(cal, Calendar.dateStringOf(Calendar.localDate(win.night.end, cal)), "00:00"))
+  if (joined) ticks.push(joined.from, Calendar.epochAt(cal, joined.date, "00:00"), Calendar.epochAt(cal, joined.date, cal.overnight.close), joined.opens)
   return ticks
 }
 
 var LIT_SESSIONS = ["pre", "post", "overnight"]
 
 // Read from the trades, never the clock, so a night with no trade yet
-// stays dim.
-function litFrom(points, evening, over) {
+// stays dim: on a day that closed (`tonight`), only joined trades light,
+// the coming session's too while the chart holds the day
+// (`CarriedClose.heldDay`).
+function litFrom(points, tonight, over) {
   var last = points.length ? points[points.length - 1] : null
-  if (!last || over || LIT_SESSIONS.indexOf(last.s) < 0) return null
-  if (evening ? last.s !== "overnight" || last.t < evening.night.start : last.s === "overnight") return null
+  if (!last || over || (tonight !== null ? last.t < tonight : LIT_SESSIONS.indexOf(last.s) < 0)) return null
   var i = points.length - 1
   while (i > 0 && points[i - 1].s === last.s) i--
   return points[i].t
 }
 
+// How far the day reaches: `now`, the shell's clock, while it is no later
+// than the end of the trading day after the newest answer's (`reach`), so
+// joined hours run on to now; past that the answers are stale, and their
+// own day stays, as it does without a clock.
+function dayEdge(cal, reach, now) {
+  var win = now > reach ? drawnWindow(cal, reach) : null
+  var next = win ? Calendar.nextOpen(cal, win.start) : null
+  var after = next ? dayWindow(cal, next.dateString) : null
+  return after && now < after.end ? now : reach
+}
+
 // `day` is shaped as a quote, so the chart and a scrub read it as they
-// read Yahoo's; the day's figures stay the quote's. `slideAt` slides the
-// day's start (`slidWindow`); without it, as where only the newest price is
-// wanted (`Chart.newestTradeOf`) or a harness gives no clock, the newest trade
-// stands in for it.
-function dayChart(quote, answer, calendars, slideAt) {
+// read Yahoo's; the day's figures stay the quote's. `now`, the shell's
+// clock five minutes at a time, carries joined hours on to now
+// (`dayEdge`); without it, as where only the newest
+// price is wanted (`Chart.newestTradeOf`) or a harness gives no clock, the
+// newest answer stands in for it. The day turns once the answers reach the
+// next open, never before Yahoo's own day has (`quote.next`, the coming
+// day held as a tail until its first trade), and a day held through the
+// next one's first minutes (`CarriedClose.heldDay`) stays, with that day's
+// first trades joined at its end, as it does when Robinhood has those
+// trades before Yahoo's answer has any (`heldWindow`).
+function dayChart(quote, answer, calendars, now) {
   var cal = Calendar.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
   var all = Overnight.allTrades(quote, answer.bars)
   var latest = all.length ? all[all.length - 1] : null
-  var reach = latest ? Math.max(latest.t, answer.through !== null ? answer.through : latest.t) : answer.through
-  var evening = reach !== null && latest ? eveningWindow(cal, latest.t, reach) : null
-  var win = evening || chartWindow(cal, quote, latest)
+  var reach = latest ? Math.max(latest.t, answer.through !== null ? answer.through : latest.t) : quote.session.regular.start
+  var edge = dayEdge(cal, reach, now)
+  var coming = quote.next && quote.next.regular ? quote.next.regular.start : Infinity
+  var win = quote.held ? dayWindow(cal, Calendar.dateStringOf(Calendar.localDate(quote.session.regular.start, cal)))
+    : heldWindow(cal, quote, all, reach, drawnWindow(cal, Math.min(reach, coming - 1)))
   if (!win) return { day: quote, latest: latest }
+  var joined = joinedHours(cal, win, edge)
   var session = windowSession(cal, quote, win)
-  if (!evening) win = slidWindow(win, session.regular.start, slideAt > 0 ? slideAt : reach)
   var own = session === quote.session
+  // Yahoo's quote, still the day's close after Yahoo's day has turned, says
+  // the close before that day too.
+  var head = Quote.headlineQuote(quote)
+  var closedOn = !!head && head.t !== null && head.t >= win.start && head.t < (joined ? joined.opens : win.end)
   var points = all.filter(function(p) { return p.t >= win.start })
   var opened = Overnight.marketDay(cal, win.date).start
-  var trades = all.filter(function(p) { return p.t >= opened })
-  // Over once Robinhood's bars reach the window's end, or Yahoo's own day
-  // is whole; an evening never is.
+  // Over once Robinhood's bars reach the day's end, or Yahoo's own day is
+  // whole, and a day over ends at its last trade; joined hours never are.
   var reachedEnd = answer.through !== null && answer.through + Overnight.SLOT >= win.end
-  var over = !evening && (reachedEnd || (own && !!quote.wholeDay))
-  // Once the window has slid past the day's first trades, the axis starts
-  // where the window does.
-  var slid = trades.length && trades[0].t < win.start ? win.start : undefined
-  var axis = tradedAxis(session, points, win.end, over, windowTicks(cal, win, session), slid)
-  // `closes`: when the day's last hour ends (`Figures.dayNote`).
-  axis.closes = evening ? evening.night.end : win.end
-  if (win.skip) axis.skip = win.skip
+  var over = !joined && (reachedEnd || (own && !!quote.wholeDay))
+  var axis = {
+    start: win.start,
+    end: joined ? edge : over && points.length ? points[points.length - 1].t : win.end,
+    ticks: windowTicks(cal, win, session, joined),
+    // When the day's last hour ends (`Figures.dayNote`).
+    closes: joined ? joined.opens : win.end
+  }
+  if (joined && joined.skip) axis.skip = joined.skip
+  var tonight = joined ? joined.from : null
   return {
     day: Object.assign({}, quote, {
       session: session,
       next: null,
       points: points,
       // Every trade of the day from its night's open, which its low and high
-      // count (`Figures.figuresTrades`) wherever the chart's start has slid.
-      trades: trades,
-      prevClose: own ? quote.prevClose : Quote.regularClose(quote),
+      // count (`Figures.figuresTrades`), though the chart starts at the open.
+      trades: all.filter(function(p) { return p.t >= opened }),
+      prevClose: own || closedOn ? quote.prevClose : Quote.regularClose(quote),
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
       axis: axis,
-      litFrom: litFrom(points, evening, over),
-      tonight: evening ? evening.night.start : null,
+      litFrom: litFrom(points, tonight, over),
+      tonight: tonight,
       calendar: cal
     }),
     latest: latest
   }
 }
 
-// A thin listing Robinhood doesn't trade all day has a few night
-// trades, and none is a night's price.
-function sessionDay(quote) {
-  if (!quote.session.regular) return quote
-  var day = Quote.tailDay(quote) || quote
-  var pts = day.points
-  return Object.assign({}, day, {
-    axis: tradedAxis(day.session, pts, Math.max(Quote.dayEnd(day), pts.length ? pts[pts.length - 1].t : 0), !!day.wholeDay,
-      [day.session.regular.end])
+// A stock Robinhood doesn't trade all day: Yahoo's day from its open, and
+// once Yahoo's answer holds the coming day's pre-market (`Quote.tailDay`),
+// that joined at its end, the night between taking no room, as is the
+// coming day's first minutes on a day held through them
+// (`CarriedClose.heldDay`). The axis runs on to `now`, the shell's clock
+// five minutes at a time, through the coming day's end, or without one, or
+// with an answer staler than that, to the newest trade. A thin listing
+// Robinhood doesn't trade all day has a few night trades, and none is a
+// night's price.
+function sessionDay(quote, now) {
+  var reg = quote.session.regular
+  if (!reg) return quote
+  var tail = Quote.tailDay(quote)
+  var all = quote.points
+  var points = all.filter(function(p) { return p.t >= reg.start })
+  var last = points.length ? points[points.length - 1].t : null
+  var tonight = tail ? Quote.tailStart(quote) : null
+  var axis = { start: reg.start, ticks: [reg.end] }
+  if (tonight !== null) {
+    var ends = Quote.dayEnd(quote)
+    axis.end = now > last && now < Quote.dayEnd(tail) ? now : last
+    axis.ticks.push(tonight)
+    if (ends < tonight) axis.skip = { from: ends, to: tonight }
+  } else axis.end = quote.wholeDay && last !== null ? last : Math.max(Quote.dayEnd(quote), last !== null ? last : 0)
+  return Object.assign({}, quote, {
+    next: null,
+    points: points,
+    // Every trade of the day, which its low and high count
+    // (`Figures.figuresTrades`), though the chart starts at the open.
+    trades: all,
+    axis: axis,
+    tonight: tonight
   })
 }

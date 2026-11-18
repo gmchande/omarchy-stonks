@@ -1,5 +1,6 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
@@ -53,8 +54,8 @@ function extendedStack(quote, latest, now, day, changeMode, calendars) {
 // A bar is five minutes of trades, so the words speak of the chart. One bar
 // is the only one once its day is over (`axis.closes` where a night follows);
 // before that it may be the first of many. They count every trade of the
-// day (`day.trades`), as its low and high do, though the chart's start may
-// have slid past some, and name the day of one that isn't today's. An empty
+// day (`day.trades`), as its low and high do, though the chart starts at
+// the open, and name the day of one that isn't today's. An empty
 // day says nothing before its bell, as an index has no trade before it, nor
 // beside a quote that is a trade of its session. Yahoo stamps its live
 // moment at the price's own second, apart from the bars at their five-minute
@@ -80,15 +81,16 @@ function exchangeDay(quote, t) {
 }
 
 // Titled against the later of today and the day drawn, so Monday's figures
-// under Tuesday's chart, from its first night trade, say MON. Its low and
-// high are Yahoo's for the session, widened by the day's trades around it
-// from its night's open, drawn or slid off the chart's left (`figuresTrades`).
+// under Tuesday's chart, while Yahoo's are still Monday's, say MON. Its low
+// and high are Yahoo's for the session, widened by the day's trades around
+// it from its night's open, drawn or before the chart's start (`figuresTrades`).
 // An end at the 52-week mark takes that direction's tone, as
 // `Fundamentals.yearLine`'s. The open keeps its slot before the first bar,
 // so the line keeps its shape.
 function dayLine(quote, today, day) {
   if (!quote) return null
-  var q = quote
+  // While the chart holds the day just closed, its figures are that day's.
+  var q = day && day.held ? day : quote
   var drawn = day && day.session && day.session.regular ? exchangeDay(q, day.session.regular.start) : null
   var head = Quote.headlineQuote(q)
   var low = q.dayLow
@@ -114,13 +116,20 @@ function dayLine(quote, today, day) {
 
 // The trades the chart draws outside the session, for the day the quote's
 // figures are of: its night, pre-market and after hours, but not tonight's,
-// joined after it, nor the coming day's. None when the chart is another
-// day's. Inside the session Yahoo's figures are the trades', and a bar there
-// can be Yahoo echoing its quote, as Tokyo's at the bell.
+// joined after it, nor the coming day's; or where the figures are of the
+// day those joined trades belong to, as while the chart holds the day
+// before (`CarriedClose.heldDay`), those. None when the chart is another
+// day's. Inside the session Yahoo's figures are the trades', and a bar
+// there can be Yahoo echoing its quote, as Tokyo's at the bell.
 function figuresTrades(quote, day) {
-  if (!day || !day.session || !day.session.regular || exchangeDay(quote, day.session.regular.start) !== exchangeDay(quote, quote.figuresDay)) return []
+  if (!day || !day.session || !day.session.regular) return []
+  var drawn = exchangeDay(quote, day.session.regular.start)
+  var figures = exchangeDay(quote, quote.figuresDay)
   var until = day.tonight || Quote.tailStart(day) || Infinity
-  return (day.trades || day.points).filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
+  var outside = function(p) { return Quote.pointSession(day, p) !== "reg" }
+  var pts = day.trades || day.points
+  if (drawn === figures) return pts.filter(function(p) { return p.t < until && outside(p) })
+  return day.tonight && drawn < figures ? pts.filter(function(p) { return p.t >= day.tonight && outside(p) }) : []
 }
 
 // Three letters at most, as a range's token is, so a day a week old or more,
@@ -193,10 +202,29 @@ function listRow(quote, scrubT, mode, newest) {
   return rowModel(quote, scrubT, mode, scrubT ? newest : Overnight.restingNewest(newest))
 }
 
+// The day a row reads a scrub against: while the 1D chart holds the day
+// just closed, that day, as the panel reads it (`CarriedClose.heldDay`).
+function scrubbedDay(quote) {
+  return CarriedClose.heldDay(quote) || quote
+}
+
 function reading(quote, scrubT, newest) {
   if (!scrubT) return Quote.restingRead(quote, newest)
-  var read = Quote.readingAt(quote, scrubT)
-  return { price: read.price, t: read.t, base: scrubbedBase(quote, scrubT, newest) }
+  var day = scrubbedDay(quote)
+  var read = Quote.readingAt(day, scrubT)
+  return { price: read.price, t: read.t, base: scrubbedBase(day, scrubT, newest) }
+}
+
+// The moment the rows follow while the 1D chart is scrubbed at `scrubT`, 0
+// for none. They stay on now for hours outside Yahoo's day, but not the
+// coming day's pre-market, which each row's quote holds too. The quote can
+// change before the day does: until the day comes, the scrub stands. While
+// the chart holds the day just closed, Yahoo's day is that one
+// (`scrubbedDay`).
+function rowsScrub(quote, day, scrubT) {
+  var rows = scrubbedDay(quote)
+  var tail = Quote.tailStart(rows)
+  return scrubT < Quote.dayStart(rows) || (!!day && !!day.axis && scrubT >= Quote.dayEnd(rows) && !(tail !== null && scrubT >= tail)) ? 0 : scrubT
 }
 
 // Every price on screen comes from here. It carries no drawing and reads no
@@ -233,16 +261,17 @@ function rowModel(quote, scrubT, mode, newest) {
 // A moment of the coming day that a two-day answer holds, once that day has
 // a trade, counts from the quote's own close with no open yet, as the 1D
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
-// reads what the hero does. Once tonight has traded, a moment past the bell
-// counts from the close just gone, where the dashed line steps: the day
-// drawn says so (`Day.nightBell`), and a row's quote by its newest
-// price (`newest.joined`). A day abroad just opened, joined to the day
-// before it, has its own open already (`CarriedClose.heldDay`).
+// reads what the hero does. Once a trade has joined the day that closed,
+// tonight's or the pre-market's, a moment past the bell counts from the
+// close just gone, where the dashed line steps: the day drawn says so
+// (`Day.nightBell`), and a row's quote by its newest price
+// (`newest.stepped`). A day abroad just opened, joined to the day before
+// it, has its own open already (`CarriedClose.heldDay`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
   var nextOpen = Format.isFiniteNumber(quote.nextOpen) ? quote.nextOpen : null
-  if (bell === null && newest && newest.joined && reg) bell = reg.end
+  if (bell === null && newest && newest.stepped && reg) bell = reg.end
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
   if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
@@ -351,25 +380,25 @@ function closeCountedFrom(quote, view, today, calendars) {
     price: Format.money(view.close, quote.priceDigits), dayT: dayT }
 }
 
-// The two lines under the price and the move, one rule at every hour.
-// Under the price, the close before the price on top, named by its day,
-// with its day's move until the next session opens (`closeLine`), and while
-// the move on top is the whole day's with trades after the bell in it, the
-// part since the close (`since`), which gives way first. Where the price on
-// top is a trade of the session or the close itself, the close it counts
-// from (`closeCountedFrom`); where it is the close and Yahoo holds a pre-
-// or after-hours trade beside it, that trade (`extendedStack`). Under the
-// move, its name and the same move in the other unit (`view.unit`): TODAY
-// +4.57, OVERNIGHT −1.83, PRE-MARKET −5.74, FRI −0.43, 24H −795.72,
-// 1M −90.97, SINCE OPEN +9.34. A scrubbed moment keeps its amount and a
-// range's name, and the legend of what it counts from takes the first
-// line's place. Where the move isn't known, the first is the close it would
-// count from, if known, and the second a mode's or a range's name alone, or
-// at an open while the day's move waits on its close, FIRST TRADES · MOVE
-// SOON.
+// The two lines under the price and the move, one rule at every hour, and
+// the move itself (`move`). Under the price, the close before the price on
+// top, named by its day, with its day's move until the next session opens
+// (`closeLine`), and while the move on top is the whole day's with trades
+// after the bell in it, the part since the close (`since`), which gives way
+// first. Where the price on top is a trade of the session or the close
+// itself, the close it counts from (`closeCountedFrom`); where it is the
+// close and Yahoo holds a pre- or after-hours trade beside it, that trade
+// (`extendedStack`). Under the move, its name and the same move in the
+// other unit (`view.unit`): TODAY +4.57 USD, OVERNIGHT −1.83 USD,
+// PRE-MARKET −5.74 USD, FRI −0.43 USD, 24H −795.72 USD, 1M −90.97 USD,
+// SINCE OPEN +9.34 USD. A scrubbed moment keeps its amount and a range's
+// name, and the legend of what it counts from takes the first line's place.
+// Where the move isn't known, the first is the close it would count from, if
+// known, and the second a mode's or a range's name alone, or at an open
+// while the day's move waits on its close, FIRST TRADES · MOVE SOON.
 function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing) {
   var none = { label: "", changeText: "", tone: "flat" }
-  if (!quote || !view) return { close: null, caption: none }
+  if (!quote || !view) return { close: null, caption: none, move: "" }
   var today = exchangeDay(quote, now)
   var newest = view.newest || null
   var period = view.periodLabel || ""
@@ -381,11 +410,17 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
   var rangeName = period === "24H" ? "" : period
-  if (view.pct === null) return { close: close, caption: { label: !scrubbing && period === "" && moveAwaited(quote, view) ? "FIRST TRADES · MOVE SOON" : rangeName, changeText: "", tone: "flat" } }
+  if (view.pct === null) return { close: close, caption: { label: !scrubbing && period === "" && moveAwaited(quote, view) ? "FIRST TRADES · MOVE SOON" : rangeName, changeText: "", tone: "flat" }, move: view.changeText }
   var label = scrubbing ? rangeName : period || moveName(quote, newest, from, today)
   var other = view.unit === "abs" ? "pct" : "abs"
-  var caption = { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) }
-  return { close: close, caption: caption }
+  var caption = { label: label, changeText: inMoney(quote, Format.changeText(view, other, quote.priceDigits), other), tone: Format.changeTone(view, other, quote.priceDigits) }
+  return { close: close, caption: caption, move: inMoney(quote, view.changeText, view.unit) }
+}
+
+// A move in money beside a percent names its currency, as the listing's
+// line does (`listingMeta`), so +4.75 USD never reads as a percent.
+function inMoney(quote, text, unit) {
+  return unit === "abs" && quote.currency ? text + " " + currencyLabel(quote.currency) : text
 }
 
 function closeOnly(from) {

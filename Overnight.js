@@ -309,24 +309,29 @@ function beside(quote, t) {
 
 // `closed`: the trade came after its day's regular close, through the
 // night until 04:00 and the weekend after a Friday; never in a pre-market.
-// `joined`: tonight's trade on the day that closed. Tonight's trades belong
-// to the day ahead, so a joined trade counts from the close just gone, with
-// no open yet, as the pre-market's does after 04:00 (`Quote.tailDay`).
-// `own`: the day drawn is Yahoo's quote's, whose open the move may count
-// from. `dayStart` names the day drawn.
+// `stepped`: the trade joined the day that closed, tonight's or then the
+// pre-market's (`Day.dayChart`). Such trades belong to the day ahead, so
+// they count from the close just gone, with no open yet, and so does a
+// scrub past that day's bell, where the dashed line steps
+// (`Figures.scrubbedBase`). `joined`: tonight's, which the rows keep the
+// day's close beside (`restingNewest`). `own`: the day drawn is Yahoo's
+// quote's, whose open the move may count from. `dayStart` names the day the
+// move is of: the day drawn, or the pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
   var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
   if (!trade) return null
   var own = day.session.regular.start === quote.session.regular.start
-  var joined = trade.phase === "overnight" && !!day.tonight && trade.t >= day.tonight
-  return { t: trade.t, p: trade.p, phase: trade.phase, base: joined ? Quote.regularClose(quote) : Quote.dayBase(day), own: own && !joined,
-    closed: own && trade.t >= quote.session.regular.end, joined: joined, dayStart: day.session.regular.start }
+  var stepped = !!day.tonight && trade.t >= day.tonight
+  var joined = stepped && trade.phase === "overnight"
+  return { t: trade.t, p: trade.p, phase: trade.phase, base: stepped ? Quote.regularClose(day) : Quote.dayBase(day), own: own && !stepped,
+    closed: own && trade.phase !== "pre" && trade.t >= quote.session.regular.end, joined: joined, stepped: stepped,
+    dayStart: stepped && !joined ? trade.t : day.session.regular.start }
 }
 
 // The newest trade as the rows and the pill read it at rest: none once
-// tonight has traded, so they keep the day's close and move until the new
-// day's first prices arrive, soon after 04:00, as the 1D chart keeps its
-// day. The panel's price on top is tonight's.
+// tonight has traded, so they keep the day's close and move until the
+// pre-market's first prices arrive, soon after 04:00, though the 1D chart
+// keeps the day until the open. The panel's price on top is tonight's.
 function restingNewest(newest) {
   return newest && newest.joined ? null : newest
 }

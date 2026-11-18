@@ -246,10 +246,10 @@ Harness {
     // moment in history/<file>-<moment>-<5d|1mo|ytd|1y|5y|10y|max>.json. With
     // -held-<1d|all>, its All held as the service holds it once fetched
     // (history/<file>-max.json), and shown by a click on ALL, then for 1d
-    // on 1D.
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y|5y|10y|all))?(?:-held-(1d|all))?-(smooth|retro)$/.exec(stateName)
+    // on 1D. With -abs, its move as an amount.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y|5y|10y|all))?(?:-held-(1d|all))?(-abs)?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
-      range: !match[4] ? "" : match[4] === "all" ? "All" : match[4].toUpperCase(), held: match[5] || "",
+      range: !match[4] ? "" : match[4] === "all" ? "All" : match[4].toUpperCase(), held: match[5] || "", amount: !!match[6],
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
@@ -355,7 +355,7 @@ Harness {
     property string featuredSymbol: "AAPL"
     property string order: "pct"
     property bool reversed: false
-    property string changeMode: "pct"
+    property string changeMode: root.overnight && root.overnight.amount ? "abs" : "pct"
     property int now: root.now
     property var owed: ({})
     readonly property var yahooGate: root.troubleGate(root.troubleKind)
