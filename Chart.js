@@ -57,17 +57,19 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // (`Day.sessionDay`); `waiting` until Robinhood says which. Without
 // `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a trade
-// (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar,
-// then holds it through the new day's first minutes (`CarriedClose.heldDay`).
+// (`Quote.tailDay`). Any listing's, London's, Tokyo's or a US stock's,
+// stays the last until its first bar, then holds it through the new day's
+// first minutes (`CarriedClose.heldDay`).
 function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
-  var out = { day: Quote.tailDay(quote) || CarriedClose.heldDay(quote) || quote, latest: null, allDay: false, waiting: false }
+  var held = CarriedClose.heldDay(quote)
+  var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
   out.allDay = !!tradability && tradability.allDay
-  if (tradability && !tradability.allDay) out.day = Day.sessionDay(quote, dayClock)
+  if (tradability && !tradability.allDay) out.day = Day.sessionDay(held || quote, dayClock)
   else if (tradability && night) {
-    var built = Day.dayChart(quote, night, calendars, dayClock)
+    var built = Day.dayChart(held || quote, night, calendars, dayClock)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true

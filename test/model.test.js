@@ -1091,13 +1091,21 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
-test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, abroad until its third bar, when Yahoo's day no longer holds the last session", () => {
+test("a stock's day is asked for two days from its pre-market until its third bar, and past the bell until it trades, when Yahoo's day no longer holds the last session", () => {
   const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [{ t: at("2026-10-23", "04:05"), p: 1 }] }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
   // Friday 23 October: one day through the night, which still holds
-  // Thursday; two from the pre-market's open; one again at the bell.
+  // Thursday; two from the pre-market's open, and past the bell until the
+  // session trades; one after the post-market.
   expect(["03:59", "04:00", "06:22", "09:29", "09:30", "20:00"].map(c => two(stock, "2026-10-23", c)))
-    .toEqual([false, true, true, true, false, false])
+    .toEqual([false, true, true, true, true, false])
+  // Once the session trades, two days on until its third five-minute bar,
+  // while the chart holds Thursday, as abroad; a stock that trades less,
+  // until an hour after the open.
+  const usSession = { regular: { start: at("2026-10-23", "09:30"), end: at("2026-10-23", "16:00") } }
+  const usTraded = (...clocks) => ({ ...stock, session: usSession, points: clocks.map(c => ({ t: at("2026-10-23", c), p: 1 })) })
+  expect([two(usTraded("09:30", "09:35"), "2026-10-23", "09:40"), two(usTraded("09:30", "09:35", "09:40"), "2026-10-23", "09:45"),
+    two(usTraded("09:30"), "2026-10-23", "10:29"), two(usTraded("09:30"), "2026-10-23", "10:30")]).toEqual([true, false, true, false])
   // A stock that hasn't traded since Thursday stays on two days past the
   // bell, so its chart keeps Thursday until it trades, to the post-market's
   // close.

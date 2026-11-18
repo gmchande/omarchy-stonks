@@ -3015,11 +3015,36 @@ test("until the next open a listing Robinhood trades all day shows the day that 
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart moves to the new session, and a listing abroad shows its last session and its move until its new one has a bar, and that session's chart until three", () => {
-  // Friday 09:31: AAPL's chart is Friday from its open, the S&P 500's
-  // Friday's session.
+test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York as abroad", () => {
+  // Friday 09:31, from answers Stonks no longer asks for one day at the
+  // open: AAPL's chart is Friday from its open, the S&P 500's Friday's
+  // session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
     expect([symbol, sessionDate(day)]).toEqual([symbol, "2026-10-23"])
+  // Nebius at 09:35 on Monday 26 October, asked for two days through its
+  // first minutes: Monday's first bars alone would draw a spike, so the
+  // chart holds Friday from its open, with the night, the pre-market and
+  // Monday's first trades at its end, bright, dashed at Thursday's close
+  // until Friday's bell, then at Friday's close, which they count from; a
+  // stock Robinhood doesn't trade all day holds Friday too. By noon,
+  // Monday's.
+  const nbisAt = (set, at) => M.carryClose(savedDay("watch-2026-10-25-1000", "nbis"),
+    M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/nbis.json"), fixture(`moments/${set}/nbis.json`)), cents), calendars, at)
+  const nbisNight = set => ({ status: "ok", ...traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS })
+  const nbisDay = (set, at, allDay) => M.viewChart("NBIS", "1D", { NBIS: nbisAt(set, at) }, {}, {}, { NBIS: nbisNight(set) },
+    { NBIS: { status: "ok", allDay, at: 0 } }, calendars, at).day
+  const nineThirtyFive = at("2026-10-26", "09:35")
+  expect(M.twoDays(nbisAt("watch-2026-10-26-0935", nineThirtyFive), nineThirtyFive, calendars)).toBe(true)
+  for (const allDay of [true, false]) {
+    const held = nbisDay("watch-2026-10-26-0935", nineThirtyFive, allDay)
+    expect([allDay, sessionDate(held), M.chartSpan(held).start, M.pointSession(held, held.points.at(-1)), held.points.at(-1).t >= at("2026-10-26", "09:30")])
+      .toEqual([allDay, "2026-10-23", at("2026-10-23", "09:30"), "reg", true])
+    expect([allDay, M.dayBase(held), M.nightBell(held), M.regularClose(held)])
+      .toEqual([allDay, savedDay("watch-2026-10-25-1000", "nbis").prevClose, at("2026-10-23", "16:00"), savedDay("watch-2026-10-25-1000", "nbis").price])
+  }
+  expect(nbisDay("watch-2026-10-26-0935", nineThirtyFive, true).litFrom).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
+  const noon = nbisDay("watch-2026-10-26-1200", at("2026-10-26", "12:00"), true)
+  expect([sessionDate(noon), M.chartSpan(noon).start]).toEqual(["2026-10-26", at("2026-10-26", "09:30")])
   // London before its session opens, its answer still the last session's:
   // the chart, the headline and its day are that session's.
   const london = M.parseChart(fixture("shel-l-day.json"), cents)
@@ -3466,15 +3491,17 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   // CVR at 09:35 on Monday 26 October hadn't traded since Friday, and
   // Yahoo's day answer held Monday's periods and no bar: alone, an empty
   // chart. It is still asked for two days past the bell (`twoDays`), and
-  // the chart stays on Friday until Monday's first trade, 13:10's.
+  // the chart stays on Friday until Monday's first trade, 13:10's. By 15:00,
+  // more than an hour past the open, it is asked for one day, and the chart
+  // is Monday's from that trade, as it trades.
   const cvrAt = (set, received) => M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/cvr.json"), fixture(`moments/${set}/cvr.json`)), cents, received)
   const opened = cvrAt("watch-2026-10-26-0935", at("2026-10-26", "09:35"))
   expect(M.twoDays(opened, at("2026-10-26", "09:35"), calendars)).toBe(true)
   const cvrDay = q => M.viewChart("CVR", "1D", { CVR: q }, {}, {}, {}, { CVR: { status: "ok", allDay: false, at: 0 } }, calendars).day
   expect([sessionDate(cvrDay(opened)), cvrDay(opened).points.length]).toEqual(["2026-10-23", 2])
-  const traded = cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00"))
-  expect([sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t, M.twoDays(traded, at("2026-10-26", "15:00"), calendars)])
-    .toEqual(["2026-10-26", at("2026-10-26", "13:10"), false])
+  const traded = M.parseChart(fixture("moments/watch-2026-10-26-1500/cvr.json"), cents, at("2026-10-26", "15:00"))
+  expect([M.twoDays(cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00")), at("2026-10-26", "15:00"), calendars), sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t])
+    .toEqual([false, "2026-10-26", at("2026-10-26", "13:10")])
   // 01:00: KILN's Tuesday and BOLT's from the open, though KILN first
   // traded at 07:50 and BOLT at 04:00.
   for (const [file, symbol] of [["kiln", "KILN"], ["bolt", "BOLT"]]) {

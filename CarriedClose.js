@@ -95,10 +95,12 @@ function firstTrade(quote, head) {
 
 // One or two trades of a day just begun, scaled to the chart's height, draw
 // a line from top to bottom, or a crash from the close. So until the day has
-// `FIRST_BARS`, the 1D chart holds the day just closed, asked for in two
-// days meanwhile (`Asks.twoDays`), as it was drawn before the open, with the
-// new day's trades joined after it as a pre-market joins a day
-// (`Quote.tailDay`). Its dashed line is the one Stonks drew before the open
+// `FIRST_BARS`, the 1D chart holds the day just closed, abroad or in New
+// York, asked for in two days meanwhile (`Asks.twoDays`), as it was drawn
+// before the open, with the new day's trades joined after it as a
+// pre-market joins a day (`Quote.tailDay`); a US stock's then draws from the
+// held day's open, with its night and pre-market (`Day.dayChart`,
+// `Day.sessionDay`). Its dashed line is the one Stonks drew before the open
 // (`heldBase`), and its open its own; the new day's trades count from its
 // close, the one the move counts from, where the dashed line steps at the
 // bell, as it does for tonight's trades (`Day.nightBell`), or since the new

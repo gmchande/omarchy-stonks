@@ -75,24 +75,26 @@ function windowSession(cal, quote, win) {
     post: { start: close, end: Calendar.postClose(cal, win.date) } }
 }
 
-// The day's bell, and where joined hours begin: tonight's open and the
-// coming day's midnight and pre-market.
+// The day's bell, and where joined hours begin: tonight's open, and the
+// coming day's midnight, pre-market and open.
 function windowTicks(cal, win, session, joined) {
   var ticks = []
   var segs = Calendar.segmentsOn(cal, win.date)
   if (segs.length && segs[0].start === session.regular.start) ticks.push(session.regular.end)
   else for (var i = 0; i < segs.length; i++) ticks.push(segs[i].end)
-  if (joined) ticks.push(joined.from, Calendar.epochAt(cal, joined.date, "00:00"), Calendar.epochAt(cal, joined.date, cal.overnight.close))
+  if (joined) ticks.push(joined.from, Calendar.epochAt(cal, joined.date, "00:00"), Calendar.epochAt(cal, joined.date, cal.overnight.close), joined.opens)
   return ticks
 }
 
 var LIT_SESSIONS = ["pre", "post", "overnight"]
 
 // Read from the trades, never the clock, so a night with no trade yet
-// stays dim: on a day that closed (`tonight`), only joined trades light.
+// stays dim: on a day that closed (`tonight`), only joined trades light,
+// the coming session's too while the chart holds the day
+// (`CarriedClose.heldDay`).
 function litFrom(points, tonight, over) {
   var last = points.length ? points[points.length - 1] : null
-  if (!last || over || LIT_SESSIONS.indexOf(last.s) < 0 || (tonight !== null && last.t < tonight)) return null
+  if (!last || over || (tonight !== null ? last.t < tonight : LIT_SESSIONS.indexOf(last.s) < 0)) return null
   var i = points.length - 1
   while (i > 0 && points[i - 1].s === last.s) i--
   return points[i].t
@@ -114,7 +116,9 @@ function dayEdge(cal, reach, now) {
 // clock five minutes at a time, turns the day at the open and carries
 // joined hours on to now (`dayEdge`); without it, as where only the newest
 // price is wanted (`Chart.newestTradeOf`) or a harness gives no clock, the
-// newest answer stands in for it.
+// newest answer stands in for it. A day held through the next one's first
+// minutes (`CarriedClose.heldDay`) stays, with that day's first trades
+// joined at its end.
 function dayChart(quote, answer, calendars, now) {
   var cal = Calendar.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
@@ -122,7 +126,7 @@ function dayChart(quote, answer, calendars, now) {
   var latest = all.length ? all[all.length - 1] : null
   var reach = latest ? Math.max(latest.t, answer.through !== null ? answer.through : latest.t) : quote.session.regular.start
   var edge = dayEdge(cal, reach, now)
-  var win = drawnWindow(cal, edge)
+  var win = quote.held ? dayWindow(cal, Calendar.dateStringOf(Calendar.localDate(quote.session.regular.start, cal))) : drawnWindow(cal, edge)
   if (!win) return { day: quote, latest: latest }
   var joined = joinedHours(cal, win, edge)
   var session = windowSession(cal, quote, win)
@@ -171,13 +175,14 @@ function dayChart(quote, answer, calendars, now) {
 // that joined at its end, the night between taking no room, the axis
 // running on to `now`, the shell's clock five minutes at a time, or without
 // one to the newest trade. From the coming day's open by that clock, until
-// its end, the coming day; past that the answer is stale, and its own day
-// stays. A thin listing Robinhood doesn't trade all day has a few night
-// trades, and none is a night's price.
+// its end, the coming day, unless the day is held through its first
+// minutes (`CarriedClose.heldDay`); past its end the answer is stale, and
+// its own day stays. A thin listing Robinhood doesn't trade all day has a
+// few night trades, and none is a night's price.
 function sessionDay(quote, now) {
   var tail = Quote.tailDay(quote)
   var coming = tail && tail.session.regular ? tail.session.regular.start : null
-  var turned = coming !== null && now >= coming && now < Quote.dayEnd(tail)
+  var turned = !quote.held && coming !== null && now >= coming && now < Quote.dayEnd(tail)
   var day = turned ? tail : quote
   var reg = day.session.regular
   if (!reg) return quote
@@ -188,7 +193,7 @@ function sessionDay(quote, now) {
   var axis = { start: reg.start, ticks: [reg.end] }
   if (tonight !== null) {
     var ends = Quote.dayEnd(quote)
-    axis.end = now > last && (coming === null || now < coming) ? now : last
+    axis.end = now > last && (quote.held || coming === null || now < coming) ? now : last
     axis.ticks.push(tonight)
     if (ends < tonight) axis.skip = { from: ends, to: tonight }
   } else axis.end = day.wholeDay && last !== null ? last : Math.max(Quote.dayEnd(day), last !== null ? last : 0)

@@ -234,8 +234,9 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
 // pre-market, and London's and Tokyo's with their open, whose first bar
 // comes about 15 minutes late. Two days keep the last session in the answer
 // until the new one has a trade, and through its first minutes, while the
-// chart holds the last (`CarriedClose.heldDay`). An index's answer stays the
-// last session's until its open.
+// chart holds the last (`CarriedClose.heldDay`), a US stock's from its
+// pre-market on. An index's answer stays the last session's until its
+// open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
   if (quote.crypto) return true
@@ -245,13 +246,14 @@ function twoDays(quote, now, calendars) {
   var segs = cal ? Calendar.segmentsOn(cal, date) : []
   var pts = quote.points
   var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  var held = function(open) { return !tradedSince(open) || (CarriedClose.firstMinutes(quote) && now < open + CarriedClose.HOLD_LIMIT) }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(pre)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && held(segs[0].start)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   if (!open || now < open.start || now >= open.end) return false
-  return !tradedSince(open.start) || (CarriedClose.firstMinutes(quote) && now < open.start + CarriedClose.HOLD_LIMIT)
+  return held(open.start)
 }
 
 // How often, while Yahoo may still answer with the last session's quote

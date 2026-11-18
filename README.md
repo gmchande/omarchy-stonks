@@ -112,9 +112,10 @@ at night, then any US stock's pre-market. The day that closed narrows as
 those hours add up, and hours the market is shut take no room, so a
 weekend or a holiday adds nothing. Those trades belong to the day ahead:
 from the first of them, the move counts from the close just gone, and the
-dashed line steps to that close at the bell. For about ten minutes after a
-market abroad opens, the chart keeps the day just closed, with the new
-day's first trades at its end.
+dashed line steps to that close at the bell. For about ten minutes after
+the open, until the new day has three five-minute bars, the chart keeps the
+day just closed, with the new day's first trades at its end, so a day of one
+or two trades doesn't fill the chart.
 
 For a US stock that Robinhood trades at night, the chart brightens the
 session trading now, such as tonight or the pre-market. The rows, like the

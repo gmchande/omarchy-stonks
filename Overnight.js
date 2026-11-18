@@ -323,7 +323,7 @@ function newestTrade(quote, latest, calendars, day) {
   var own = day.session.regular.start === quote.session.regular.start
   var stepped = !!day.tonight && trade.t >= day.tonight
   var joined = stepped && trade.phase === "overnight"
-  return { t: trade.t, p: trade.p, phase: trade.phase, base: stepped ? Quote.regularClose(quote) : Quote.dayBase(day), own: own && !stepped,
+  return { t: trade.t, p: trade.p, phase: trade.phase, base: stepped ? Quote.regularClose(day) : Quote.dayBase(day), own: own && !stepped,
     closed: own && trade.phase !== "pre" && trade.t >= quote.session.regular.end, joined: joined, stepped: stepped,
     dayStart: stepped && !joined ? trade.t : day.session.regular.start }
 }
