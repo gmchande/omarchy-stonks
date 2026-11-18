@@ -94,11 +94,11 @@ Item {
   // Each listing's newest price since its close.
   property var newestTrades: ({})
   // Robinhood's answers, for the day each row's line draws, held still while
-  // the surface is closed; and the clock that slides its start, held still
-  // while no screen shows the surface.
+  // the surface is closed; and the day's clock, held still while no screen
+  // shows the surface.
   property var nights: ({})
   property var allDay: ({})
-  property int slideAt: 0
+  property int dayClock: 0
   property var previewEntries: ({})
   // Each symbol's cap and P/E, and the currency rates P/Es need.
   property var fundamentalEntries: ({})
@@ -125,7 +125,7 @@ Item {
   // A closed surface's clock holds still too.
   property int now: 0
   readonly property bool reading: surfaceOpen && !!service
-  // The view, its chart rebuilt as the clock slides 1D's start, holds still
+  // The view, its chart rebuilt as the day's clock steps, holds still
   // for a surface no screen shows, such as a window on another workspace.
   readonly property bool showing: reading && onScreen
   readonly property bool previewing: previewSymbol !== "" && !!service && service.previewSurface === root
@@ -140,7 +140,7 @@ Item {
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
   Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
   Binding on nightFailed { when: root.reading; value: root.service?.nightFailed; restoreMode: Binding.RestoreNone }
-  Binding on slideAt { when: root.showing; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
+  Binding on dayClock { when: root.showing; value: root.service?.viewDayClock ?? 0; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
@@ -1246,7 +1246,7 @@ Item {
     newestTrades: root.newestTrades
     nights: root.nights
     allDay: root.allDay
-    slideAt: root.slideAt
+    dayClock: root.dayClock
     entries: root.entries
     featuredSymbol: root.featuredSymbol
     scrubShown: root.watchlistScrubShown

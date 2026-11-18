@@ -53,8 +53,8 @@ function extendedStack(quote, latest, now, day, changeMode, calendars) {
 // A bar is five minutes of trades, so the words speak of the chart. One bar
 // is the only one once its day is over (`axis.closes` where a night follows);
 // before that it may be the first of many. They count every trade of the
-// day (`day.trades`), as its low and high do, though the chart's start may
-// have slid past some, and name the day of one that isn't today's. An empty
+// day (`day.trades`), as its low and high do, though the chart starts at
+// the open, and name the day of one that isn't today's. An empty
 // day says nothing before its bell, as an index has no trade before it, nor
 // beside a quote that is a trade of its session. Yahoo stamps its live
 // moment at the price's own second, apart from the bars at their five-minute
@@ -80,9 +80,9 @@ function exchangeDay(quote, t) {
 }
 
 // Titled against the later of today and the day drawn, so Monday's figures
-// under Tuesday's chart, from its first night trade, say MON. Its low and
-// high are Yahoo's for the session, widened by the day's trades around it
-// from its night's open, drawn or slid off the chart's left (`figuresTrades`).
+// under Tuesday's chart, while Yahoo's are still Monday's, say MON. Its low
+// and high are Yahoo's for the session, widened by the day's trades around
+// it from its night's open, drawn or before the chart's start (`figuresTrades`).
 // An end at the 52-week mark takes that direction's tone, as
 // `Fundamentals.yearLine`'s. The open keeps its slot before the first bar,
 // so the line keeps its shape.

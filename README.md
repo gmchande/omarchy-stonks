@@ -100,23 +100,28 @@ amount, the move beside the price names its currency too. On a longer
 range, the move counts from the range's start. A coin never closes, so
 its day is its last 24 hours.
 
-The 1D chart shows one trading day, with the regular session bright and
-the hours around it dim. For about ten minutes after a market abroad
-opens, it keeps the day just closed, with the new day's first trades at
-its end.
+The 1D chart starts at the open and runs by the clock to the close, or for
+a US stock to 20:00, when its after hours end. The line stops at the newest
+price and the hours still to come stay empty, so the open sits in the same
+place every day. The regular session is bright and the hours around it
+dim.
 
-A US stock that Robinhood trades at night has a day that runs from 20:00
-the evening before to 20:00, New York time, and its chart brightens the
-session trading now, such as the pre-market or tonight. Through the night,
-until about 04:00, the chart keeps the day that just closed and adds
-tonight's trades at its end. Those trades belong to the day ahead: from
-the night's first trade, the move counts from the close just gone, and the
-dashed line steps to that close at the bell. The rows, like the pill, keep
-the day's close and move until the new day's prices arrive. Over a weekend
-or a holiday, the chart shows the last trading day, and the night before
-the next session joins at its end. Where Yahoo has no prices for half an
-hour or more of the pre-market or after hours, the chart draws Robinhood's
-trades there, never in place of Yahoo's.
+Until the next open, the chart keeps the day that closed and adds what has
+traded since at its end: tonight's trades, for a US stock Robinhood trades
+at night, then any US stock's pre-market. The day that closed narrows as
+those hours add up, and hours the market is shut take no room, so a
+weekend or a holiday adds nothing. Those trades belong to the day ahead:
+from the first of them, the move counts from the close just gone, and the
+dashed line steps to that close at the bell. For about ten minutes after a
+market abroad opens, the chart keeps the day just closed, with the new
+day's first trades at its end.
+
+For a US stock that Robinhood trades at night, the chart brightens the
+session trading now, such as tonight or the pre-market. The rows, like the
+pill, keep the day's close and move until the pre-market's first prices
+arrive, soon after 04:00. Where Yahoo has no prices for half an hour or
+more of the pre-market or after hours, the chart draws Robinhood's trades
+there, never in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
 while its market trades, or saved from before and not yet refreshed.

@@ -137,15 +137,15 @@ Item {
   function chartOf(symbol, range, quoteFeed) {
     var quotes = quoteFeed.quotes
     return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
-      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt),
+      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewDayClock),
       overnightFeed.entries, allDayFeed.entries)
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
   // The chart to show: `chart`, with the day built for it before while that
   // was built from the same objects, its quote and an all-day listing's
-  // trades and reach, and while its start hasn't slid. So an answer for
-  // another symbol repaints nothing, nor does a clock that moves no start,
+  // trades and reach, and while its axis hasn't moved. So an answer for
+  // another symbol repaints nothing, nor does a clock that moves no edge,
   // and a preview's Yahoo day never stands in once it is added. `builtDays`
   // is kept from each chart the views show (`keepDay`); it doesn't notify.
   readonly property var builtDays: ({})
@@ -153,7 +153,8 @@ Item {
     if (!chart || !chart.quote || chart.day === chart.quote) return chart
     var made = root.dayMadeFrom(symbol, chart, nights, allDay)
     var built = builtDays[symbol]
-    if (built && built.quote === made.quote && built.bars === made.bars && built.through === made.through && built.start === made.start)
+    if (built && built.quote === made.quote && built.bars === made.bars && built.through === made.through && built.start === made.start
+        && built.end === made.end)
       return Object.assign({}, chart, { day: built.day, latest: built.latest })
     return chart
   }
@@ -166,7 +167,7 @@ Item {
     var tradability = allDay ? allDay[symbol] : null
     var night = tradability && tradability.allDay ? nights[symbol] : null
     return { quote: chart.quote, bars: night ? night.bars : null, through: night ? night.through : null,
-      start: chart.day.axis ? chart.day.axis.start : null }
+      start: chart.day.axis ? chart.day.axis.start : null, end: chart.day.axis ? chart.day.axis.end : null }
   }
   onPreviewViewChanged: keepDay(previewView.featured, previewView.chart)
 
@@ -1142,7 +1143,7 @@ Item {
     }
   }
   onNowChanged: {
-    slideClock()
+    stepDayClock()
     askOvernight()
     if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
     if (Math.floor(root.now / 60) !== root.prunedMinute) {
@@ -1157,22 +1158,23 @@ Item {
     flushQuotes()
   }
   property int prunedMinute: -1
-  // The clock five minutes at a time, which slides 1D's start
-  // (`Day.slidWindow`): the pill's line follows it while a screen is
-  // on, and the panel's and window's chart and rows (`viewSlideAt`) only
-  // while one is open, so nothing rebuilds for a surface no screen shows.
-  property int slideAt: 0
-  property int viewSlideAt: 0
-  function slideClock() {
+  // The clock five minutes at a time, to which 1D's day runs on before the
+  // open for a stock Robinhood doesn't trade all day (`Day.sessionDay`):
+  // the pill's line follows it while a screen is on, and the panel's and
+  // window's chart and rows (`viewDayClock`) only while one is open, so
+  // nothing rebuilds for a surface no screen shows.
+  property int dayClock: 0
+  property int viewDayClock: 0
+  function stepDayClock() {
     if (root.screensOff) return
     var at = root.now - root.now % 300
-    if (at !== root.slideAt) root.slideAt = at
-    if (root.openSurfaces.length > 0 && root.viewSlideAt !== root.slideAt) root.viewSlideAt = root.slideAt
+    if (at !== root.dayClock) root.dayClock = at
+    if (root.openSurfaces.length > 0 && root.viewDayClock !== root.dayClock) root.viewDayClock = root.dayClock
   }
-  onScreensOffChanged: slideClock()
-  onOpenSurfacesChanged: slideClock()
+  onScreensOffChanged: stepDayClock()
+  onOpenSurfacesChanged: stepDayClock()
   Component.onCompleted: {
-    slideClock()
+    stepDayClock()
     if (root.quotesPath !== "") quotesReader.read(root.quotesPath, root.quotesCap)
   }
 }

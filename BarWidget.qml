@@ -43,11 +43,11 @@ BarWidget {
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
   // The day the 1D chart draws, once Robinhood has said which. Only the
-  // five-minute clock that slides its start redraws it, never the second.
+  // day's five-minute clock redraws it, never the second.
   // Built only for the form that draws it, and handed only to the look on
   // show.
   readonly property var lineDay: featuredQuote && barStyle === "sparkline"
-    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.slideAt) : null
+    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.dayClock) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a middle-click picks another, as the
