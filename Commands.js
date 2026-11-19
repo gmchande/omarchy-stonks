@@ -3,12 +3,30 @@
 // Process takes, each beside the rule that reads what it prints. A test runs
 // each one (test/commands.test.js).
 
+// Every command Stonks runs that should end, `argv`, runs under this:
+// `timeout` ends it and all it started after `seconds`, and so does a stop,
+// since `timeout` hands the shell's TERM on to its process group, whose
+// leader it is. The shell can also kill `timeout` alone, as it does when it
+// destroys a Process, whose destructor sends one KILL to the PID it started.
+// For that, `setpriv` arms the guard's parent-death signal, and the
+// guard, a shell that goes on only while its parent is still `timeout`, kills
+// the group when it hears it. The command keeps the guard's input, which a
+// shell would otherwise give a command it runs in the background.
+function bounded(seconds, argv) {
+  return ["timeout", "-k", "1", String(seconds), "setpriv", "--pdeathsig", "USR1", "--", "sh", "-c",
+    "read -r _ _ _ parent group _ < /proc/$$/stat && [ \"$parent\" = \"$group\" ] || exit 125\n"
+    + "trap 'kill -KILL 0' USR1\n"
+    + "exec 3<&0\n"
+    + "\"$@\" <&3 3<&- &\n"
+    + "wait $!", "sh"].concat(argv)
+}
+
 // The camera's: the editor, then the file, printed once its folder can take
 // it. With Omasnap, as Omarchy 4.5 hands it screenshots, its folder; without,
 // Omarchy 4.0's, from at most 64 KiB of user-dirs.dirs. Cut at 8 KB, twice
 // Linux's PATH_MAX, and a byte past, so an answer over the cap names no file.
 function screenshotName(symbol, omasnapFolder, pictures) {
-  return ["timeout", "-k", "1", "5", "sh", "-c", "{\n"
+  return bounded(5, ["sh", "-c", "{\n"
     + "if command -v omasnap > /dev/null; then\n"
     + "  editor=omasnap\n"
     + "  conf=$2\n"
@@ -33,7 +51,7 @@ function screenshotName(symbol, omasnapFolder, pictures) {
     + "n=1\n"
     + "while [ -e \"$file\" ]; do n=$((n + 1)); file=$dir/stonks-$1-$stamp-$n.png; done\n"
     + "printf '%s\\n%s\\n' \"$editor\" \"$file\"\n"
-    + "} | head -c 8193\n", "sh", symbol, omasnapFolder, pictures]
+    + "} | head -c 8193\n", "sh", symbol, omasnapFolder, pictures])
 }
 
 // { editor, file }, or null for an answer that names no whole file.
@@ -197,11 +215,11 @@ function iniValue(raw) {
 // command starts: a command line is world-readable, /proc/PID/environ is
 // 0400.
 function createPrivately(path) {
-  return ["timeout", "-k", "1", "5", "sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
+  return bounded(5, ["sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
     + "printf '%s' \"$STONKS_TEXT\" > \"$tmp\" && ln -- \"$tmp\" \"$1\"\n"
     + "code=$?\n"
     + "rm -f -- \"$tmp\"\n"
-    + "exit $code", "sh", path]
+    + "exit $code", "sh", path])
 }
 
 // The file reader's (`FileRead`): a file Stonks keeps, or a setting it
@@ -210,9 +228,9 @@ function createPrivately(path) {
 // since the test can't hold the read, and the read has 5 s. It exits 3
 // where nothing is there, and 4 where what is there is no regular file.
 function readSaved(path, cap) {
-  return ["timeout", "-k", "1", "5", "sh", "-c", "[ -e \"$1\" ] || exit 3\n"
+  return bounded(5, ["sh", "-c", "[ -e \"$1\" ] || exit 3\n"
     + "[ -f \"$1\" ] || exit 4\n"
-    + "exec dd if=\"$1\" iflag=nonblock,count_bytes bs=65536 count=\"$2\" status=none", "sh", path, String(cap + 1)]
+    + "exec dd if=\"$1\" iflag=nonblock,count_bytes bs=65536 count=\"$2\" status=none", "sh", path, String(cap + 1)])
 }
 
 // What a read found: { text }, { missing: true } where nothing is there, or
@@ -229,14 +247,14 @@ function readSavedFile(code, bytes, text, cap) {
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is
 // read up to 64.
 function soundSurvey(pluginFolder, cacheFolder) {
-  return ["timeout", "-k", "1", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml Waking.js sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
+  return bounded(5, ["sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml Waking.js sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
     + "for look in smooth retro; do\n"
     + "  [ -f \"stamp-$look\" ] || continue\n"
     + "  printf 'stamp %s %s\\n' \"$look\" \"$(head -c 64 -- \"stamp-$look\")\"\n"
     + "  for f in chime-*\"$look\"-*.wav lead-\"$look\"-*.wav; do\n"
     + "    [ -f \"$f\" ] && ! [ \"$f\" -nt \"stamp-$look\" ] && printf 'have %s\\n' \"$f\"\n"
     + "  done\n"
-    + "done; } | head -c 65536", "sh", pluginFolder, cacheFolder]
+    + "done; } | head -c 65536", "sh", pluginFolder, cacheFolder])
 }
 
 // Per look, the md5 lines its sounds are made from, null unless all of
@@ -265,8 +283,8 @@ function readSoundSurvey(text, fixed) {
 // Each has its own time; the whole has 8 s, past both, and a stop ends both:
 // --foreground keeps each in the whole's process group.
 function bellCheck() {
-  return ["timeout", "-k", "1", "8", "bash", "-c", "[ \"$(timeout --foreground -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
-    + "set -o pipefail; timeout --foreground -k 1 3 pw-dump | head -c 4000001"]
+  return bounded(8, ["bash", "-c", "[ \"$(timeout --foreground -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
+    + "set -o pipefail; timeout --foreground -k 1 3 pw-dump | head -c 4000001"])
 }
 
 // An app's capture stream running, not one reading a speaker's monitor, as
@@ -319,8 +337,8 @@ function updating(pluginId) {
 // a middle-click pastes it, cut a byte past `cap`, so an answer over the cap
 // shows itself. An owner that never answers, or never stops, has 2 s.
 function pastedText(primary, cap) {
-  return ["timeout", "-k", "1", "2", "bash", "-c", "set -o pipefail; wl-paste " + (primary ? "--primary " : "")
-    + "--no-newline --type text | head -c " + (cap + 1)]
+  return bounded(2, ["bash", "-c", "set -o pipefail; wl-paste " + (primary ? "--primary " : "")
+    + "--no-newline --type text | head -c " + (cap + 1)])
 }
 
 // The text a paste puts in, or null for an answer over `cap` bytes, or one
@@ -334,7 +352,7 @@ function readPastedText(code, bytes, text, cap) {
 // middle-click elsewhere, as a TextField puts it (`Field`). The text comes
 // on wl-copy's input; wl-copy stays to hand it out, as it does for a copy.
 function primaryCopy() {
-  return ["timeout", "-k", "1", "5", "wl-copy", "--primary"]
+  return bounded(5, ["wl-copy", "--primary"])
 }
 
 // The silence that holds the output awake for the chimes (`Sounds`): pw-cat
@@ -344,6 +362,6 @@ function primaryCopy() {
 // and a dd of larger blocks counts each short read as a block, so a few
 // short lines would end the silence. pw-cat says a few hundred bytes.
 function silenceStream(seconds) {
-  return ["timeout", "-k", "1", String(seconds), "sh", "-c", "pw-cat -v --playback --raw --rate 24000 --channels 1 --format s16"
-    + " --media-role Notification --latency 30ms /dev/zero 2>&1 > /dev/null | dd bs=1 count=65536 status=none"]
+  return bounded(seconds, ["sh", "-c", "pw-cat -v --playback --raw --rate 24000 --channels 1 --format s16"
+    + " --media-role Notification --latency 30ms /dev/zero 2>&1 > /dev/null | dd bs=1 count=65536 status=none"])
 }

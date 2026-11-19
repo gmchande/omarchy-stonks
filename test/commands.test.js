@@ -37,7 +37,7 @@ test("a screenshot is named for its stock and the moment, in the folder and for 
   const home = join(dir, "home")
   mkdirSync(join(home, ".config"), { recursive: true })
   writeFileSync(join(home, ".config/user-dirs.dirs"), 'XDG_PICTURES_DIR="$HOME/Shots"\n')
-  const base = tools(dir, ["sh", "timeout", "mkdir", "sed", "tail", "head"])
+  const base = tools(dir, ["sh", "timeout", "setpriv", "mkdir", "sed", "tail", "head"])
   standIn(base, "date", "echo 2026-11-11_13-00-00\n")
   const named = (env, omasnapFolder = "", pictures = join(home, "Pictures")) => {
     const r = run(C.screenshotName("AAPL", omasnapFolder, pictures), { HOME: home, PATH: base, ...env })
@@ -175,30 +175,52 @@ test("the bell keeps quiet under Do Not Disturb and while an app records, and ri
 }))
 
 // The shell stops a command as QProcess::terminate does, with a TERM to the
-// one it started: what that started ends with it. Each stand-in hangs, its
-// PID kept.
-test("a request or a bell's check stopped by the shell ends with everything it started", async () => {
+// one it started, and kills it outright as it destroys its Process
+// (~Process, QProcess::kill): a KILL to that one alone. Either way, what that
+// started ends with it. Each stand-in hangs, its PID kept.
+test("a request, a bell's check, a paste or the silence, stopped or killed outright by the shell, ends with everything it started", async () => {
   const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
   try {
     const bin = join(dir, "bin")
-    for (const name of ["curl", "pw-dump"]) standIn(bin, name, `echo $$ > "${dir}/${name}.pid"\nsleep 3600 &\necho $! > "${dir}/${name}.child"\nwait\n`)
+    const commands = [
+      ["curl", F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000)],
+      ["pw-dump", C.bellCheck()],
+      ["wl-paste", C.pastedText(false, 4096)],
+      ["pw-cat", C.silenceStream(30)]
+    ]
+    for (const [name] of commands) standIn(bin, name, `echo $$ > "${dir}/${name}.pid"\nsleep 3600 &\necho $! > "${dir}/${name}.child"\nwait\n`)
     standIn(bin, "omarchy-shell", "echo off\n")
-    for (const [name, argv] of [["curl", F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000)], ["pw-dump", C.bellCheck()]]) {
-      const proc = Bun.spawn(argv, { env: { PATH: bin + ":" + process.env.PATH }, stdout: "ignore", stderr: "ignore" })
-      const pids = () => ["pid", "child"].map(kind => { try { return readFileSync(join(dir, `${name}.${kind}`), "utf8").trim() } catch (e) { return "" } })
-      for (let t = 0; t < 100 && pids().includes(""); t++) await Bun.sleep(20)
-      expect(pids().includes("")).toBe(false)
-      proc.kill("SIGTERM")
-      await proc.exited
-      await Bun.sleep(1500)
-      // A process gone, or a zombie no one has reaped yet, has ended.
-      const live = pid => { try { return !/^\d+ \(.*\) Z /.test(readFileSync(`/proc/${pid}/stat`, "utf8")) } catch (e) { return false } }
-      expect(pids().filter(live)).toEqual([])
+    // A process gone, or a zombie no one has reaped yet, has ended.
+    const live = pid => { try { return !/^\d+ \(.*\) Z /.test(readFileSync(`/proc/${pid}/stat`, "utf8")) } catch (e) { return false } }
+    for (const signal of ["SIGTERM", "SIGKILL"]) {
+      for (const [name, argv] of commands) {
+        for (const kind of ["pid", "child"]) rmSync(join(dir, `${name}.${kind}`), { force: true })
+        const proc = Bun.spawn(argv, { env: { PATH: bin + ":" + process.env.PATH }, stdout: "ignore", stderr: "ignore" })
+        const pids = () => ["pid", "child"].map(kind => { try { return readFileSync(join(dir, `${name}.${kind}`), "utf8").trim() } catch (e) { return "" } })
+        for (let t = 0; t < 100 && pids().includes(""); t++) await Bun.sleep(20)
+        expect([signal, name, pids().includes("")]).toEqual([signal, name, false])
+        proc.kill(signal)
+        await proc.exited
+        await Bun.sleep(1500)
+        expect([signal, name, pids().filter(live)]).toEqual([signal, name, []])
+      }
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-}, 10000)
+}, 30000)
+
+// Curl stops a body past --max-filesize, and the cap holds again where
+// curl's output leaves it, whatever curl writes.
+test("a request hands on its answers whole, and never more than its cap for each URL, however much curl writes", () => scratch(dir => {
+  const bin = join(dir, "bin")
+  const answer = "{\"chart\":1}\n@@stonks 0 200 0 \n"
+  standIn(bin, "curl", `printf '%s' '${answer}'\n`)
+  expect(run(F.curlCommand(["https://example.com/a"], 1000), { PATH: bin + ":" + process.env.PATH }).out).toBe(answer)
+  standIn(bin, "curl", "head -c 1000000 /dev/zero\n")
+  const flood = run(F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000), { PATH: bin + ":" + process.env.PATH })
+  expect(flood.out.length).toBe(2 * (1000 + F.MARK_ROOM))
+}))
 
 test("the chimes' player plays each chime it's sent that its names allow, and nothing else", () => scratch(dir => {
   const bin = join(dir, "bin")

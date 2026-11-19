@@ -290,7 +290,7 @@ Item {
   // puts a Bluetooth output 11 ms further behind, and AirPods go silent once a
   // few seconds of chimes add up.
   function start(file) {
-    player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "30ms", file])
+    player.exec(Commands.bounded(4, ["pw-play", "--media-role", "Notification", "--latency", "30ms", file]))
   }
 
   Process { id: player }

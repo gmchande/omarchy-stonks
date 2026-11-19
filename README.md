@@ -361,13 +361,16 @@ empty.
 
 **Commands**, all of which Omarchy ships:
 
-- `curl` for every request, with a time limit and a size cap.
+- `curl` for every request, with a time limit and a size cap, and `dd`
+  to stop what it hands on at that cap.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln` and `rm`, to make its files and
   keep them readable only by you.
 - `sh` with `dd`, to read your lists, the last prices, your theme's colours
   and the settings it reads from Omarchy and Omasnap: only an ordinary
   file, and only up to a size cap far above what a real one holds.
-- `timeout`, to stop every command that should end, if it hangs.
+- `timeout`, to stop every command that should end, if it hangs, and
+  `setpriv`, so what a command started stops with it if the shell stops
+  it outright.
 - When you paste into search or a list's name: `bash` with `wl-paste` and
   `head`, to read what you copied. A paste over 4 KB, or one that takes
   over 2 seconds, pastes nothing. When you select text there with the
@@ -449,8 +452,8 @@ shows what changes. Say yes, and it updates Stonks and restarts the shell,
 unless Stonks has changes it hasn't saved or can't read your lists file.
 Then, or after an update run anywhere else, the footer says "Updated to … ·
 click to restart the shell". Stonks never updates itself. From 1.2.1 or
-earlier, the terminal first stops at a page of the changes: press `q`, then
-say yes.
+earlier, the terminal first stops at a page of the changes, which `q`
+closes; then say yes.
 
 ## Remove
 

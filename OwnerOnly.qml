@@ -92,7 +92,7 @@ Item {
   Process {
     id: make
     property int code: -1
-    command: ["timeout", "-k", "1", "5", "sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
+    command: Commands.bounded(5, ["sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder])
     onExited: function(code) { make.code = code }
     onRunningChanged: {
       if (running) return
@@ -109,7 +109,7 @@ Item {
 
   Process {
     id: chmod
-    command: ["timeout", "-k", "1", "5", "chmod", "go=", "--"].concat(root.changing)
+    command: Commands.bounded(5, ["chmod", "go=", "--"].concat(root.changing))
     onRunningChanged: if (!running) root.next()
   }
 

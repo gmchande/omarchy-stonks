@@ -1,4 +1,5 @@
 .pragma library
+.import "Commands.js" as Commands
 // The one curl every feed runs, several URLs over one connection. Knows
 // nothing of what it fetches.
 
@@ -27,13 +28,20 @@ function instrumentsCap(count) {
   return 16000 + 8000 * count
 }
 
+// Curl's own line after each answer, as `-w` writes it, with room for a
+// Retry-After header far longer than any host sends.
+var MARK_ROOM = 1024
+
 // `--max-time` is per URL, so no URL holds a run more than 10 s, and the
 // URLs go one after another: `timeout` ends the whole run 5 s after the
-// last could, curl and all, and so does a stop.
+// last could, curl and all, and so does a stop. Curl stops an answer past
+// `maxBytes`, and dd hands on what it writes, as it comes, up to that for
+// every URL, so the cap holds where curl's output is made too.
 function curlCommand(urls, maxBytes) {
-  return ["timeout", "-k", "1", String(10 * urls.length + 5), "curl", "-sS", "--compressed", "--max-filesize", String(maxBytes),
-    "--connect-timeout", "5", "--max-time", "10", "-A", USER_AGENT,
-    "-w", "\\n" + ANSWER_MARK + " %{urlnum} %{http_code} %{exitcode} %header{retry-after}\\n"].concat(urls)
+  return Commands.bounded(10 * urls.length + 5, ["sh", "-c",
+    "curl \"$@\" | exec dd bs=65536 iflag=count_bytes count=" + urls.length * (maxBytes + MARK_ROOM) + " status=none", "sh",
+    "-sS", "--compressed", "--max-filesize", String(maxBytes), "--connect-timeout", "5", "--max-time", "10", "-A", USER_AGENT,
+    "-w", "\\n" + ANSWER_MARK + " %{urlnum} %{http_code} %{exitcode} %header{retry-after}\\n"].concat(urls))
 }
 
 // none: no HTTP answer, as with no network or a timeout before the status.

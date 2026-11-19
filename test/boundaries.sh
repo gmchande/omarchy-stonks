@@ -61,18 +61,21 @@ only 'wl-paste|Commands\.(pastedText|primaryCopy)' Field.qml
 # anything, or hold its output awake, by the commands written there or
 # Commands.js's bell check and chime player.
 only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' Sounds.qml
-none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
+none '\.exec\s*\((?!Commands\.bounded\(4, \["pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
-# Every finite command runs under `timeout` with a kill after it: those the
-# camera, the file keeper and the sounds write out, and those Commands.js
-# and Fetch.js make. The chimes' one shell runs while sounds are on, each
-# chime under its own; the update's are a terminal and a restart, started
-# apart from the shell.
-none 'command:\s*\[(?!"timeout", "-k", "1",)' Camera.qml OwnerOnly.qml Sounds.qml
+# Every finite command runs under Commands.bounded, `timeout` with a kill
+# after it and a guard that ends what it started if the shell kills
+# `timeout` alone: those the camera, the file keeper and the sounds write
+# out, and those Commands.js and Fetch.js make. The chimes' one shell runs
+# while sounds are on, each chime under its own; the update's are a
+# terminal and a restart, started apart from the shell.
+rg -qUP 'function bounded\(seconds, argv\) \{\n  return \["timeout", "-k", "1", String\(seconds\), "setpriv", "--pdeathsig", ' Commands.js \
+  || fail "Commands.js: bounded does not start with timeout -k 1 and setpriv --pdeathsig"
+none 'command:\s*\[' Camera.qml OwnerOnly.qml Sounds.qml
 for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved silenceStream; do
-  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", \"-k\", \"1\", " Commands.js || fail "Commands.js: $made does not start with timeout -k 1"
+  rg -qUP "function $made\\([^)]*\\) \\{\\n  return bounded\\(" Commands.js || fail "Commands.js: $made does not run under bounded"
 done
-rg -qUP 'function curlCommand\([^)]*\) \{\n  return \["timeout", "-k", "1", ' Fetch.js || fail "Fetch.js: curlCommand does not start with timeout -k 1"
+rg -qUP 'function curlCommand\([^)]*\) \{\n  return Commands\.bounded\(' Fetch.js || fail "Fetch.js: curlCommand does not run under bounded"
 # Hyprland's dispatcher can start a program too: only the plugin's entry
 # reaches Hyprland, to hand it on, and the one dispatch is the window
 # host's, which focuses the window.
@@ -97,7 +100,7 @@ done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # after its `timeout`, or at a command's place in a shell script it hands
 # `sh -c`, `bash -c` or Omarchy's terminal. Each here must be in the code
 # and the README, and each the README names must be here.
-programs="curl timeout sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
+programs="curl timeout setpriv sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
   omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
 programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
 named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)
@@ -111,10 +114,9 @@ scripted() {
     | sed -E 's/\$\{[^}]*\}//g; s/\$\(\(([^)]*)\)\)//g; s/\\n/\n/g; s/\\"/"/g; s/\$\(/\n/g; s/(&&|\|\||[;|{(!`])/\n/g; s/\b(then|do|else|exec)\b/\n/g' \
     | sed -E 's/^[[:space:]]+//; s/^timeout( +-[a-z-]+( +[0-9]+)?)* +[0-9.]+ +//' \
     | rg -o -P '^[a-z][a-z0-9-]*(?![=a-z0-9-])' \
-    | rg -vx 'case|cd|command|continue|done|echo|esac|exit|false|fi|for|if|printf|read|return|set|test|true|umask|while'
+    | rg -vx 'case|cd|command|continue|done|echo|esac|exit|false|fi|for|if|kill|printf|read|return|set|test|trap|true|umask|wait|while'
 }
-started=$( { rg -o --no-filename -P '(?:command:\s*|return\s+|\.exec\s*\()\["([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
-  rg -o --no-filename -P '"timeout", (?:"-[a-z-]+", (?:"\d+", )?)?"[0-9.]+"\s*\)?,\s*"([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
+started=$( { rg -o --no-filename -P '(?:command:\s*|return\s+|\.exec\s*\(|bounded\([^,\[]+,\s*)\["([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
   rg -o --no-filename -P '"timeout", "-k", "1", String\([^)]*\)\)?, "([a-z][a-z0-9-]*)"' -r '$1' -- *.qml *.js
   scripted; } | sort -u)
 while read -r program; do

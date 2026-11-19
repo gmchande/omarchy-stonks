@@ -101,7 +101,7 @@ Item {
   Process {
     id: copying
     property int code: -1
-    command: ["timeout", "-k", "1", "5", "sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile]
+    command: Commands.bounded(5, ["sh", "-c", "exec wl-copy --type image/png < \"$1\"", "sh", root.shotFile])
     onExited: function(code) { copying.code = code }
     onRunningChanged: {
       if (running) return
@@ -114,8 +114,8 @@ Item {
   // then.
   Process {
     id: announcing
-    command: ["timeout", "-k", "1", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
-      "Click to edit", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
+    command: Commands.bounded(5, ["omarchy-notification-send", "Screenshot saved to clipboard and file",
+      "Click to edit", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile])
     onRunningChanged: if (!running) root.finish(0)
   }
 }
