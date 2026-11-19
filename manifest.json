@@ -5,7 +5,7 @@
   "version": "1.3.0",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "Your stocks in the Omarchy bar, each price as it traded: in its own currency, on its exchange's clock, with its time when it's late. Pre-market, after hours and US overnight, for stocks, ETFs, indexes and crypto from New York to London and Tokyo. From Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
+  "description": "Your stocks in the Omarchy bar, each price as it traded: in its own currency, on its exchange's clock, and with its time when it's late. Stonks follows stocks, ETFs, indexes and crypto from New York to London and Tokyo, before the open, after the close, and overnight for US stocks. Prices come from Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
