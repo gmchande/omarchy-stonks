@@ -326,37 +326,59 @@ Item {
   // Every row's line while the rows follow a scrub, so the breadth reads
   // what each row reads, never worked out at a step. Each is worked out
   // again only when what it is drawn from changes, as the newest prices are
-  // (`Service.newestFrom`): a later scrub, or an answer during one, builds
-  // only the lines that changed.
+  // (`Service.newestFrom`), and only as many a frame as fit in
+  // `rowLinesBudget` ms, so a long list's first scrub stalls no frame.
+  // Until every line is in, the rule shows the breadth it had for the list
+  // (`shownBreadth`).
   property var rowLines: null
   property var rowLinesFrom: ({})
-  function workOutRowLines() {
-    if (!rowsScrubbed) {
-      rowLines = null
-      return
-    }
-    var from = {}
-    var lines = {}
-    view.rows.forEach(function(symbol) {
-      var quote = quotes[symbol]
-      if (!quote) return
-      var had = rowLinesFrom[symbol]
-      from[symbol] = had && had.quote === quote && had.night === nights[symbol] && had.trades === allDay[symbol]
-        && had.calendars === calendars && had.dayClock === dayClock ? had
-        : { quote: quote, night: nights[symbol], trades: allDay[symbol], calendars: calendars, dayClock: dayClock,
-          line: Chart.lineDay(symbol, quote, nights, allDay, calendars, dayClock) }
-      if (from[symbol].line) lines[symbol] = from[symbol].line
-    })
-    rowLinesFrom = from
-    rowLines = lines
-  }
-  // What the lines are drawn from, while the rows follow a scrub.
+  // The lines being worked out: what they are drawn from, the next row's
+  // place, and those done.
+  property var rowLinesWork: null
+  readonly property int rowLinesBudget: 1
   readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, allDay, calendars, dayClock] : null
-  onRowLinesAskChanged: workOutRowLines()
+  onRowLinesAskChanged: {
+    var done = rowLinesWork ? Object.assign({}, rowLinesWork.done, rowLinesWork.from) : {}
+    if (!rowLinesAsk) rowLines = null
+    rowLinesWork = rowLinesAsk ? { symbols: view.rows, quotes: quotes, nights: nights, allDay: allDay, calendars: calendars,
+      dayClock: dayClock, next: 0, from: {}, lines: {}, done: done } : null
+  }
+  function workOnRowLines() {
+    var work = rowLinesWork
+    var until = Date.now() + rowLinesBudget
+    while (work.next < work.symbols.length && Date.now() < until) {
+      var symbol = work.symbols[work.next++]
+      var quote = work.quotes[symbol]
+      if (!quote) continue
+      var night = work.nights[symbol]
+      var trades = work.allDay[symbol]
+      var had = work.done[symbol] || rowLinesFrom[symbol]
+      var line = had && had.quote === quote && had.night === night && had.trades === trades
+        && had.calendars === work.calendars && had.dayClock === work.dayClock ? had
+        : { quote: quote, night: night, trades: trades, calendars: work.calendars, dayClock: work.dayClock,
+          line: Chart.lineDay(symbol, quote, work.nights, work.allDay, work.calendars, work.dayClock) }
+      work.from[symbol] = line
+      if (line.line) work.lines[symbol] = line.line
+    }
+    if (work.next < work.symbols.length) return
+    rowLinesFrom = work.from
+    rowLines = work.lines
+    rowLinesWork = null
+  }
+  FrameAnimation {
+    running: root.rowLinesWork !== null
+    onTriggered: root.workOnRowLines()
+  }
 
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },
     Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
+  property var shownBreadth: breadth
+  Binding on shownBreadth {
+    value: root.breadth
+    when: root.rowLinesWork === null || root.breadth.list !== root.shownBreadth.list
+    restoreMode: Binding.RestoreNone
+  }
 
   // ---- The header's words
 
@@ -1232,7 +1254,7 @@ Item {
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel
-    breadth: root.breadth
+    breadth: root.shownBreadth
     listMenuOpen: root.listMenuOpen
     rowsCovered: root.adding || root.listViewOpen
     replayRunning: motion.replayRunning
