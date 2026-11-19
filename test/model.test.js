@@ -683,6 +683,10 @@ test("the data file reads as written and repairs hand edits", () => {
   // Symbols are upper-cased, trimmed, and kept once, from a string or a list.
   expect(M.fileSettings({ symbols: "nvda, aapl AAPL" }).symbols).toEqual(["NVDA", "AAPL"])
   expect(M.fileSettings({ symbols: ["spy", " tsla ", "SPY"] }).symbols).toEqual(["SPY", "TSLA"])
+  // Only a list is read as one: a hand edit's object with a length, as
+  // {"length": 1e12}, would hold the shell's thread for each index it names.
+  const posing = M.fileSettings({ symbols: { length: 2, 0: "NEST", 1: "SILK" }, lists: { length: 1, 0: { name: "Growth", symbols: ["BO"] } } })
+  expect([posing.symbols, posing.lists]).toEqual([["NVDA", "AAPL", "MSFT", "SPY", "TSLA"], []])
   // The cadence stays between 30 seconds and 15 minutes.
   for (const [given, kept] of [[15, 30], [1000, 900], [120, 120], ["nope", 60]])
     expect([given, M.fileSettings({ refreshIntervalSec: given }).refreshIntervalSec]).toEqual([given, kept])

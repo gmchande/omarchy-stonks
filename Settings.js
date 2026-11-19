@@ -10,10 +10,12 @@ function nextChangeMode(mode) {
   return mode === "pct" ? "abs" : mode === "abs" ? "open" : "pct"
 }
 
+// A hand edit can give an object with a length, as {"length": 1e12}: only
+// a list is read as one, so a few bytes can't hold the shell's thread.
 function normalizeSymbols(value) {
   var list = []
   if (typeof value === "string") list = value.split(/[\s,]+/)
-  else if (value && typeof value.length === "number") list = value
+  else if (Array.isArray(value)) list = value
   var out = []
   var seen = {}
   for (var i = 0; i < list.length; i++) {
@@ -102,7 +104,8 @@ function fileBytes(text) {
 function fileSettings(src) {
   var from = src || {}
   var lists = normalizeLists(from.lists)
-  var symbols = normalizeSymbols(from.symbols && from.symbols.length ? from.symbols : ["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
+  var own = normalizeSymbols(from.symbols)
+  var symbols = own.length ? own : normalizeSymbols(["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   for (var i = 0; i < lists.length; i++) symbols = symbols.concat(lists[i].symbols)
   symbols = normalizeSymbols(symbols)
   return Object.assign({}, from, {
@@ -128,7 +131,7 @@ function fileSettings(src) {
 // name like its own (`freeListName`); lists named well keep theirs, so they
 // are named first.
 function normalizeLists(value) {
-  if (!value || typeof value.length !== "number") return []
+  if (!Array.isArray(value)) return []
   var lists = []
   for (var i = 0; i < value.length; i++) if (value[i] && typeof value[i] === "object") lists.push(value[i])
   var named = []
