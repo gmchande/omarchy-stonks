@@ -197,6 +197,26 @@ function traded(bar) {
   return Format.isFiniteNumber(bar.v) && bar.v > 0
 }
 
+// Yahoo has no first trade on record for a listing on its first day
+// (`firstTradeDate` null, where every other listing's is a date). Until
+// shares trade, it sends the offer price as the price, as the day's and the
+// 52 weeks' low and high, and in the bars at the bell, which carry no
+// shares. None of these is a trade.
+function untraded(meta) {
+  return meta.firstTradeDate === null && !(Format.isFiniteNumber(meta.regularMarketVolume) && meta.regularMarketVolume > 0)
+}
+
+// The bars before such a listing's first shares: every bar until it trades,
+// then those leading bars with no shares. A spark answer sends no shares, so
+// the last chart answer's verdict names its bars (`sparkQuote`).
+function offerTimes(meta, bars) {
+  if (meta.firstTradeDate !== null) return []
+  var none = untraded(meta)
+  var out = []
+  for (var i = 0; i < bars.length && (none || bars[i].v === 0); i++) out.push(bars[i].t)
+  return out
+}
+
 function sessionAt(periods, t) {
   var names = ["pre", "regular", "post"]
   for (var n = 0; periods && n < names.length; n++) {
@@ -262,8 +282,11 @@ function parseChart(json, centExchanges, receivedAt) {
   var bars = answerBars(timestamps, series, from)
   if (!bars) return null
   var tick = answerTick(meta, bars, centExchanges)
-  var filtered = filterStrayCloses(bars, periods, tick)
+  var offered = offerTimes(meta, bars)
+  var filtered = filterStrayCloses(bars.filter(function(b) { return offered.indexOf(b.t) < 0 }), periods, tick)
+  filtered.droppedTimes = offered.concat(filtered.droppedTimes)
   var kept = filtered.bars
+  var unpriced = untraded(meta)
   var regular = periodOf(periods.regular)
   var index = meta.instrumentType === "INDEX"
   var points = dayPoints(kept, next, regular, index)
@@ -288,19 +311,22 @@ function parseChart(json, centExchanges, receivedAt) {
     clocks: clocks,
     instrumentType: instrumentType,
     crypto: instrumentType === "CRYPTOCURRENCY",
-    price: knownPrice(meta.regularMarketPrice),
+    price: unpriced ? null : knownPrice(meta.regularMarketPrice),
     priceDigits: Format.priceDigits(knownPrice(meta.regularMarketPrice) !== null ? meta.regularMarketPrice
       : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
     prevClose: answerPrevClose(meta, days, chosen, quoted, regular),
-    marketTime: Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
+    marketTime: !unpriced && Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The session `dayOpen` opened.
     openSession: firstRegular ? regular.start : null,
-    dayHigh: knownPrice(meta.regularMarketDayHigh),
-    dayLow: knownPrice(meta.regularMarketDayLow),
+    dayHigh: unpriced ? null : knownPrice(meta.regularMarketDayHigh),
+    dayLow: unpriced ? null : knownPrice(meta.regularMarketDayLow),
     volume: meta.regularMarketVolume,
-    fiftyTwoWeekHigh: knownPrice(meta.fiftyTwoWeekHigh),
-    fiftyTwoWeekLow: knownPrice(meta.fiftyTwoWeekLow),
+    fiftyTwoWeekHigh: unpriced ? null : knownPrice(meta.fiftyTwoWeekHigh),
+    fiftyTwoWeekLow: unpriced ? null : knownPrice(meta.fiftyTwoWeekLow),
+    // A listing that hasn't traded yet: its previous close is its offer
+    // price (`listingDay`).
+    untraded: unpriced,
     // The session the day's open, high, low and volume belong to.
     figuresDay: figuresDayOf(ahead, current, regular, quoted),
     nextDayBegun: nextDayHasBegun(index, next, regular, current, receivedAt),
@@ -767,6 +793,15 @@ function closingTrade(quote, pt) {
 function regularOrTrades(quote) {
   var pts = quote.points
   return quote.session.regular || { start: pts[0] ? pts[0].t : 0, end: pts.length ? pts[pts.length - 1].t : 1 }
+}
+
+// A listing's first day, whose previous close is its offer price: before it
+// trades, as Yahoo's answer shows (`untraded`), and through that day, as
+// Robinhood's listing date says (`listDate`, as "2026-11-19").
+function listingDay(quote) {
+  if (quote.untraded) return true
+  var reg = quote.listDate ? quote.session.regular : null
+  return !!reg && new Date((reg.start + clockAt(quote, reg.start).offset) * 1000).toISOString().slice(0, 10) === quote.listDate
 }
 
 function lastTradeTime(quote) {

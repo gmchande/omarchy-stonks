@@ -1,9 +1,9 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
-// Whether Robinhood trades each US stock or ETF all day, in one run of
-// requests. A fetch while a run is out is dropped: the service asks again
-// for what it still wants once that run lands.
+// Whether Robinhood trades each US stock or ETF all day, and the day each
+// listed, in one run of requests. A fetch while a run is out is dropped: the
+// service asks again for what it still wants once that run lands.
 Item {
   id: root
 
@@ -34,8 +34,13 @@ Item {
     batches.forEach(function(batch, b) {
       var answer = got.filter(function(a) { return a.index === b })[0]
       var parsed = null
-      try { parsed = answer && answer.kind === "ok" ? Overnight.parseAllDay(JSON.parse(answer.body), batch) : null } catch (e) { parsed = null }
-      batch.forEach(function(symbol) { next[symbol] = Overnight.allDayEntry(parsed, symbol, entries[symbol], askedAt) })
+      var dates = null
+      try {
+        var json = answer && answer.kind === "ok" ? JSON.parse(answer.body) : null
+        parsed = json ? Overnight.parseAllDay(json, batch) : null
+        dates = parsed ? Overnight.listDates(json, batch) : null
+      } catch (e) { parsed = null }
+      batch.forEach(function(symbol) { next[symbol] = Overnight.allDayEntry(parsed, symbol, entries[symbol], askedAt, dates) })
     })
     root.batches = []
     root.entries = next

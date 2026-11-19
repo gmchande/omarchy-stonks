@@ -164,7 +164,48 @@ test("a bar with shares traded in it is a trade, never stray", () => {
   expect(toy.droppedTimes).toEqual([close + 900, close + 1200])
 })
 
-test("a young listing's ranges start at its first trade and keep its thin trades, and agree on its high and low", () => {
+test("a young listing shows only what traded: on its first day the IPO price, named, and nothing else before its first trade; its ranges from its first trade", () => {
+  // ANT on Thursday 19 November, its first day: Yahoo sends its 83.00 IPO
+  // price as its price, its close, its day's and its 52 weeks' low and high,
+  // and in a bar at 09:35 with no shares, before its first trade at 11:45.
+  // At 11:41 its IPO price is on top, named, with no move, no open, no low
+  // or high and no bar: not 83.00 "As of 09:37" over "WED CLOSE 83.00 0.00%".
+  const ipo = (hhmm, file) => fixture(`moments/ipo-2026-11-19-${hhmm}/${file}.json`)
+  const listed = (hhmm, listDate) => M.withListDates({ ANT: M.parseChart(ipo(hhmm, "ant"), cents) }, { ANT: { listDate } }).ANT
+  const robinhood = M.listDates(ipo("1141", "robinhood-instruments"), ["ANT", "NBIS"])
+  expect(robinhood).toEqual({ ANT: "2026-11-19", NBIS: "2011-05-24" })
+  const lines = (q, hhmm) => M.heroLines(q, M.rowModel(q, 0, "pct"), null, M.epochAt(US, "2026-11-19", hhmm), q, calendars, "pct", false)
+  const before = M.parseChart(ipo("1141", "ant"), cents)
+  expect([before.price, before.dayOpen, before.dayLow, before.dayHigh, before.fiftyTwoWeekLow, before.fiftyTwoWeekHigh, before.points])
+    .toEqual([null, null, null, null, null, null, []])
+  expect([M.rowModel(before, 0, "pct").priceText, M.rowModel(before, 0, "pct").pct]).toEqual(["83.00", null])
+  expect(lines(before, "11:41").close).toMatchObject({ label: "IPO PRICE", price: "" })
+  const fresh = M.freshness({ status: "ok", receivedAt: 0 }, before, M.epochAt(US, "2026-11-19", "11:41"), 0, false, null, false)
+  expect(M.freshnessText(fresh, before, calendars)).toBe("NOT TRADED YET")
+  expect(M.dayNote(before, M.epochAt(US, "2026-11-19", "11:41"), calendars)).toBe("No trades yet")
+  expect(M.listingNote(before)).toBe("Not traded yet · IPO price 83.00")
+  // At 11:52 its move counts from the IPO price, named as Robinhood's listing
+  // date shows it is: not "WED CLOSE 83.00". Its open is its first trade's,
+  // not the IPO price's bar, and its 52 weeks are Yahoo's, not from 83.00.
+  const after = listed("1152", robinhood.ANT)
+  expect([after.price, after.dayOpen, after.points.some(p => p.p === 83)]).toEqual([108.24, 111.5, false])
+  expect(M.yearLine(after, null, null, null, after.points).range).toMatchObject({ lowText: "107.19", highText: "114.99" })
+  expect(lines(after, "11:52")).toMatchObject({ close: { label: "IPO PRICE", price: "83.00" }, caption: { label: "TODAY" }, move: "+30.41%" })
+  expect(M.listingNote(after)).toBe("From its IPO price, 83.00")
+  // A day that isn't its listing day names its close as any listing's.
+  expect(lines(listed("1152", "2026-11-18"), "11:52").close.label).toBe("WED CLOSE")
+  // Its ranges count from the IPO price that day, so say so: SINCE IPO, not
+  // 1W, its start IPO 83.00, and no 83.00 low from the bar at 09:30.
+  const quotes = { ANT: listed("1217", robinhood.ANT) }
+  for (const [file, range] of [["5d", "1W"], ["1mo", "1M"], ["1y", "1Y"], ["max", "All"]]) {
+    const entry = { status: "ok", history: M.parseHistory(fixture(`history/ant-2026-11-19-1217-${file}.json`), range, cents) }
+    const history = M.viewChart("ANT", range, quotes, {}, { [`ANT|${range}`]: entry }, {}, undefined, calendars).history
+    const line = M.rangeLine(history, M.rangeEnds(history, M.periodStats(history), quotes.ANT), quotes.ANT)
+    expect([range, M.historyRowModel(history, quotes.ANT, 0).periodLabel, line.facts[0], history.bars.some(b => b.l === 83)])
+      .toMatchObject([range, "SINCE IPO", { label: "IPO", value: "83.00" }, false])
+    expect([range, M.barDay(history, history.start).date]).toEqual([range, "IPO PRICE"])
+  }
+
   // WREN, first traded Friday 16 October: Yahoo's 1W and 1M open with its
   // 18.00 offer at 09:30, no shares traded, its first trade 23.00 at 11:45.
   // 1W must not say "18.00 23.00", nor drop the week's 23.875 high on

@@ -108,11 +108,42 @@ function parseAllDay(json, symbols) {
   return out
 }
 
-// Robinhood's word on whether `symbol` trades all day, from a check's
-// answer (`parsed`, null when the check failed). A failed check keeps the
-// last answer, or none: `allDay` null, never said either way.
-function allDayEntry(parsed, symbol, had, at) {
-  return parsed ? { status: "ok", allDay: parsed[symbol], at: at } : { status: "failed", allDay: had ? had.allDay : null, at: at }
+// The day Robinhood says each listed, as "2026-11-19", where it says one.
+function listDates(json, symbols) {
+  var results = Format.fetchedList(json && json.results, 2 * symbols.length) || []
+  var out = {}
+  for (var i = 0; i < symbols.length; i++) {
+    var wanted = robinhoodSymbol(symbols[i])
+    var found = results.filter(function(r) {
+      return r && r.symbol === wanted && typeof r.list_date === "string" && /^\d{4}-\d\d-\d\d$/.test(r.list_date)
+    })[0]
+    if (found) out[symbols[i]] = found.list_date
+  }
+  return out
+}
+
+// Robinhood's word on whether `symbol` trades all day, and the day it
+// listed, from a check's answer (`parsed` and `dates`, null when the check
+// failed). A failed check keeps the last answer, or none: `allDay` null,
+// never said either way.
+function allDayEntry(parsed, symbol, had, at, dates) {
+  return parsed ? { status: "ok", allDay: parsed[symbol], listDate: dates && dates[symbol] || null, at: at }
+    : { status: "failed", allDay: had ? had.allDay : null, listDate: had && had.listDate || null, at: at }
+}
+
+// Robinhood's listing date on each quote it gave one for, so a listing's
+// first day names its IPO price (`Quote.listingDay`). The same object where
+// none changes.
+function withListDates(quotes, allDay) {
+  var out = quotes
+  for (var symbol in allDay) {
+    var quote = quotes[symbol]
+    var date = allDay[symbol] && allDay[symbol].listDate || null
+    if (!quote || (quote.listDate || null) === date) continue
+    if (out === quotes) out = Object.assign({}, quotes)
+    out[symbol] = Object.assign({}, quote, { listDate: date })
+  }
+  return out
 }
 
 function allDayDue(entry, now) {

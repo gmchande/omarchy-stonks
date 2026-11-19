@@ -27,7 +27,7 @@ Item {
   readonly property font labelFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   // A label as the shell's panels set one: plain, in sentence case.
   readonly property font factFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption })
-  function factLabel(text) { return text === "P/E" ? text : text.charAt(0) + text.slice(1).toLowerCase() }
+  function factLabel(text) { return text === "P/E" || text === "IPO" ? text : text.charAt(0) + text.slice(1).toLowerCase() }
   // Rounds ascent and descent up each, as a line of text does.
   readonly property int lineHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
 

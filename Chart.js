@@ -39,9 +39,12 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (!entry) return null
   if (entry.history) {
     var trade = Overnight.newestTrade(quote, chart.latest, calendars, chart.day)
-    var first = entry.history.bars[0]
+    // On a listing's first day, Yahoo counts every range from its offer price.
+    var offered = Quote.listingDay(quote) && Quote.sameClose(entry.history.baseline, quote.prevClose)
+    var history = offered ? Object.assign({}, entry.history, { offered: true }) : entry.history
+    var first = history.bars[0]
     var closeAt = first ? Calendar.closeBefore(Calendar.calendarFor(calendars, quote), first.t) : null
-    chart.history = History.withStart(History.withNewest(entry.history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null),
+    chart.history = History.withStart(History.withNewest(history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null),
       closeAt, closeAt !== null ? Market.tradeClock(quote, closeAt, calendars) : null)
   } else chart.failed = true
   return chart

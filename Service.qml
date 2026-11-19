@@ -540,6 +540,7 @@ Item {
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
+    allDay: allDayFeed.entries
   }
   readonly property var quotes: feed.quotes
   readonly property var entries: feed.entries
@@ -608,6 +609,7 @@ Item {
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
+    allDay: allDayFeed.entries
     bulk: false
     onQuotesChanged: root.askOvernight()
   }

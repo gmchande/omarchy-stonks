@@ -97,9 +97,11 @@ function parseHistory(json, range, centExchanges) {
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
   // Yahoo opens a new listing's history with its offer price: one price, no
-  // shares, at its first day's bell, hours before its first trade.
+  // shares, at its first day's bell, hours before its first trade. On that
+  // day it has no first trade on record, and the bar comes first.
   var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
-  bars = bars.filter(function(b) { return !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
+  var offerAt = firstTrade !== null ? firstTrade : meta.firstTradeDate === null && bars.length ? bars[0].t : null
+  bars = bars.filter(function(b) { return !(b.t === offerAt && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
   // A daily bar never carries a stray close.
@@ -345,12 +347,13 @@ function withNewest(history, trade, clock) {
 // (`baseline`), where Yahoo's first bar doesn't already close on it. That is
 // the close before the range, at `closeAt` with the exchange's `clock` where
 // its calendar names that day, as 1D names its close; or, for a listing that
-// began inside the range, Yahoo's first price for it. Yahoo sends the start
+// began inside the range, Yahoo's first price for it, which on its first day
+// is its offer price (`offered`, `Chart.viewChart`). Yahoo sends the start
 // rounded and the bar's close as a float, so they match to a millionth.
 function withStart(history, closeAt, clock) {
   var first = history.bars[0]
   if (!first || !Format.isFiniteNumber(history.baseline) || Math.abs(history.baseline - first.c) <= first.c * 1e-6) return history
-  var listed = periodStats(history).coverage.short
+  var listed = periodStats(history).coverage.short || !!history.offered
   var named = !listed && closeAt !== null
   return Object.assign({}, history, {
     start: { t: named ? closeAt : first.t - 1, c: history.baseline, clock: named ? clock : null, listed: listed }
@@ -427,9 +430,9 @@ function rangeVolume(history) {
   return sum > 0 ? Format.compactNumber(sum) : ""
 }
 
-function rangeFacts(widest, start, volume) {
+function rangeFacts(widest, start, volume, offered) {
   return [
-    { label: "START", value: start || "", widest: widest },
+    { label: offered ? "IPO" : "START", value: start || "", widest: widest },
     { label: "VOL", value: volume || "", widest: Format.widest("999.9M") }
   ]
 }
@@ -444,7 +447,7 @@ function rangeLine(history, ends, quote) {
   return {
     title: String(history.range || "").toUpperCase(),
     range: range,
-    facts: rangeFacts(range.widest, start, rangeVolume(history))
+    facts: rangeFacts(range.widest, start, rangeVolume(history), !!history.offered)
   }
 }
 
@@ -485,13 +488,13 @@ function rangeMarks(history, ends, quote, clockAt) {
 // of a bar that has a time: `{ date, clock }`, `clock` null for a day's bar.
 // The start is the close before the range, by its own day where the
 // calendar names it, or as the close before the first bar; or a listing's
-// first day.
+// first day, or on that day its offer price.
 function barDay(history, bar) {
   var years = historySpansYears(history)
   var timed = !!bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
   if (bar === history.start) {
     if (bar.clock) return { date: historyDateText(history, bar.t, years, "1d"), clock: timed ? bar.clock : null }
-    if (bar.listed) return { date: historyDateText(history, history.firstTradeDate, years, "1d"), clock: null }
+    if (bar.listed) return { date: history.offered ? "IPO PRICE" : historyDateText(history, history.firstTradeDate, years, "1d"), clock: null }
     return { date: "CLOSE BEFORE " + historyDateText(history, history.bars[0].t, years, "1d"), clock: null }
   }
   var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
@@ -532,8 +535,8 @@ function historyRowModel(history, quote, scrubT) {
     changeLine: Format.pct(chg.pct),
     // Said under the change, as the day's move names its day
     // (`Figures.heroLines`).
-    periodLabel: stats.coverage.short && history.range !== "All"
-      ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
+    periodLabel: history.offered ? "SINCE IPO"
+      : stats.coverage.short && history.range !== "All" ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
     newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest, closed: tail.closed } : null
   }

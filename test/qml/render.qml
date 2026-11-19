@@ -165,6 +165,8 @@ Harness {
   function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
   // The pill at night (pill-sheet-night), { quote, newest }.
   property var nightPill: null
+  // The pill on a listing's first day (pill-sheet-ipo-<hhmm>), { quote }.
+  property var ipoPill: null
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
   // <popup-help|popup-help-sorted|window-help|min-window-help>-<look>: the
   // key sheet, min-window- in the smallest window.
@@ -487,6 +489,23 @@ Harness {
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }
+      // pill-sheet-ipo-<hhmm>: ANT on its first day, Thursday 19 November,
+      // at that minute New York time (moments/ipo-2026-11-19-<hhmm>), with
+      // Robinhood's listing date, as the service reads it.
+      var ipo = /^pill-sheet-ipo-(\d\d)(\d\d)$/.exec(root.stateName)
+      if (ipo) {
+        var load = function(name) {
+          var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+          view.path = fixtureDir + "/moments/ipo-2026-11-19-" + ipo[1] + ipo[2] + "/" + name + ".json"
+          var text = JSON.parse(view.text())
+          view.destroy()
+          return text
+        }
+        var at = Calendar.epochAt(stub.calendars.calendars.US, "2026-11-19", ipo[1] + ":" + ipo[2])
+        var ant = Quote.parseChart(load("ant"), Calendar.centExchanges(stub.calendars), at)
+        root.ipoPill = { quote: Object.assign({}, ant, { listDate: Overnight.listDates(load("robinhood-instruments"), ["ANT"]).ANT }) }
+        root.now = at
+      }
       return
     }
     if (root.loadingKind) {
@@ -724,11 +743,15 @@ Harness {
       // answer.
       var answer = named ? (day ? robinhoodAnswers(JSON.parse(day), us) : null)
         : root.overnight.power ? {} : robinhoodAnswers(read("robinhood-day"), us)
+      // And Robinhood's listing dates, which the quote feed puts on each
+      // quote (`Overnight.withListDates`).
+      var dates = instruments ? Overnight.listDates(JSON.parse(instruments), us) : {}
       us.forEach(function(s) {
         if (named && !tradable) return
-        allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
+        allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, listDate: dates[s] || null, at: 0 }
         if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
+      quotes = Overnight.withListDates(quotes, allDay)
       if (root.overnight.own) {
         var own = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         own.path = fixtureDir + "/" + root.overnight.own.file + ".json"
@@ -1429,10 +1452,11 @@ Harness {
                   return forms.concat(["down", "up"].map(function(day) { return { style: style, retro: retro, day: day } }))
                 }, []))
               }, [])
-            // At night, every form in each look, each with its hover's words.
-            if (root.stateName === "pill-sheet-night")
+            // At night, and on a listing's first day, every form in each
+            // look, each with its hover's words.
+            if (root.stateName === "pill-sheet-night" || root.ipoPill)
               return [false, true].reduce(function(all, retro) {
-                return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
+                return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: root.ipoPill ? "ipo" : "night" } }))
               }, [])
             // pill-sheet-trouble: the text and icon forms in each look, in
             // each trouble (`troubleGate`), and with no price yet while
@@ -1501,9 +1525,10 @@ Harness {
               QtObject {
                 id: pillService
                 readonly property bool night: pillRow.modelData.day === "night" && !!root.nightPill
+                readonly property var own: night ? root.nightPill : pillRow.modelData.day === "ipo" ? root.ipoPill : null
                 function pillShown(pill, shown) {}
-                property string featuredSymbol: night ? "JNJ" : "NEST"
-                property var quotes: night ? ({ JNJ: root.nightPill.quote })
+                property string featuredSymbol: own ? own.quote.symbol : "NEST"
+                property var quotes: own ? ({ [featuredSymbol]: own.quote })
                   : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
                 property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
                   || pillRow.modelData.trouble === "failed" ? "failed"
@@ -1517,7 +1542,7 @@ Harness {
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
                 property var nightFailed: ({})
-                property var calendars: night ? stub.calendars : null
+                property var calendars: own ? stub.calendars : null
               }
               QtObject {
                 id: pillShell
@@ -1595,7 +1620,7 @@ Harness {
             // The hover's words, in a bubble drawn as the bar draws its own;
             // none without words, as the bar shows none.
             Rectangle {
-              readonly property bool night: pillRow.modelData.day === "night"
+              readonly property bool night: pillRow.modelData.day === "night" || pillRow.modelData.day === "ipo"
               visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open || night) && hoverWords.text !== ""
               anchors.verticalCenter: parent.verticalCenter
               width: hoverWords.implicitWidth + 20
