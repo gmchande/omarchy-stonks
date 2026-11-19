@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "Cells.js" as Cells
 import "Rows.js" as Rows
 import "Motion.js" as Motion
@@ -267,5 +268,15 @@ Item {
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     onClicked: root.unitClicked()
+
+    // A sign can't say what it counts from, so the tip does.
+    PanelToolTip {
+      visible: unitMouse.containsMouse
+      text: ({ pct: "% change since the previous close", abs: "Change since the previous close, in each stock's currency",
+        open: "% change since today's open" })[root.changeMode] || ""
+      fontFamily: root.look.fontFamily
+      y: parent.height + 3
+      x: parent.width - implicitWidth
+    }
   }
 }
