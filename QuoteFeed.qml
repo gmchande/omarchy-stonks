@@ -45,7 +45,7 @@ Item {
   // however it landed (`Overnight.withListDates`).
   property var allDay: ({})
   function tagListDates() {
-    var tagged = Overnight.withListDates(quotes, allDay)
+    var tagged = Overnight.withListDates(quotes, allDay, stamp())
     if (tagged !== quotes) root.quotes = tagged
   }
   onQuotesChanged: tagListDates()

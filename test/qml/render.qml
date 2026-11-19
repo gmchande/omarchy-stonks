@@ -751,7 +751,7 @@ Harness {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, listDate: dates[s] || null, at: 0 }
         if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
-      quotes = Overnight.withListDates(quotes, allDay)
+      quotes = Overnight.withListDates(quotes, allDay, root.now)
       if (root.overnight.own) {
         var own = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         own.path = fixtureDir + "/" + root.overnight.own.file + ".json"

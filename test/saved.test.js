@@ -171,7 +171,7 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   // At 11:41 its IPO price is on top, named, with no move, no open, no low
   // or high and no bar: not 83.00 "As of 09:37" over "WED CLOSE 83.00 0.00%".
   const ipo = (hhmm, file) => fixture(`moments/ipo-2026-11-19-${hhmm}/${file}.json`)
-  const listed = (hhmm, listDate) => M.withListDates({ ANT: M.parseChart(ipo(hhmm, "ant"), cents) }, { ANT: { listDate } }).ANT
+  const listed = (hhmm, listDate) => M.withListDates({ ANT: M.parseChart(ipo(hhmm, "ant"), cents) }, { ANT: { listDate } }, M.epochAt(US, "2026-11-19", "12:00")).ANT
   const robinhood = M.listDates(ipo("1141", "robinhood-instruments"), ["ANT", "NBIS"])
   expect(robinhood).toEqual({ ANT: "2026-11-19", NBIS: "2011-05-24" })
   const lines = (q, hhmm) => M.heroLines(q, M.rowModel(q, 0, "pct"), null, M.epochAt(US, "2026-11-19", hhmm), q, calendars, "pct", false)

@@ -132,14 +132,17 @@ function allDayEntry(parsed, symbol, had, at, dates) {
 }
 
 // Robinhood's listing date on each quote it gave one for, so a listing's
-// first day names its IPO price (`Quote.listingDay`). The same object where
-// none changes.
-function withListDates(quotes, allDay) {
+// first day names its IPO price (`Quote.listingDay`). Only a date of the
+// last two days, by `now`, can be a quote's listing day, so only those
+// quotes are read. The same object where none changes.
+function withListDates(quotes, allDay, now) {
+  var since = new Date((now - 2 * 86400) * 1000).toISOString().slice(0, 10)
   var out = quotes
   for (var symbol in allDay) {
-    var quote = quotes[symbol]
     var date = allDay[symbol] && allDay[symbol].listDate || null
-    if (!quote || (quote.listDate || null) === date) continue
+    if (!date || date < since) continue
+    var quote = quotes[symbol]
+    if (!quote || quote.listDate === date) continue
     if (out === quotes) out = Object.assign({}, quotes)
     out[symbol] = Object.assign({}, quote, { listDate: date })
   }
