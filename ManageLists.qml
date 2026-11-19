@@ -36,6 +36,10 @@ OverRows {
   property string pendingName: ""
   onChoicesChanged: {
     syncRows()
+    // The other surface can delete or rename the lifted list, or one below
+    // the place it's over: the drag ends where things are.
+    var listed = choices.map(function(c) { return c.name })
+    if (dragName !== "" && (listed.indexOf(dragName) < 0 || dragTarget >= choices.length)) cancelDrag()
     if (!renaming && !confirming) return
     var at = choices.map(function(c) { return c.name }).indexOf(pendingName)
     if (at < 0) { stopEditing(); return }
@@ -103,9 +107,9 @@ OverRows {
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle. A rename or a delete's
-  // question keeps its row.
+  // question keeps its row, and a lifted list the cursor.
   function keepCursorInSight() {
-    if (renaming || confirming) return
+    if (renaming || confirming || dragName !== "") return
     cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
   }
 

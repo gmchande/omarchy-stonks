@@ -218,6 +218,22 @@ Harness {
       var kept = !within(500, function() { return listNames() !== "Later," + first }) && within(1500, function() { return manage.dragName === "" })
       harness.check("in Manage lists a list dragged past the one above takes its place, and none goes above All",
         three && lifted && carried && kept, [three, lifted, carried, kept, listNames()].join(" "))
+      // The window deletes the list lifted in the panel: the drag ends, and
+      // the lists left keep their places under All.
+      var laterRow = manageRows()[1]
+      lift = laterRow.mapToItem(body, laterRow.width / 4, laterRow.height / 2)
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y + up / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, lift.y + up, -1, Qt.LeftButton)
+      var liftedAgain = within(1000, function() { return manage.dragName === "Later" && manage.dragTarget === 2 })
+      service.deleteList("Later")
+      var dropped = within(1500, function() {
+        var rows = manageRows()
+        return manage.dragName === "" && rows.length === 2 && rows[0].y === 0 && rows[1].y === manage.itemHeight
+      })
+      mouseRelease(body, lift.x, lift.y + up)
+      harness.check("in Manage lists a list deleted elsewhere while lifted ends the drag, and All stays first",
+        liftedAgain && dropped, [liftedAgain, dropped, manageRows().map(function(r) { return r.name + "@" + r.y }).join(" ")].join(" "))
       body.closeViews()
       service.deleteList("Later")
       service.switchList(wasList)
