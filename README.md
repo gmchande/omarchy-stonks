@@ -1,25 +1,32 @@
 # Stonks
 
-Stonks puts your stock watchlist in the Omarchy bar. A small pill shows how
-one stock is doing today. Click it for the chart and your lists.
+Stonks puts your stock watchlist in the Omarchy bar and shows each price as
+it traded. A small pill shows how one stock is doing today. Click it for
+the chart and your lists.
 
 <img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's line chart. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
-- Stocks, ETFs, indexes and crypto from New York to London and Tokyo,
-  with charts from one day to all time.
+- Prices as Yahoo and Robinhood send them, in each listing's own currency
+  and its exchange's own time. Stonks never converts a price, since a
+  converted price is one nobody traded at.
+- A price more than two minutes old while its market trades says "As of"
+  and its time, and a "!" on the pill means a refresh failed or is late.
 - Pre-market and after-hours prices, and overnight prices for the US
   stocks and ETFs that trade at night.
-- Point anywhere on the chart to see the price at that moment.
-- Prices as Yahoo and Robinhood send them, in each listing's own currency
-  and its exchange's own time, never converted.
-- Lists of your own, such as a portfolio or a sector.
+- The market's hours on its own clock, with the holidays and early closes
+  of New York, Toronto, London and Tokyo.
+- Point anywhere on the chart to see the price at that moment, on eleven
+  ranges from one day to all time.
+- Stocks, ETFs, indexes and crypto, in lists of your own.
 - A screenshot of any chart, sized so X shows it whole.
 - Everything works by mouse alone, and `?` lists the keys.
-- Light on your computer: Stonks fetches nothing while your screens are
-  off, and fetches each stock only as often as its market moves.
+- Light on your computer: with the panel closed and 152 stocks in its
+  list, Stonks uses about 0.1% of one core on one screen. It asks for a
+  stock about once a minute while its market trades, less often while
+  it's shut, and not at all while your screens are off.
 - Free, with no account and no API key.
 
-Stonks doesn't track your holdings or send price alerts.
+Stonks doesn't track your holdings, send price alerts or show news.
 
 Website: [getstonks.app](https://getstonks.app)
 
