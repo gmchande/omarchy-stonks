@@ -413,7 +413,8 @@ test("a spark day keeps the last chart's verdict, and a jump past it waits for a
     const quote = { close: cs }
     if (withOpens) quote.open = cs.map((c, i) => i === 6 ? 100 : i > 0 ? cs[i - 1] : c)
     return { meta: { symbol: "AAA", instrumentType: "EQUITY", exchangeName: "NMS", priceHint: 2,
-      regularMarketPrice: cs[cs.length - 1], regularMarketTime: ts[ts.length - 1], chartPreviousClose: 100 },
+      regularMarketPrice: cs[cs.length - 1], regularMarketTime: ts[ts.length - 1], chartPreviousClose: 100,
+      currentTradingPeriod: { regular: { start: t0, end: t0 + 23400 } } },
       timestamp: ts, indicators: { quote: [quote] } }
   }
   const chart = M.parseChart({ chart: { result: [answer(closes, true)] } }, [])
@@ -2005,6 +2006,16 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     // 1.1.0 read and kept such a pre-market.
     { name: "a saved quote whose pre-market spans centuries", call: kept,
       answer: saved(q => { q.session.pre = { start: T0 - 3600, end: 1e12 } }) },
+    // A day with no session throws where the chart, or a refresh, reads it,
+    // and every refresh waits on that answer until Stonks restarts.
+    { name: "a day with no session", call: read,
+      answer: chartAnswer(r => { r.meta.tradingPeriods.regular = [[]] }) },
+    { name: "a two-day answer whose day before has no session", call: read, answer: chartAnswer(r => {
+      r.meta.tradingPeriods.pre = [[period(T0 - 90000, T0 - 86400)], [period(T0 - 3600, T0)]]
+    }) },
+    { name: "a saved quote with no session", call: kept, answer: saved(q => { q.session.regular = null }) },
+    { name: "a saved quote whose day before has no session", call: kept,
+      answer: saved(q => { q.before = { session: { pre: null, regular: null, post: null }, points: [] } }) },
     { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,

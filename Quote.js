@@ -278,6 +278,10 @@ function parseChart(json, centExchanges, receivedAt) {
   var periods = days[chosen]
   var next = !coin && chosen + 1 < days.length ? days[chosen + 1] : null
   var from = !coin && chosen > 0 ? periodsStart(periods) : null
+  // Every day Yahoo sends has its session. One without, the headline's or the
+  // day before it the chart holds, is no answer: every reader of the day
+  // counts from its session.
+  if (!periods.regular || (from !== null && !days[chosen - 1].regular)) return null
   var series = { o: opens, c: closes, v: volumes, h: highs, l: lows }
   var bars = answerBars(timestamps, series, from)
   if (!bars) return null
@@ -636,13 +640,17 @@ function currentPeriods(current) {
 
 // The cache's quotes, { symbol: { quote, receivedAt } }, as this or an
 // earlier Stonks saved them. Before 1.1.1 a period could span centuries, and
-// `Overnight.extendedSlots` walks the pre- and post-markets slot by slot.
+// `Overnight.extendedSlots` walks the pre- and post-markets slot by slot. A
+// quote is kept only with its day's session, and the day before's when it
+// holds one, as `parseChart` reads an answer.
 function keptQuotes(saved) {
   var out = {}
   for (var symbol in saved) {
     var quote = saved[symbol] && saved[symbol].quote
     var days = quote && quote.session ? [quote.session, quote.next] : []
-    if (days.length && days.every(function(day) { return !day || ((!day.pre || isPeriod(day.pre)) && (!day.post || isPeriod(day.post))) }))
+    var before = quote && quote.before
+    if (days.length && isPeriod(quote.session.regular) && (!before || (!!before.session && isPeriod(before.session.regular)))
+      && days.every(function(day) { return !day || ((!day.pre || isPeriod(day.pre)) && (!day.post || isPeriod(day.post))) }))
       out[symbol] = saved[symbol]
   }
   return out
