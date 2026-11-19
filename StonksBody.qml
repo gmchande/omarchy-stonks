@@ -347,8 +347,10 @@ Item {
       var symbol = work.symbols[work.next++]
       var quote = work.quotes[symbol]
       if (!quote) continue
-      var night = work.nights[symbol]
-      var trades = work.allDay[symbol]
+      // Either may be null, as in a harness that stubs the service
+      // (`Chart.dayDrawn`).
+      var night = work.nights ? work.nights[symbol] : null
+      var trades = work.allDay ? work.allDay[symbol] : null
       var had = work.done[symbol] || rowLinesFrom[symbol]
       var line = had && had.quote === quote && had.night === night && had.trades === trades
         && had.calendars === work.calendars && had.dayClock === work.dayClock ? had
