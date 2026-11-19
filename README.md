@@ -14,7 +14,7 @@ one stock is doing today. Click it for the chart and your lists.
   and its exchange's own time, never converted.
 - Lists of your own, such as a portfolio or a sector.
 - A screenshot of any chart, sized so X shows it whole.
-- Everything works by mouse alone or by keyboard alone.
+- Everything works by mouse alone, and `?` lists the keys.
 - Light on your computer: Stonks fetches nothing while your screens are
   off, and fetches each stock only as often as its market moves.
 - Free, with no account and no API key.
