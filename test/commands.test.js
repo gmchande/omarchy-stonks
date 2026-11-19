@@ -211,16 +211,33 @@ test("a request, a bell's check, a paste or the silence, stopped or killed outri
 }, 30000)
 
 // Curl stops a body past --max-filesize, and the cap holds again where
-// curl's output leaves it, whatever curl writes.
-test("a request hands on its answers whole, and never more than its cap for each URL, however much curl writes", () => scratch(dir => {
-  const bin = join(dir, "bin")
-  const answer = "{\"chart\":1}\n@@stonks 0 200 0 \n"
-  standIn(bin, "curl", `printf '%s' '${answer}'\n`)
-  expect(run(F.curlCommand(["https://example.com/a"], 1000), { PATH: bin + ":" + process.env.PATH }).out).toBe(answer)
-  standIn(bin, "curl", "head -c 1000000 /dev/zero\n")
-  const flood = run(F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000), { PATH: bin + ":" + process.env.PATH })
-  expect(flood.out.length).toBe(2 * (1000 + F.MARK_ROOM))
-}))
+// curl's output leaves it, whatever curl writes. The rows asked first show
+// first, so each answer passes on as it comes, not with the next.
+test("a request hands on each answer whole as it comes, and never more than its cap for each URL, however much curl writes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
+  try {
+    const bin = join(dir, "bin")
+    const env = { PATH: bin + ":" + process.env.PATH }
+    const first = "{\"chart\":1}\n@@stonks 0 200 0 \n", second = "{\"chart\":2}\n@@stonks 1 200 0 \n"
+    standIn(bin, "curl", `printf '%s' '${first}'\nsleep 1\nprintf '%s' '${second}'\n`)
+    const proc = Bun.spawn(F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000), { env, stdout: "pipe", stderr: "ignore" })
+    const reader = proc.stdout.getReader()
+    let text = "", early = null
+    const started = Date.now()
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      text += new TextDecoder().decode(value)
+      if (early === null && text === first) early = Date.now() - started < 800
+    }
+    expect([early, text]).toEqual([true, first + second])
+    standIn(bin, "curl", "head -c 1000000 /dev/zero\n")
+    const flood = run(F.curlCommand(["https://example.com/a", "https://example.com/b"], 1000), env)
+    expect(flood.out.length).toBe(2 * (1000 + F.MARK_ROOM))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 test("the chimes' player plays each chime it's sent that its names allow, and nothing else", () => scratch(dir => {
   const bin = join(dir, "bin")

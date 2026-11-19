@@ -35,11 +35,12 @@ var MARK_ROOM = 1024
 // `--max-time` is per URL, so no URL holds a run more than 10 s, and the
 // URLs go one after another: `timeout` ends the whole run 5 s after the
 // last could, curl and all, and so does a stop. Curl stops an answer past
-// `maxBytes`, and dd hands on what it writes, as it comes, up to that for
-// every URL, so the cap holds where curl's output is made too.
+// `maxBytes`, and head hands on what it writes, as it comes, up to that for
+// every URL, so the cap holds where curl's output is made too. Unbuffered,
+// since a head that held its output would hold each answer until the next.
 function curlCommand(urls, maxBytes) {
   return Commands.bounded(10 * urls.length + 5, ["sh", "-c",
-    "curl \"$@\" | exec dd bs=65536 iflag=count_bytes count=" + urls.length * (maxBytes + MARK_ROOM) + " status=none", "sh",
+    "curl \"$@\" | exec stdbuf -o0 head -c " + urls.length * (maxBytes + MARK_ROOM), "sh",
     "-sS", "--compressed", "--max-filesize", String(maxBytes), "--connect-timeout", "5", "--max-time", "10", "-A", USER_AGENT,
     "-w", "\\n" + ANSWER_MARK + " %{urlnum} %{http_code} %{exitcode} %header{retry-after}\\n"].concat(urls))
 }

@@ -361,8 +361,8 @@ empty.
 
 **Commands**, all of which Omarchy ships:
 
-- `curl` for every request, with a time limit and a size cap, and `dd`
-  to stop what it hands on at that cap.
+- `curl` for every request, with a time limit and a size cap, and `stdbuf`
+  with `head` to stop what it hands on at that cap.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln` and `rm`, to make its files and
   keep them readable only by you.
 - `sh` with `dd`, to read your lists, the last prices, your theme's colours
