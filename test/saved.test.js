@@ -192,6 +192,10 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   expect(M.yearLine(after, null, null, null, after.points).range).toMatchObject({ lowText: "107.19", highText: "114.99" })
   expect(lines(after, "11:52")).toMatchObject({ close: { label: "IPO PRICE", price: "83.00" }, caption: { label: "TODAY" }, move: "+30.41%" })
   expect(M.listingNote(after)).toBe("From its IPO price, 83.00")
+  // A row's spark answer sends no shares: the chart answer's verdict leaves
+  // the IPO price's bar out of its line too.
+  const spark = M.sparkQuote(M.sparkResults(ipo("1152", "spark")).ANT, after.verdict, cents)
+  expect([spark.quote.points.length > 0, spark.quote.points.some(p => p.p === 83)]).toEqual([true, false])
   // A day that isn't its listing day names its close as any listing's.
   expect(lines(listed("1152", "2026-11-18"), "11:52").close.label).toBe("WED CLOSE")
   // Its ranges count from the IPO price that day, so say so: SINCE IPO, not

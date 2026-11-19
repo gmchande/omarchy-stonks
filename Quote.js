@@ -284,7 +284,6 @@ function parseChart(json, centExchanges, receivedAt) {
   var tick = answerTick(meta, bars, centExchanges)
   var offered = offerTimes(meta, bars)
   var filtered = filterStrayCloses(bars.filter(function(b) { return offered.indexOf(b.t) < 0 }), periods, tick)
-  filtered.droppedTimes = offered.concat(filtered.droppedTimes)
   var kept = filtered.bars
   var unpriced = untraded(meta)
   var regular = periodOf(periods.regular)
@@ -347,7 +346,7 @@ function parseChart(json, centExchanges, receivedAt) {
     before: from !== null ? dayBefore(timestamps, series, days[chosen - 1], from, tick, index) : null,
     points: points,
     droppedTimes: filtered.droppedTimes,
-    verdict: chartVerdict(bars, opens, filtered, firstRegular, regular)
+    verdict: chartVerdict(bars, opens, filtered, offered, firstRegular, regular)
   }
   var rolled = coin ? coinDay(points, kept) : null
   return rolled ? Object.assign(out, rolled) : out
@@ -472,11 +471,12 @@ function nextDayHasBegun(index, next, regular, current, receivedAt) {
   return Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start
 }
 
-// For a later spark answer (`sparkQuote`). Null without opens, when the
-// filter judged nothing. A stray run reaches at most MIXED_RUN bars on, so no
-// later bar can change the verdict before that. The newest bar is the live
-// moment.
-function chartVerdict(bars, opens, filtered, firstRegular, regular) {
+// For a later spark answer (`sparkQuote`), which leaves out the bars this
+// answer did: its strays and a new listing's bars before its first shares
+// (`offered`). Null without opens, when the filter judged nothing. A stray
+// run reaches at most MIXED_RUN bars on, so no later bar can change the
+// verdict before that. The newest bar is the live moment.
+function chartVerdict(bars, opens, filtered, offered, firstRegular, regular) {
   if (!opens.length) return null
   var whole = bars.slice(0, Math.max(0, bars.length - 1))
   var settled = bars.slice(0, Math.max(0, bars.length - MIXED_RUN))
@@ -485,7 +485,7 @@ function chartVerdict(bars, opens, filtered, firstRegular, regular) {
     settled: settled.length ? settled[settled.length - 1].t : 0,
     times: whole.map(function(b) { return b.t }),
     closes: whole.map(function(b) { return b.c }),
-    dropped: filtered.droppedTimes,
+    dropped: offered.concat(filtered.droppedTimes),
     open: firstRegular ? knownPrice(firstRegular.o) : null,
     openSession: firstRegular ? regular.start : null
   }
