@@ -138,8 +138,9 @@ lists…", or Ctrl-click it.
 
 To find or add a stock, click "+ Find or add a symbol" or press `/`, and
 type a name or a symbol. Stocks in the list you're looking at come first,
-with today's move. Below them come Yahoo's results: the chart shows the
-highlighted one before you add it, and Enter or a click adds it.
+with today's move, and right after you start a list, every stock in All
+does. Below them come Yahoo's results: the chart shows the highlighted one
+before you add it, and Enter or a click adds it.
 
 To remove a row, click the × beside its symbol, or select it and press
 Delete. It leaves the list you're looking at, and removing it from All

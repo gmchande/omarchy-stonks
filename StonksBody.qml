@@ -500,13 +500,19 @@ Item {
   onFeaturedSymbolChanged: if (featuredSymbol !== landing) landing = ""
 
   // The list's own stocks the search names, each with the move its row
-  // shows at rest. Asked only while search is open.
-  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
+  // shows at rest, and All's while a new list is being filled, so a stock
+  // Stonks already follows comes at once, without asking Yahoo. Asked only
+  // while search is open.
+  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, filling && service ? service.allSymbols : members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
     var row = quote ? Figures.listRow(quote, 0, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
       move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
   }) : []
+
+  // Search opened by New list, to fill the list just made.
+  property bool filling: false
+  onAddingChanged: if (!adding) filling = false
 
   function startAdding() {
     if (!keepRename()) return
@@ -620,6 +626,7 @@ Item {
     var problem = service.createList(name)
     if (problem !== "") { listMenu.problem = problem; return }
     startAdding()
+    filling = true
   }
 
   function openManageLists() {

@@ -426,7 +426,8 @@ Harness {
         [failedFirst, shorter, askedAgain, atOnce, unasked, afresh, harness.calls("SEARCH.asked") - askedSoFar].join(" "))
 
       // w, down to New list, Enter, a name, Enter: the list is made and
-      // shown, with search open to fill it.
+      // shown, with search open to fill it. With Yahoo's search down, a
+      // stock All holds is offered at once, and Enter adds it.
       quiet()
       press("w")
       press("↓")
@@ -435,11 +436,14 @@ Harness {
       type("tech")
       press("⏎")
       var made = within(2000, function() { return service.listName === "tech" && b.adding })
+      fault(true)
       type("shop")
+      var offered = within(2000, function() { return b.search.chosenSymbol === "SHOP" })
       press("⏎")
       var filled = within(5000, function() { return service.symbols.join(",") === "SHOP" && !b.adding })
-      harness.check("by keys alone, w makes a list and the words and Enter fill it",
-        naming && made && filled, [naming, made, service.listName, service.symbols.join(",")].join(" "))
+      fault(false)
+      harness.check("by keys alone, w makes a list, its search finds a stock All holds with Yahoo's search down, and Enter fills the list with it",
+        naming && made && offered && filled, [naming, made, offered, service.listName, service.symbols.join(",")].join(" "))
 
       // w, down past the lists and New list to Manage lists, Enter; Delete
       // asks, Enter deletes, and All keeps the stock.

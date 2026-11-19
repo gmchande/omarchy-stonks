@@ -1019,6 +1019,24 @@ Harness {
         root.searchField(body.search).text = "berk"
         body.search.slow = true
       }
+      // popup-search-filling-*: the list "Semis" just made and empty, search
+      // open to fill it, "berk" typed, Yahoo not yet answered: All's
+      // Berkshire found by its name, chosen, with ADD.
+      if (root.stateName.indexOf("-filling-") > 0) {
+        var everySymbol = stub.symbols.slice()
+        stub.lists = stub.lists.concat([{ name: "Semis", label: "Semis", count: 0, symbols: [] }])
+        stub.allSymbols = everySymbol
+        stub.listName = "Semis"
+        stub.symbols = []
+        stub.shown = []
+        body.filling = true
+        body.search.results = []
+        body.search.answer = ""
+        body.search.resultsQuery = ""
+        body.search.searchText = "berk"
+        root.searchField(body.search).text = "berk"
+        body.search.slow = true
+      }
       // popup-search-putback-*: SHOP.TO just removed, and search opened on
       // an empty field: its one result is the removal, chosen, UNDO, the
       // hero showing it.
