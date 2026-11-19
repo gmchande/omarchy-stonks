@@ -380,7 +380,14 @@ Harness {
     property var allDay: null
     property var nightFailed: ({})
     // Each listing's newest price since its close, as the service reads it.
-    readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
+    readonly property var newestTrades: {
+      var out = {}
+      symbols.forEach(function(s) {
+        var newest = Chart.newestTradeOf(s, quotes[s], nights, allDay, calendars)
+        if (newest) out[s] = newest
+      })
+      return out
+    }
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, allSymbols: allSymbols,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })

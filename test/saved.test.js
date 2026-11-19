@@ -25,6 +25,10 @@ const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overn
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
+// Each listing's newest trade, as the service works them out one by one
+// (`Chart.newestTradeOf`).
+const newestTrades = (symbols, quotes, nights, allDay) => Object.fromEntries(symbols
+  .map(s => [s, M.newestTradeOf(s, quotes[s], nights, allDay, calendars)]).filter(([, newest]) => newest))
 // The header's status at full width, the first of its forms.
 const marketStatus = (...args) => M.statusForms(...args)[0]
 const US = calendars.calendars.US
@@ -295,7 +299,7 @@ test("a bucket stamped at the bell is post-market, unless it holds the closing t
   expect(quotes.PSIX.points.at(-1).t - quotes.PSIX.session.regular.end).toBe(13)
   expect(M.pointSession(quotes.PSIX, quotes.PSIX.points.at(-1))).toBe("reg")
   const notAllDay = { PSIX: { status: "ok", allDay: false, at: 0 }, BLDP: { status: "ok", allDay: false, at: 0 } }
-  const tops = M.newestTrades(["PSIX", "BLDP"], quotes, {}, notAllDay, calendars)
+  const tops = newestTrades(["PSIX", "BLDP"], quotes, {}, notAllDay)
   expect([tops.PSIX || null, M.newestNote(quotes.BLDP, tops.BLDP, answeredAt(night), calendars)]).toEqual([null, "After hours 17:55"])
 })
 
@@ -2148,7 +2152,7 @@ const topsAt = set => {
     }
   }
   const symbols = Object.keys(quotes)
-  const newest = M.newestTrades(symbols, quotes, nights, allDay, calendars)
+  const newest = newestTrades(symbols, quotes, nights, allDay)
   // The panel's two lines (`heroLines`), each said whole: under the price,
   // the close before it with its day's move and the part since; under the
   // move, its name and the same move in the other unit.
@@ -2268,7 +2272,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // close just gone.
   for (const set of ["watch-2026-10-25-2335", "watch-2026-10-26-2005", "watch-2026-10-27-0350"]) {
     const at = topsAt(set)
-    const waiting = M.newestTrades(at.symbols, at.quotes, {}, {}, calendars)
+    const waiting = newestTrades(at.symbols, at.quotes, {}, {})
     for (const s of ["NBIS", "JNJ"]) {
       expect([set, s, waiting[s].phase, waiting[s].base, waiting[s].t <= at.newest[s].t]).toEqual([set, s, "post", M.dayBase(at.quotes[s]), true])
       if (at.newest[s].joined) expect([set, s, at.newest[s].base]).toEqual([set, s, M.regularClose(at.quotes[s])])
