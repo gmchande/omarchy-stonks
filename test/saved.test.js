@@ -213,6 +213,11 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   expect([spark.quote.points.length > 0, spark.quote.points.some(p => p.p === 83)]).toEqual([true, false])
   // A day that isn't its listing day names its close as any listing's.
   expect(lines(listed("1152", "2026-11-18"), "11:52").close.label).toBe("WED CLOSE")
+  // A quote stays on its listing day until the next session, a Friday
+  // listing's through the weekend and a Monday holiday: Thursday's, standing
+  // in, still names its IPO price on the Tuesday morning after.
+  const tuesday = M.withListDates({ ANT: M.parseChart(ipo("1152", "ant"), cents) }, { ANT: { listDate: robinhood.ANT } }, M.epochAt(US, "2026-11-24", "08:00")).ANT
+  expect(lines(tuesday, "11:52").close.label).toBe("IPO PRICE")
   // Its ranges count from the IPO price that day, so say so: SINCE IPO, not
   // 1W, its start IPO 83.00, and no 83.00 low from the bar at 09:30.
   const quotes = { ANT: listed("1217", robinhood.ANT) }
