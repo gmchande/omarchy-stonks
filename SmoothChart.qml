@@ -194,43 +194,54 @@ Item {
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
-
-        // With no previous close known there is no wash, only the line.
-        ctx.fillStyle = sides(ctx, by, root.aboveWash, root.belowWash)
-        for (var r = 0; root.hasBaseline && r < filled.length; r++) {
-          var run = filled[r]
-          if (run.length < 2) continue
-          ctx.beginPath()
-          ctx.moveTo(pad + run[0].x * w, by)
-          for (var i = 0; i < run.length; i++) {
-            if (i > 0 && run[i].untraded) ctx.lineTo(pad + run[i].x * w, pad + run[i - 1].y * h)
-            ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
-          }
-          ctx.lineTo(pad + run[run.length - 1].x * w, by)
-          ctx.closePath()
-          ctx.fill()
-        }
-
-        ctx.lineJoin = "round"
-        ctx.lineCap = "round"
-        ctx.lineWidth = 2 * root.weight
-        // The whole series in dim ink, then the bright part over it (`dim`),
-        // so the rest reads as the quieter part of one line. Each side of the
-        // step takes its colours from its own baseline, or with none, the
-        // line's own ink.
+        // Each side of the step counts from its own baseline, as the retro
+        // columns do: the wash and the line take their colours from it, or
+        // with none, the line takes its own ink and there is no wash.
         var stepX = geometry.step ? pad + geometry.step.x * w : width
         var parts = [{ from: 0, to: stepX, by: root.hasBaseline ? by : null }]
         if (geometry.step) parts.push({ from: stepX, to: width, by: pad + geometry.step.y * h })
+
         for (var s = 0; s < parts.length; s++) {
+          var base = parts[s].by
+          if (base === null) continue
           ctx.save()
           if (geometry.step) {
             ctx.beginPath()
             ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
             ctx.clip()
           }
-          ctx.strokeStyle = sides(ctx, parts[s].by, 0.45, 0.45)
+          ctx.fillStyle = sides(ctx, base, root.aboveWash, root.belowWash)
+          for (var r = 0; r < filled.length; r++) {
+            var run = filled[r]
+            if (run.length < 2) continue
+            ctx.beginPath()
+            ctx.moveTo(pad + run[0].x * w, base)
+            for (var i = 0; i < run.length; i++) {
+              if (i > 0 && run[i].untraded) ctx.lineTo(pad + run[i].x * w, pad + run[i - 1].y * h)
+              ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
+            }
+            ctx.lineTo(pad + run[run.length - 1].x * w, base)
+            ctx.closePath()
+            ctx.fill()
+          }
+          ctx.restore()
+        }
+
+        ctx.lineJoin = "round"
+        ctx.lineCap = "round"
+        ctx.lineWidth = 2 * root.weight
+        // The whole series in dim ink, then the bright part over it (`dim`),
+        // so the rest reads as the quieter part of one line.
+        for (var p = 0; p < parts.length; p++) {
+          ctx.save()
+          if (geometry.step) {
+            ctx.beginPath()
+            ctx.rect(parts[p].from, 0, parts[p].to - parts[p].from, height)
+            ctx.clip()
+          }
+          ctx.strokeStyle = sides(ctx, parts[p].by, 0.45, 0.45)
           strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-          ctx.strokeStyle = sides(ctx, parts[s].by, 1, 1)
+          ctx.strokeStyle = sides(ctx, parts[p].by, 1, 1)
           strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
           ctx.restore()
         }

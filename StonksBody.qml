@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "Chart.js" as Chart
 import "ChartSound.js" as ChartSound
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
@@ -315,12 +316,60 @@ Item {
 
   // ---- The rows
 
-  // The rows follow a scrub of the day (`Figures.rowsScrub`).
-  readonly property int watchlistScrubShown: historyActive || !featuredQuote ? 0 : Figures.rowsScrub(featuredQuote, featuredDay, scrubShown)
+  // The rows follow a scrub of the day, each reading its own line
+  // (`Figures.listRow`).
+  readonly property int watchlistScrubShown: historyActive ? 0 : scrubShown
+  readonly property bool rowsScrubbed: watchlistScrubShown !== 0
+  // Every row's line while the rows follow a scrub, so the breadth reads
+  // what each row reads, never worked out at a step. Each is worked out
+  // again only when what it is drawn from changes, as the newest prices are
+  // (`Service.newestFrom`), and only as many a frame as fit in
+  // `rowLinesBudget` ms, so a long list's first scrub stalls no frame.
+  // Until every line is in, the rule is plain: it counts nothing rather
+  // than a count the rows don't say.
+  property var rowLines: null
+  property var rowLinesFrom: ({})
+  // The lines being worked out: what they are drawn from, the next row's
+  // place, and those done.
+  property var rowLinesWork: null
+  readonly property int rowLinesBudget: 1
+  readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, allDay, calendars, dayClock] : null
+  onRowLinesAskChanged: {
+    var done = rowLinesWork ? Object.assign({}, rowLinesWork.done, rowLinesWork.from) : {}
+    if (!rowLinesAsk) rowLines = null
+    rowLinesWork = rowLinesAsk ? { symbols: view.rows, quotes: quotes, nights: nights, allDay: allDay, calendars: calendars,
+      dayClock: dayClock, next: 0, from: {}, lines: {}, done: done } : null
+  }
+  function workOnRowLines() {
+    var work = rowLinesWork
+    var until = Date.now() + rowLinesBudget
+    while (work.next < work.symbols.length && Date.now() < until) {
+      var symbol = work.symbols[work.next++]
+      var quote = work.quotes[symbol]
+      if (!quote) continue
+      var night = work.nights[symbol]
+      var trades = work.allDay[symbol]
+      var had = work.done[symbol] || rowLinesFrom[symbol]
+      var line = had && had.quote === quote && had.night === night && had.trades === trades
+        && had.calendars === work.calendars && had.dayClock === work.dayClock ? had
+        : { quote: quote, night: night, trades: trades, calendars: work.calendars, dayClock: work.dayClock,
+          line: Chart.lineDay(symbol, quote, work.nights, work.allDay, work.calendars, work.dayClock) }
+      work.from[symbol] = line
+      if (line.line) work.lines[symbol] = line.line
+    }
+    if (work.next < work.symbols.length) return
+    rowLinesFrom = work.from
+    rowLines = work.lines
+    rowLinesWork = null
+  }
+  FrameAnimation {
+    running: root.rowLinesWork !== null
+    onTriggered: root.workOnRowLines()
+  }
 
   // Read from the view: `symbols` may lag a switch.
-  readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestTrades))
+  readonly property var breadth: Object.assign({ list: view.list }, rowLinesWork ? { up: 0, flat: 0, down: 0, none: 0 }
+    : Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
 
   // ---- The header's words
 
@@ -505,7 +554,7 @@ Item {
   // while search is open.
   readonly property var ownFound: adding ? Search.ownMatches(search.searchText, filling && service ? service.allSymbols : members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
-    var row = quote ? Figures.listRow(quote, 0, changeMode, newestTrades[symbol] || null) : null
+    var row = quote ? Figures.listRow(quote, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
       move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
   }) : []

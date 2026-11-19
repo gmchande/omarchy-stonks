@@ -233,6 +233,15 @@ function fractionAtTime(quote, t) {
   return axisFraction(axis, t)
 }
 
+// Where a row's dot sits while scrubbed at `t`: on the line where the price
+// its figures read sits (`Quote.readingAt`), its trade or the close's bell,
+// never between two trades, where the line's slope is no price anyone
+// paid. -1 before the first trade (`Figures.scrubbedLine`).
+function tradeFraction(quote, t) {
+  var at = Quote.readingAt(quote, t).at
+  return at === null ? -1 : fractionAtTime(quote, at)
+}
+
 // Five minutes of room a step, so one crosses the hours that take none, kept
 // on the day and no later than `last`, the last trade.
 function stepTime(quote, t, steps, last) {

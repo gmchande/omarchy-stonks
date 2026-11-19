@@ -34,7 +34,7 @@ BarWidget {
   // As its row shows it (`Figures.listRow`): at night the day's close and
   // move until the new day's first prices arrive, soon after 04:00.
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
-  readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, 0, service.changeMode, newest) : null
+  readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, service.changeMode, newest) : null
   // The pill has no room for the newest price's session and time, nor at
   // night for tonight's price and move; the hover says them.
   readonly property string newestNote: newest
