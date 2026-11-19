@@ -1590,10 +1590,7 @@ Harness {
                 id: hoverWords
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
-                text: pillRow.modelData.open || pillRow.modelData.day === "night"
-                  ? (pillRow.modelData.open ? verticalPill : horizontalPill).children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
-                  : (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
-                  + horizontalPill.warningText
+                text: (pillRow.modelData.open ? verticalPill : horizontalPill).children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
                 color: Commons.Color.tooltip.text
                 font.family: Style.font.family
                 font.pixelSize: Style.font.body

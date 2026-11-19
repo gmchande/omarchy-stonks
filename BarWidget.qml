@@ -261,11 +261,12 @@ BarWidget {
     // Only what the pill can't say: the icon form's symbol and change, that
     // the stacked form's move counts from the open, a newest price's session
     // and time ("Overnight 23:25"), at night with whose move the pill shows
-    // and tonight's price and move, and what a "!" means. None while the
-    // panel is open: the bubble would land on its header.
+    // and tonight's price and move, what a "!" means, and that a right-click
+    // opens the window. None while the panel is open: the bubble would land
+    // on its header.
     tooltipText: root.opened ? ""
-      : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.newestNote, root.warningText]
-        .filter(function(part) { return part !== "" }).join(" · ")
+      : [[root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.newestNote, root.warningText]
+        .filter(function(part) { return part !== "" }).join(" · "), "Right-click opens the window"].filter(function(part) { return part !== "" }).join("\n")
 
     onPressed: function(b) {
       if (b === Qt.RightButton) { if (root.plugin) root.plugin.windowHost.toggle() }
