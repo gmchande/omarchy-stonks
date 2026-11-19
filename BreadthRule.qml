@@ -8,7 +8,7 @@ import "Motion.js" as Motion
 // The rule between the list's name and its order, drawn as the list's
 // breadth: rows up in the up colour from the left, rows down in the down
 // colour from the right, as a list sorted by the day's move reads from the
-// top. Hover says the counts.
+// top. Hover says the counts, where they fit in the rule's length.
 Item {
   id: root
 
@@ -23,7 +23,7 @@ Item {
     if (breadth.down) parts.push(breadth.down + " DOWN")
     return parts.join(" · ")
   }
-  readonly property bool revealed: hover.hovered && counts !== ""
+  readonly property bool revealed: hover.hovered && counts !== "" && countsText.implicitWidth <= width
   // At 1 px the colours don't read. The info lines' rules share its ink and
   // grain (`Cells.RULE_*`).
   readonly property int thickness: Cells.RULE_THICKNESS
@@ -142,6 +142,7 @@ Item {
   }
 
   Text {
+    id: countsText
     anchors.centerIn: parent
     opacity: root.revealed ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }

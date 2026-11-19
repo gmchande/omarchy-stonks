@@ -88,7 +88,7 @@ every_state() (
   for control in range list orderword orderarrow unit manualorder look help footer done symbol search remove; do
     states="$states popup-controls-$control-hover-smooth popup-controls-$control-press-smooth"
   done
-  states="$states popup-controls-deadmove-hover-smooth popup-controls-livemove-hover-smooth popup-controls-breadth-hover-smooth"
+  states="$states popup-controls-deadmove-hover-smooth popup-controls-livemove-hover-smooth popup-controls-breadth-hover-smooth popup-controls-breadthlong-hover-smooth"
   # Retro's chart under the pointer, on its last lit column.
   states="$states window-controls-chart-hover-retro"
   # The list menu over the cursor's row in both looks on both surfaces: its

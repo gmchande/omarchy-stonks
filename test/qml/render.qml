@@ -1747,6 +1747,12 @@ Harness {
         {name: "Watching", label: "Watching", count: 2, symbols: all.slice(0, 2)},
         {name: "Growth", label: "Growth", count: 1, symbols: all.slice(2, 3)}]
       stub.order = "pct"
+      // breadthlong: the counts beside a list name long enough to leave
+      // them no room, on a list of every row, so the panel keeps its height.
+      if (control === "breadthlong") {
+        stub.lists = stub.lists.concat([{name: "Semiconductors & AI infrastructure", label: "Semiconductors & AI infrastructure", count: all.length, symbols: all}])
+        stub.listName = "Semiconductors & AI infrastructure"
+      }
       waitForRendering(body)
       var target = null
       if (control === "range") target = root.findAll(one("rangeRow"), "rangeToken")[1]
@@ -1758,7 +1764,7 @@ Harness {
       else if (control === "look") target = one("lookIcon")
       else if (control === "help") target = one("helpMark")
       else if (control === "footer") target = one("footerText")
-      else if (control === "breadth") target = one("breadthRule")
+      else if (control === "breadth" || control === "breadthlong") target = one("breadthRule")
       else if (control === "remove") {
         body.watchlist.cursorSymbol = stub.shown[1]
         waitForRendering(body)
