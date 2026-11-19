@@ -1332,11 +1332,11 @@ Harness {
           downColor: stub.downColor
           fontFamily: stub.fontFamily
           surfaceOpen: true
-          // The animal held still: its fidget is motion.
-          screenOn: false
-          // So are the live mark's blink and ripple, six seconds from the
-          // end of the draw-in: held, the mark is drawn as it rests.
+          // The animal held still, since its fidget is motion, and so are
+          // the live mark's blink and ripple, six seconds from the end of
+          // the draw-in: held, the mark is drawn as it rests.
           Component.onCompleted: {
+            root.find(body, "animal").seen = false
             var charts = root.find(body, "heroChart").children
             for (var i = 0; i < charts.length; i++) if (charts[i].still !== undefined) charts[i].still = true
           }

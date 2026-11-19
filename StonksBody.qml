@@ -54,9 +54,6 @@ Item {
   // for the key sheet or a view.
   property int rowsRoom: 0
 
-  // False holds the animal's fidget still.
-  property bool screenOn: true
-
   property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   property color upColor: Commons.Color.foreground
@@ -1146,7 +1143,7 @@ Item {
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
     animal: root.animal
-    seen: root.seen && root.screenOn
+    seen: root.seen
     scrubbing: root.scrubT !== 0
     live: root.heroLive
     trouble: !!root.troubleForms
