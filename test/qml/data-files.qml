@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import "Settings.js" as Settings
 
 // Makes a release's data file through the real Service (data-files.sh
@@ -68,7 +69,7 @@ Harness {
       service.persist({ sounds: harness.made.sounds, updateCheck: harness.made.updateCheck })
       var text = ""
       var saved = within(5000, function() {
-        text = harness.readFile(service.listsPath)
+        text = harness.readFile(Quickshell.env("HOME") + "/" + Settings.listsFile("grvc.stonks"))
         try { return Settings.settingsEqual(JSON.parse(text), service.fileSettings) } catch (e) { return false }
       })
       harness.check("the Service saved what was made", saved

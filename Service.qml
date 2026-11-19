@@ -468,7 +468,6 @@ Item {
   // Bindings, not aliases: an alias reads nothing until the file's own
   // bindings have run, and the view is worked out before that.
   readonly property var fileSettings: listsFile.fileSettings
-  readonly property string listsPath: listsFile.path
   readonly property bool ready: listsFile.ready
   readonly property bool listsUnreadable: listsFile.unreadable
   readonly property bool editsUnsaved: listsFile.editsUnsaved
