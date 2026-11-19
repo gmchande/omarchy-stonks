@@ -14,6 +14,10 @@ Item {
 
   readonly property int columns: shape ? shape.columns : 0
   readonly property int rows: shape ? shape.rows : 0
+  // A stroke's round end can reach a pixel past the grid, as the speaker's
+  // outer arc does. The canvas reaches past it by as much, so no end is cut
+  // flat, and the icon keeps its place and size.
+  readonly property int bleed: Math.ceil(cell / 3)
 
   implicitWidth: columns * cell - 1
   implicitHeight: rows * cell - 1
@@ -25,6 +29,7 @@ Item {
   Canvas {
     id: pen
     anchors.fill: parent
+    anchors.margins: -root.bleed
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
     onPaint: {
@@ -32,6 +37,7 @@ Item {
       ctx.reset()
       if (!root.shape) return
       var s = root.cell / 3
+      ctx.translate(root.bleed, root.bleed)
       ctx.scale(s, s)
       ctx.lineWidth = 1.5
       ctx.lineCap = "round"
