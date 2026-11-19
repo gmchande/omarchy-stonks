@@ -422,13 +422,14 @@ for state in $states; do
   # picture this run wrote counts. It is judged in this run's own folder,
   # where no other run's picture can stand in for it, then moved to $out.
   rm -f "$dest"
-  # A sweep of a saved moment's folder (render.qml): the answers it holds,
-  # each by its file's name, since QML can't list a folder.
+  # A sweep of a saved moment's folder (render.qml): its listings' chart
+  # answers, each by its file's name, since QML can't list a folder. Not
+  # Robinhood's answers, nor Yahoo's spark, which holds several listings.
   saved=""
   if [[ $state =~ sweep-([a-z]+-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4})- ]]; then
     for answer in "$STONKS_FIXTURES/moments/${BASH_REMATCH[1]}"/*.json; do
       name=${answer##*/}
-      [[ -e $answer && $name != robinhood-* ]] && saved="$saved ${name%.json}"
+      [[ -e $answer && $name != robinhood-* && $name != spark.json ]] && saved="$saved ${name%.json}"
     done
   fi
   # The stand-ins in bin/ first on PATH: the shell asks hyprctl for the
