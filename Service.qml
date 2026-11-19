@@ -754,7 +754,11 @@ Item {
     if (!asks || !root.screensClear()) return
     // The pill's own ask waits for a request already out.
     if (!open && (allDayFeed.busy || overnightFeed.busy)) return
+    // After a pause one request goes alone. While it is out, the other ask
+    // waits for its answer rather than fail unasked and wait five minutes.
+    if (robinhoodGate.loneOut) return
     allDayFeed.fetch(asks.tradability, root.now)
+    if (robinhoodGate.loneOut) return
     overnightFeed.fetch(asks.trades, root.now)
   }
   function overnightWanted() {

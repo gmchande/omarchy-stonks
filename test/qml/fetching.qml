@@ -781,6 +781,21 @@ Harness {
       harness.check("the bell keeps quiet once every screen goes off before Do Not Disturb and the microphone answer, and rings with a screen on",
         dark && atClose === 0 && rang, "screens off " + dark + ", bells at the close " + atClose + ", at the open " + (bells() - openFrom))
 
+      // Sunday night, Robinhood gone as the day's check of which stocks
+      // trade all day falls due, so both asks fail together: once it answers
+      // again, the "!" goes at the next try, not five minutes after it.
+      service.feature("NEST")
+      touch("ROBINHOOD.offline")
+      startAt(at(harness.wed7 + 4 * 86400, 21, 0))()
+      var goneMarked = false
+      tick(600, 5, function() { goneMarked = goneMarked || pill.warns })
+      remove("ROBINHOOD.offline")
+      var backAt = service.now, backClearedAt = 0
+      tick(900, 5, function() { if (!backClearedAt && !pill.warns) backClearedAt = service.now })
+      harness.check("Robinhood gone as its daily check falls due: once it answers again, the \"!\" goes at the next try",
+        goneMarked && backClearedAt > 0 && backClearedAt - backAt <= 5 * 60 + 60,
+        [goneMarked, backClearedAt - backAt].join(" | "))
+
       harness.finish()
     }
   }
