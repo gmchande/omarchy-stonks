@@ -216,7 +216,8 @@ Item {
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
     text: Format.lookSigns(root.lines.move, root.look.retro)
-    color: root.toneColor(root.view ? root.view.tone : "flat")
+    // An old night's move dims with its price.
+    color: root.newestOld ? root.look.dim : root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.display
     font.bold: true
