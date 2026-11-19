@@ -322,10 +322,37 @@ Item {
   // The rows follow a scrub of the day, each reading its own line
   // (`Figures.listRow`).
   readonly property int watchlistScrubShown: historyActive ? 0 : scrubShown
-  // Every row's line, worked out as the rows start following a scrub and
-  // when an answer lands during one, never at each step.
   readonly property bool rowsScrubbed: watchlistScrubShown !== 0
-  readonly property var rowLines: rowsScrubbed ? Chart.lineDays(view.rows, quotes, nights, allDay, calendars, dayClock) : null
+  // Every row's line while the rows follow a scrub, so the breadth reads
+  // what each row reads, never worked out at a step. Each is worked out
+  // again only when what it is drawn from changes, as the newest prices are
+  // (`Service.newestFrom`): a later scrub, or an answer during one, builds
+  // only the lines that changed.
+  property var rowLines: null
+  property var rowLinesFrom: ({})
+  function workOutRowLines() {
+    if (!rowsScrubbed) {
+      rowLines = null
+      return
+    }
+    var from = {}
+    var lines = {}
+    view.rows.forEach(function(symbol) {
+      var quote = quotes[symbol]
+      if (!quote) return
+      var had = rowLinesFrom[symbol]
+      from[symbol] = had && had.quote === quote && had.night === nights[symbol] && had.trades === allDay[symbol]
+        && had.calendars === calendars && had.dayClock === dayClock ? had
+        : { quote: quote, night: nights[symbol], trades: allDay[symbol], calendars: calendars, dayClock: dayClock,
+          line: Chart.lineDay(symbol, quote, nights, allDay, calendars, dayClock) }
+      if (from[symbol].line) lines[symbol] = from[symbol].line
+    })
+    rowLinesFrom = from
+    rowLines = lines
+  }
+  // What the lines are drawn from, while the rows follow a scrub.
+  readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, allDay, calendars, dayClock] : null
+  onRowLinesAskChanged: workOutRowLines()
 
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },

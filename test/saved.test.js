@@ -2390,16 +2390,36 @@ test("in every phase, a stock that has traded since its close shows that newest 
     "JNJ \u22121.42%", "PSIX \u22123.14%"])
   const monday = topsAt("watch-2026-10-26-2005")
   expect(M.listBreadth(["NBIS"], monday.quotes, null, 0, "pct", monday.newest)).toEqual({ up: 0, flat: 0, down: 1, none: 0 })
-  // At rest, and scrubbed to Sunday 22:00 or Monday noon, where each row
-  // reads its own line.
-  for (const [moment, t] of [[sunday, at("2026-10-25", "22:00")], [monday, at("2026-10-26", "12:00")]]) {
-    const lines = M.lineDays(moment.symbols, moment.quotes, moment.nights, moment.allDay, calendars, moment.now)
+  // At rest, and scrubbed: Sunday 22:00 and Monday noon; Monday 18:55 seen
+  // at 04:05 the next day, where SPY's last trade before it is above
+  // Friday's close and its next below; and Friday's open seen at 04:05 on
+  // Monday, before Toyota's line, Monday in Tokyo, has a trade. A row
+  // scrubbed reads its own line, its dot on the trade it reads, on the side
+  // of the dashed line its move says; before its line's first trade it has
+  // no dot and rests. The count reads the rows.
+  const scrubs = [[sunday, at("2026-10-25", "22:00")], [monday, at("2026-10-26", "12:00")],
+    [topsAt("watch-2026-10-27-0405"), at("2026-10-26", "18:55")], [topsAt("watch-2026-10-26-0405"), at("2026-10-23", "09:30")]]
+  for (const [moment, t] of scrubs) {
+    const lines = Object.fromEntries(moment.symbols.map(s => [s, M.lineDay(s, moment.quotes[s], moment.nights, moment.allDay, calendars, moment.now)]))
     for (const scrubT of [0, t]) {
-      const tones = moment.symbols.map(s => M.listRow(moment.quotes[s], "pct", moment.newest[s] || null, lines[s], scrubT).tone)
+      const rows = moment.symbols.map(s => M.listRow(moment.quotes[s], "pct", moment.newest[s] || null, lines[s], scrubT))
       const breadth = M.listBreadth(moment.symbols, moment.quotes, lines, scrubT, "pct", moment.newest)
-      expect([scrubT, breadth.up, breadth.down]).toEqual([scrubT, tones.filter(t => t === "up").length, tones.filter(t => t === "down").length])
+      expect([scrubT, breadth.up, breadth.down]).toEqual([scrubT, rows.filter(r => r.tone === "up").length, rows.filter(r => r.tone === "down").length])
+    }
+    for (const s of moment.symbols) {
+      const line = lines[s]
+      const row = M.listRow(moment.quotes[s], "pct", moment.newest[s] || null, line, t)
+      const x = line ? M.tradeFraction(line, t) : -1
+      if (x < 0) {
+        expect([t, s, row]).toEqual([t, s, M.listRow(moment.quotes[s], "pct", moment.newest[s] || null)])
+        continue
+      }
+      const geometry = M.chartGeometry(line, calendars)
+      const y = M.yAt(geometry.points, x), base = M.baseAt(geometry, x)
+      expect([t, s, row.tone]).toEqual([t, s, y < base ? "up" : y > base ? "down" : row.tone])
     }
   }
+  expect(scrubs[3][0].symbols.includes("7203.T") && M.tradeFraction(M.lineDay("7203.T", scrubs[3][0].quotes["7203.T"], {}, {}, calendars, scrubs[3][0].now), scrubs[3][1])).toBe(-1)
   // Monday 04:20 JNJ's pre-market price, up on Friday's close though Friday fell, counts up.
   const early = topsAt("watch-2026-10-26-0420")
   expect(M.listBreadth(["JNJ"], early.quotes, null, 0, "pct", early.newest)).toEqual({ up: 1, flat: 0, down: 0, none: 0 })

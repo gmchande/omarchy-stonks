@@ -185,7 +185,7 @@ function listBreadth(symbols, quotes, lines, scrubT, mode, newest) {
   var out = { up: 0, flat: 0, down: 0, none: 0 }
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
-    var line = scrubT && lines ? lines[symbols[i]] || null : null
+    var line = lines ? scrubbedLine(lines[symbols[i]] || null, scrubT) : null
     var trade = newest ? newest[symbols[i]] || null : null
     var read = !quote ? null : line ? reading(line, scrubT, trade) : reading(quote, 0, Overnight.restingNewest(trade))
     var chg = read ? Quote.change(read.base, read.price, mode, quote.priceDigits) : null
@@ -199,10 +199,18 @@ function listBreadth(symbols, quotes, lines, scrubT, mode, newest) {
 // traded, the day's close and move until 04:00, as the panel's line under
 // the price says them (`closeLine`), while the panel's price on top is
 // tonight's. Scrubbed at `scrubT`, a row reads its own line, `line`, the
-// day it draws (`Chart.lineDay`), where its dot sits, as the panel reads
-// the stock's chart; one whose line isn't drawn yet has no dot, and rests.
+// day it draws (`Chart.lineDay`), as the panel reads the stock's chart
+// (`scrubbedLine`).
 function listRow(quote, mode, newest, line, scrubT) {
-  return scrubT && line ? rowModel(line, scrubT, mode, newest) : rowModel(quote, 0, mode, Overnight.restingNewest(newest))
+  var scrubbed = scrubbedLine(line, scrubT)
+  return scrubbed ? rowModel(scrubbed, scrubT, mode, newest) : rowModel(quote, 0, mode, Overnight.restingNewest(newest))
+}
+
+// The line a row reads a scrub at `t` from: its own, once it has a trade at
+// or before `t`, the one its dot sits on (`Chart.tradeFraction`). Before
+// its first trade, or with no line drawn yet, the row has no dot, and rests.
+function scrubbedLine(line, t) {
+  return t && line && line.points.length && line.points[0].t <= t ? line : null
 }
 
 function reading(quote, scrubT, newest) {

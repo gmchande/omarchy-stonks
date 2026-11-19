@@ -83,18 +83,6 @@ function lineDay(symbol, quote, nights, allDay, calendars, dayClock) {
   return drawn.waiting ? null : drawn.day
 }
 
-// Each of `symbols`' lines (`lineDay`), the rows' while they follow a scrub,
-// so the breadth reads what each row reads (`Figures.listBreadth`).
-function lineDays(symbols, quotes, nights, allDay, calendars, dayClock) {
-  var out = {}
-  for (var i = 0; i < symbols.length; i++) {
-    var quote = quotes[symbols[i]]
-    var day = quote ? lineDay(symbols[i], quote, nights, allDay, calendars, dayClock) : null
-    if (day) out[symbols[i]] = day
-  }
-  return out
-}
-
 // Measured from the dashed line of the day each chart draws. While that day
 // waits on Robinhood, Yahoo's own trades make it. Until the next open that
 // is the day that closed, as the chart will draw it, with its after hours
@@ -251,6 +239,23 @@ function fractionAtTime(quote, t) {
   var axis = chartSpan(quote)
   if (t < axis.start || t > axis.end) return -1
   return axisFraction(axis, t)
+}
+
+// Where a row's dot sits while scrubbed at `t`: on the trade its figures
+// read, the last at or before `t` (`Figures.scrubbedLine`), never between
+// two trades, where the line's slope is no price anyone paid. -1 before the
+// first.
+function tradeFraction(quote, t) {
+  var pts = quote.points
+  if (!pts.length || t < pts[0].t) return -1
+  var k = 0
+  var top = pts.length - 1
+  while (k < top) {
+    var mid = (k + top + 1) >> 1
+    if (pts[mid].t <= t) k = mid
+    else top = mid - 1
+  }
+  return fractionAtTime(quote, pts[k].t)
 }
 
 // Five minutes of room a step, so one crosses the hours that take none, kept

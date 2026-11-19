@@ -708,7 +708,7 @@ Flickable {
         removable: symbol === root.cursorRow && symbol === root.cursorSymbol && symbol !== root.scrolledUnder
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
-        scrubX: day && sightScrub ? Chart.fractionAtTime(day, sightScrub) : -1
+        scrubX: day && sightScrub ? Chart.tradeFraction(day, sightScrub) : -1
         onFeatureRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.featureRequested(symbol) }
         onMenuRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.menuRequested(symbol, x, y) }
         onRemovePressed: function(x, y, second) { root.removeArmed = root.clickCounts(x, y, second) ? symbol : "" }
