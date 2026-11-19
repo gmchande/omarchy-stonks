@@ -119,9 +119,9 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 //
 // Once tonight has traded (`Day.nightBell`), the day holds two closes, and
 // the one dashed line is the one the number beside the chart counts from:
-// the panel's, the close just gone, so the day before the bell draws grey;
-// a row's or the pill's while it keeps the day's move (`dayMove`), the
-// close before the day, so what traded since the bell draws grey: `grey`.
+// the panel's, the close just gone, so the day before the bell is set
+// aside; a row's or the pill's while it keeps the day's move (`dayMove`),
+// the close before the day, so what traded since the bell is: `aside`.
 // The scale holds both closes, so nothing moves when one look turns into
 // the other.
 function chartGeometry(quote, calendars, dayMove) {
@@ -175,7 +175,7 @@ function chartGeometry(quote, calendars, dayMove) {
   return {
     points: out,
     baselineY: known ? 1 - (base - lo) / (hi - lo) : null,
-    grey: !stepped ? null : dayMove ? { from: bellX, to: 1 } : { from: 0, to: bellX },
+    aside: !stepped ? null : dayMove ? { from: bellX, to: 1 } : { from: 0, to: bellX },
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true
@@ -195,10 +195,10 @@ function hasBaseline(geometry) {
 }
 
 // Whether `x` is in the stretch the number beside the chart doesn't count
-// (`chartGeometry`'s `grey`).
-function greyAt(geometry, x) {
-  var grey = geometry.grey
-  return !!grey && x >= grey.from && (x < grey.to || grey.to >= 1)
+// (`chartGeometry`'s `aside`).
+function asideAt(geometry, x) {
+  var aside = geometry.aside
+  return !!aside && x >= aside.from && (x < aside.to || aside.to >= 1)
 }
 
 // Without the drawing: a scrub step asks it of every row. A quote with the
@@ -263,8 +263,8 @@ function stepTime(quote, t, steps, last) {
 // Retro's cells for a chart `width` by `height`, of `pixel` cells `gap`
 // apart: each column's level, whether it is dim, which side of the close
 // it is on (`above`), the last column lit, the baseline's row, and the
-// columns from `greyFrom` to before `greyTo`, which draw grey
-// (`chartGeometry`'s `grey`). The last trade in a column wins: the price at
+// columns from `asideFrom` to before `asideTo`, which draw aside
+// (`chartGeometry`'s `aside`). The last trade in a column wins: the price at
 // the end of that stretch. A range's start (`rangeStart`) keeps the first
 // column to itself, so the column the line starts from is always there
 // (`ownStart`, `retroColumn`). A column between two trades the line joins
@@ -277,13 +277,13 @@ function stepTime(quote, t, steps, last) {
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, greyFrom: columns, greyTo: columns, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
-  var grey = geometry.grey
-  if (grey) {
-    g.greyFrom = Math.floor(grey.from * columns)
-    g.greyTo = grey.to >= 1 ? columns : Math.floor(grey.to * columns)
+  var aside = geometry.aside
+  if (aside) {
+    g.asideFrom = Math.floor(aside.from * columns)
+    g.asideTo = aside.to >= 1 ? columns : Math.floor(aside.to * columns)
   }
   var pts = geometry.points
   g.ownStart = pts.length > 1 && columns > 1 && !!pts[0].rangeStart

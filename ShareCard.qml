@@ -291,7 +291,6 @@ Rectangle {
       upColor: root.upColor
       downColor: root.downColor
       baselineColor: root.look.dimmer
-      greyColor: root.look.dim
       hairlineColor: root.foreground
       ground: root.ground
       scrubX: root.scrubX
@@ -309,7 +308,6 @@ Rectangle {
       upColor: root.upColor
       downColor: root.downColor
       baselineColor: root.look.dimmer
-      greyColor: root.look.dim
       hairlineColor: root.foreground
       ghostColor: root.look.ghost
       ground: root.ground

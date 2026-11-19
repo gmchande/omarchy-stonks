@@ -144,13 +144,13 @@ Rectangle {
   // or another symbol's quote.
   property var day: null
   // Whether the row keeps the day's move (`Overnight.keepsDay`), so its line
-  // greys tonight.
+  // draws tonight faint.
   property bool keepsDay: false
   readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars, keepsDay) : null
   // The line's grey, as the name's dim reads on the row's own ground, the
   // selected row's fill too. A line with no grey keeps one colour, so a hover
   // repaints none.
-  readonly property color lineGrey: geometry && geometry.grey ? Tones.dim(look.foreground, Qt.tint(look.ground, fill)) : look.dim
+  readonly property color lineGrey: geometry && geometry.aside ? Tones.dim(look.foreground, Qt.tint(look.ground, fill)) : look.dim
 
   readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
   property var freshness: null
@@ -224,6 +224,7 @@ Rectangle {
       upColor: row.look.upColor
       downColor: row.look.downColor
       baselineColor: row.look.dimmer
+      greyAside: true
       greyColor: row.lineGrey
       hairlineColor: row.look.foreground
       ground: Qt.tint(row.look.ground, row.fill)

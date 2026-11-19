@@ -310,6 +310,7 @@ BarWidget {
         upColor: root.trendColor
         downColor: root.trendColor
         baselineColor: Util.alpha(button.foreground, 0.25)
+        greyAside: true
         greyColor: root.dimColor
         pixel: 2
         gap: 1

@@ -5,7 +5,8 @@ import "Tones.js" as Tones
 // A row's day line. With a known direction it takes the hero's rule, the up
 // colour above the dashed baseline and the down colour below; without one,
 // as on a row still loading, one colour. Once tonight has traded, what the
-// number beside it doesn't count takes the grey ink (`geometry.grey`). The
+// number beside it doesn't count (`geometry.aside`) keeps that rule in a
+// thinner, fainter line, or with one colour, takes `greyColor`. The
 // draw-in clips the line, not the baseline, in the one canvas, so a row
 // costs no layer more; the scrub's dot has its own layer, so a scrub never
 // repaints the line.
@@ -14,8 +15,12 @@ Item {
 
   property var geometry: null
   property color lineColor: Tones.dim(Commons.Color.foreground, Commons.Color.background)
-  // What the number beside the line doesn't count (`geometry.grey`).
+  // What the number beside the line doesn't count, in a line of one colour.
   property color greyColor: lineColor
+  // And in a split line: thinner and fainter, so it reads as context beside
+  // the day the number counts.
+  readonly property real asideAlpha: 0.5
+  readonly property real asideWidth: 0.75
   property var up: null
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
@@ -45,9 +50,10 @@ Item {
 
   // A dot's ink at `x`, `y` pixels down: the line's there.
   function inkAt(x, y) {
-    if (Chart.greyAt(geometry, x)) return greyColor
-    if (!split || !hasBaseline) return lineColor
-    return y <= pad + geometry.baselineY * (height - pad * 2) ? upColor : downColor
+    var aside = Chart.asideAt(geometry, x)
+    if (!split || !hasBaseline) return aside ? greyColor : lineColor
+    var c = y <= pad + geometry.baselineY * (height - pad * 2) ? upColor : downColor
+    return aside ? Qt.rgba(c.r, c.g, c.b, asideAlpha) : c
   }
 
   Canvas {
@@ -67,11 +73,11 @@ Item {
 
       // With no line under it, the line takes its own ink (`by` null).
       var by = root.hasBaseline ? pad + root.geometry.baselineY * h : null
-      var grey = root.geometry.grey
-      var gx0 = !grey || grey.from <= 0 ? 0 : pad + grey.from * w
-      var gx1 = !grey ? 0 : grey.to >= 1 ? width : pad + grey.to * w
-      var parts = !grey ? [{ from: 0, to: width, grey: false }]
-        : [{ from: 0, to: gx0, grey: false }, { from: gx0, to: gx1, grey: true }, { from: gx1, to: width, grey: false }]
+      var aside = root.geometry.aside
+      var gx0 = !aside || aside.from <= 0 ? 0 : pad + aside.from * w
+      var gx1 = !aside ? 0 : aside.to >= 1 ? width : pad + aside.to * w
+      var parts = !aside ? [{ from: 0, to: width, aside: false }]
+        : [{ from: 0, to: gx0, aside: false }, { from: gx0, to: gx1, aside: true }, { from: gx1, to: width, aside: false }]
       if (root.hasBaseline) {
         ctx.strokeStyle = root.baselineColor
         ctx.lineWidth = 1
@@ -100,20 +106,23 @@ Item {
       for (var s = 0; s < parts.length; s++) {
         if (parts[s].to <= parts[s].from) continue
         ctx.save()
-        if (grey) {
+        if (aside) {
           ctx.beginPath()
           ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
           ctx.clip()
         }
-        // Two stops at one offset merge, so the second sits a hair below.
-        if (parts[s].grey) ctx.strokeStyle = root.greyColor
-        else if (root.split && by !== null) {
+        var tinted = root.split && by !== null
+        if (parts[s].aside && !tinted) ctx.strokeStyle = root.greyColor
+        else if (tinted) {
+          // Two stops at one offset merge, so the second sits a hair below.
+          var alpha = parts[s].aside ? root.asideAlpha : 1
           var stop = Math.max(0, Math.min(1, by / height))
           var g = ctx.createLinearGradient(0, 0, 0, height)
-          g.addColorStop(stop, root.upColor)
-          g.addColorStop(Math.min(1, stop + 0.0001), root.downColor)
+          g.addColorStop(stop, Qt.rgba(root.upColor.r, root.upColor.g, root.upColor.b, alpha))
+          g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(root.downColor.r, root.downColor.g, root.downColor.b, alpha))
           ctx.strokeStyle = g
         } else ctx.strokeStyle = root.lineColor
+        if (parts[s].aside && tinted) ctx.lineWidth = root.asideWidth
         // A break (`brk`) lifts the pen, as the hero's line does, and a
         // stretch with no trade (`untraded`) holds the trade before it, dotted.
         var held = []

@@ -936,12 +936,12 @@ test("retro draws each column at the price its last trade ended on, holds it acr
   // Columns a trade's price holds across are as dim as that trade.
   expect(grid([point(0, 0, { dim: true }), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([true, true, true, true, true, true])
   expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([false, false, false, false, false, true])
-  // The baseline: a known close's row; none known, the floor. The grey
-  // stretch takes the columns up to the bell's, or from it to the end.
+  // The baseline: a known close's row; none known, the floor. The stretch
+  // set aside takes the columns up to the bell's, or from it to the end.
   expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
-  const before = M.retroGrid({ points: [point(0, 0)], baselineY: 0, grey: { from: 0, to: 0.5 } }, 100, 30, 3, 1)
-  const after = M.retroGrid({ points: [point(0, 0)], baselineY: 0, grey: { from: 0.5, to: 1 } }, 100, 30, 3, 1)
-  expect([before.greyFrom, before.greyTo, after.greyFrom, after.greyTo]).toEqual([0, 12, 12, 25])
+  const before = M.retroGrid({ points: [point(0, 0)], baselineY: 0, aside: { from: 0, to: 0.5 } }, 100, 30, 3, 1)
+  const after = M.retroGrid({ points: [point(0, 0)], baselineY: 0, aside: { from: 0.5, to: 1 } }, 100, 30, 3, 1)
+  expect([before.asideFrom, before.asideTo, after.asideFrom, after.asideTo]).toEqual([0, 12, 12, 25])
   // A column's side is its own price's against the close, and a price at
   // the close is up.
   const sided = M.retroGrid({ points: [point(0, 0.5), point(0.2, 0.52), point(0.6, 0.1), point(0.8, 0.12)], baselineY: 0.1 }, 100, 32, 3, 1)

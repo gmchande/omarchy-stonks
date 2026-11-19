@@ -9,8 +9,8 @@ import "Motion.js" as Motion
 // colour above it and the down colour below, as the retro columns fall. The day
 // adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
 // dot on the newest bright trade. Once tonight has traded, what the number
-// beside the chart doesn't count draws in grey, with no wash
-// (`geometry.grey`). Three layers, so each paints only when what
+// beside the chart doesn't count draws fainter and thinner, with no wash
+// (`geometry.aside`). Three layers, so each paints only when what
 // it draws changes: the baseline, the ink under a clip the draw-in widens, and
 // the scrub.
 Item {
@@ -20,9 +20,9 @@ Item {
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
-  // What the number beside the chart doesn't count (`geometry.grey`): a step
-  // stronger than the baseline's ink, so the two read apart.
-  property color greyColor: Tones.dim(Commons.Color.foreground, ground)
+  // How strongly what the number beside the chart doesn't count
+  // (`geometry.aside`) draws: fainter than the dim hours' 45%.
+  readonly property real asideAlpha: 0.4
   property color hairlineColor: Commons.Color.foreground
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
@@ -76,7 +76,6 @@ Item {
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
   onAboveColorChanged: ink.requestPaint()
-  onGreyColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
   onHairlineColorChanged: marks.requestPaint()
   onScrubXChanged: marks.requestPaint()
@@ -182,19 +181,18 @@ Item {
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
-        // The stretch the number beside the chart doesn't count takes the
-        // grey ink and no wash; the rest takes its colours from the dashed
-        // line, or with none, the line's own ink, and there is no wash.
-        var grey = geometry.grey
-        var gx0 = !grey || grey.from <= 0 ? 0 : pad + grey.from * w
-        var gx1 = !grey ? 0 : grey.to >= 1 ? width : pad + grey.to * w
-        var parts = !grey ? [{ from: 0, to: width, grey: false }]
-          : [{ from: 0, to: gx0, grey: false }, { from: gx0, to: gx1, grey: true }, { from: gx1, to: width, grey: false }]
+        // The stretch the number beside the chart doesn't count
+        // (`geometry.aside`) takes no wash.
+        var aside = geometry.aside
+        var gx0 = !aside || aside.from <= 0 ? 0 : pad + aside.from * w
+        var gx1 = !aside ? 0 : aside.to >= 1 ? width : pad + aside.to * w
+        var parts = !aside ? [{ from: 0, to: width, aside: false }]
+          : [{ from: 0, to: gx0, aside: false }, { from: gx0, to: gx1, aside: true }, { from: gx1, to: width, aside: false }]
         var clipped = parts.length > 1
         var by = root.hasBaseline ? pad + geometry.baselineY * h : null
 
         for (var s = 0; by !== null && s < parts.length; s++) {
-          if (parts[s].grey || parts[s].to <= parts[s].from) continue
+          if (parts[s].aside || parts[s].to <= parts[s].from) continue
           ctx.save()
           if (clipped) {
             ctx.beginPath()
@@ -222,7 +220,11 @@ Item {
         ctx.lineCap = "round"
         ctx.lineWidth = 2 * root.weight
         // The whole series in dim ink, then the bright part over it (`dim`),
-        // so the rest reads as the quieter part of one line.
+        // so the rest reads as the quieter part of one line. The stretch the
+        // number beside the chart doesn't count keeps the sides' colours,
+        // fainter than the dim ink and half as thick, so it reads apart from
+        // tonight's dim hours on a dark ground, where a fainter shade alone
+        // runs into them.
         for (var p = 0; p < parts.length; p++) {
           if (parts[p].to <= parts[p].from) continue
           ctx.save()
@@ -231,10 +233,16 @@ Item {
             ctx.rect(parts[p].from, 0, parts[p].to - parts[p].from, height)
             ctx.clip()
           }
-          ctx.strokeStyle = parts[p].grey ? Util.alpha(root.greyColor, 0.45) : sides(ctx, by, 0.45, 0.45)
-          strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-          ctx.strokeStyle = parts[p].grey ? root.greyColor : sides(ctx, by, 1, 1)
-          strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
+          if (parts[p].aside) {
+            ctx.lineWidth = root.weight
+            ctx.strokeStyle = sides(ctx, by, root.asideAlpha, root.asideAlpha)
+            strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
+          } else {
+            ctx.strokeStyle = sides(ctx, by, 0.45, 0.45)
+            strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
+            ctx.strokeStyle = sides(ctx, by, 1, 1)
+            strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
+          }
           ctx.restore()
         }
 

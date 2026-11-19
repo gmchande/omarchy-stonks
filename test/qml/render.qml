@@ -58,8 +58,8 @@ Harness {
   readonly property string requested: {
     var state = asked.replace(/^(quiet-)?(lit-)?/, "")
     if (shareOf) state = "popup-" + state.slice(state.indexOf("-of-") + 4)
-    // A sweep in a light theme: the theme is render.sh's.
-    if (state.indexOf("popup-sweep-") === 0) state = state.replace(/-(catppuccin-latte|white)$/, "")
+    // A sweep in another theme: the theme is render.sh's.
+    if (state.indexOf("popup-sweep-") === 0) state = state.replace(/-(catppuccin-latte|white|kanagawa)$/, "")
     return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-size-\d+$/, "")
   }
   // A -size-N state's text scale, as Style.fontScale has it; 1 for the rest.

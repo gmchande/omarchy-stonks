@@ -11,11 +11,10 @@ import "Chart.js" as Chart
 // below, each by its own price's side of the close, as smooth's line is. The
 // day adds dimmer hours, the bell and the night's edges, and the lit last
 // trade. Once tonight has traded, what the number beside the chart doesn't
-// count draws as grey cells alone (`geometry.grey`): a column there would
-// stand on a close that number doesn't count from. The unlit cells paint
-// when the size changes, the baseline and the columns when the data
-// changes; the draw-in widens a clip a whole column at a time, and the
-// ticks and the scrub are cells laid over them.
+// count (`geometry.aside`) draws fainter, its stems every other cell. The
+// unlit cells paint when the size changes, the baseline and the columns
+// when the data changes; the draw-in widens a clip a whole column at a
+// time, and the ticks and the scrub are cells laid over them.
 Item {
   id: root
 
@@ -23,9 +22,17 @@ Item {
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
-  // What the number beside the chart doesn't count (`geometry.grey`): a step
-  // stronger than the baseline's ink, so the two read apart.
+  // What the number beside the chart doesn't count (`geometry.aside`) stands
+  // on the dashed line too, at a fainter share than the dim hours', and with
+  // every other cell of its stems: fainter alone, it runs into tonight's dim
+  // hours on a dark ground. With `greyAside`, as on a row, whose counted day
+  // is already dim, it takes `greyColor`, a step stronger than the
+  // baseline's ink, its caps whole: at a fainter share they'd read as the
+  // baseline's.
+  property bool greyAside: false
   property color greyColor: Tones.dim(Commons.Color.foreground, ground)
+  readonly property real asideShare: greyAside ? 0.45 : 0.4
+  readonly property real asideInk: greyAside ? 1 : asideShare
   property var up: true
   // Lights the last regular trade's cap. Off for small copies, and a range
   // has none: its last bar need not be the headline trade.
@@ -81,6 +88,8 @@ Item {
   readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
   readonly property real aboveStemDim: solid ? 0.45 : Tones.washAlpha(aboveColor, upColor, ground, 0.35 * 0.45, 0.45)
   readonly property real belowStemDim: solid ? 0.45 : Tones.washAlpha(belowColor, upColor, ground, 0.35 * 0.45, 0.45)
+  readonly property real aboveStemAside: Tones.washAlpha(greyAside ? greyColor : aboveColor, upColor, ground, 0.35 * asideShare, asideShare)
+  readonly property real belowStemAside: Tones.washAlpha(greyAside ? greyColor : belowColor, upColor, ground, 0.35 * asideShare, asideShare)
 
   onGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()
@@ -95,6 +104,8 @@ Item {
   onBelowStemChanged: ink.requestPaint()
   onAboveStemDimChanged: ink.requestPaint()
   onBelowStemDimChanged: ink.requestPaint()
+  onAboveStemAsideChanged: ink.requestPaint()
+  onBelowStemAsideChanged: ink.requestPaint()
   onGreyColorChanged: ink.requestPaint()
 
   // How far along the columns `x` is: they end short of the chart's width
@@ -187,27 +198,34 @@ Item {
         if (!root.drawable) return
         var g = root.grid
         var pixel = root.pixel
+        var asideInk = root.asideInk
         for (var c = 0; c < g.columns; c++) {
           if (g.levels[c] === undefined) continue
           var baseY = g.baseRow * pixel
           var y = g.levels[c] * pixel
           var above = g.above[c]
-          var grey = c >= g.greyFrom && c < g.greyTo
+          var aside = c >= g.asideFrom && c < g.asideTo
           // With no line under it, a column takes the baseline's ink.
-          var color = grey ? root.greyColor : !root.hasBaseline ? root.baselineColor : above ? root.aboveColor : root.belowColor
-          // The grey cells keep their ink: at the dim share they'd read as
-          // the baseline's.
-          var dim = g.dim[c] && !grey ? 0.45 : 1
+          var color = aside && root.greyAside ? root.greyColor : !root.hasBaseline ? root.baselineColor : above ? root.aboveColor : root.belowColor
+          var dim = aside ? asideInk : g.dim[c] ? 0.45 : 1
           var x = c * g.pitch
           // The stem fills the rows between the baseline's and the cap's, on
           // both sides alike, so equal moves stand equally long and the
-          // baseline's dots show under every column.
+          // baseline's dots show under every column. A `solid` chart has no
+          // fainter stem for the aside, so its caps stand alone there.
           var top = Math.min(y, baseY) + pixel
           var h = Math.abs(y - baseY) - pixel
-          if (h > 0 && !grey) {
-            var stem = g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
+          if (h > 0 && !(aside && root.solid)) {
+            var stem = aside ? (above ? root.aboveStemAside : root.belowStemAside)
+              : g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
-            ctx.fillRect(x, top, pixel, h)
+            if (aside) {
+              // Every other cell from the one on the dashed line, so the
+              // cells line up across columns.
+              var step = y < baseY ? -1 : 1
+              var far = Math.abs(g.levels[c] - g.baseRow)
+              for (var k = 1; k < far; k += 2) ctx.fillRect(x, (g.baseRow + k * step) * pixel, pixel, pixel - root.gap)
+            } else ctx.fillRect(x, top, pixel, h)
           }
           ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, dim)
           ctx.fillRect(x, y, pixel, pixel)

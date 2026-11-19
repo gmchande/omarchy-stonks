@@ -120,18 +120,20 @@ at night, then any US stock's pre-market. The day that closed narrows as
 those hours add up, and hours the market is shut take no room, so a
 weekend or a holiday adds nothing. Those trades belong to the day ahead:
 from the first of them, the move counts from the close just gone, the
-dashed line marks that close, and the day before the bell turns grey,
-since the move doesn't count it. For about ten minutes after the open,
-until the new day has three five-minute bars, the chart keeps the day
-just closed, with the new day's first trades at its end, so a day of one
-or two trades doesn't fill the chart.
+dashed line marks that close, and the day before the bell fades to a
+thinner line, still green above the dashed line and red below, since the
+move doesn't count it. In retro its columns light every other cell. For
+about ten minutes after the open, until the new day has three five-minute
+bars, the chart keeps the day just closed, with the new day's first trades
+at its end, so a day of one or two trades doesn't fill the chart.
 
 For a US stock that Robinhood trades at night, the chart brightens the
 session trading now, such as tonight or the pre-market. The rows, like the
 pill, keep the day's close and move until the pre-market's first prices
-arrive, soon after 04:00, and draw tonight in grey. Where Yahoo has no
-prices for half an hour or more of the pre-market or after hours, the
-chart draws Robinhood's trades there, never in place of Yahoo's.
+arrive, soon after 04:00. Their line draws tonight as a thinner, fainter
+line in the same green and red, or in retro as grey columns. Where Yahoo
+has no prices for half an hour or more of the pre-market or after hours,
+the chart draws Robinhood's trades there, never in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
 while its market trades, or saved from before and not yet refreshed.
