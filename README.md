@@ -448,7 +448,9 @@ Or, when the footer says "Update to …", click it. A terminal opens and
 shows what changes. Say yes, and it updates Stonks and restarts the shell,
 unless Stonks has changes it hasn't saved or can't read your lists file.
 Then, or after an update run anywhere else, the footer says "Updated to … ·
-click to restart the shell". Stonks never updates itself.
+click to restart the shell". Stonks never updates itself. From 1.2.1 or
+earlier, the terminal first stops at a page of the changes: press `q`, then
+say yes.
 
 ## Remove
 
