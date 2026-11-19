@@ -1265,12 +1265,18 @@ Harness {
           var row = body.watchlist.rowItem(held)
           body.openRowMenu(held, named ? row.mapToItem(null, Style.space(60), row.height / 2) : null)
         }
-      } else if (/-(manage|rename|confirm)-/.test(root.stateName)) {
+      } else if (/-(manage|rename|confirm|lift)-/.test(root.stateName)) {
         body.openManageLists()
-        // After the view opens on its first named list.
+        // After the view opens on its first named list. -lift-: the third
+        // named list lifted and carried most of a row up, mid-drag.
         Qt.callLater(function() {
           var manage = child("manageLists")
           if (root.stateName.indexOf("-confirm-") > 0) manage.askDelete(4)
+          if (root.stateName.indexOf("-lift-") > 0) {
+            var at = 3.5 * manage.itemHeight
+            manage.beginDrag(manage.names[3], at)
+            manage.dragTo(at - 0.7 * manage.itemHeight)
+          }
           if (root.stateName.indexOf("-rename-") > 0) {
             manage.startRenaming(2)
             Qt.callLater(function() {
@@ -1847,11 +1853,10 @@ Harness {
         body.watchlist.cursorSymbol = stub.shown[1]
         waitForRendering(body)
         target = root.findAll(body.watchlist.rowItem(stub.shown[1]), "rowRemove")[0]
-      } else if (control === "done" || control === "deadmove" || control === "livemove") {
+      } else if (control === "done") {
         body.openManageLists()
         waitForRendering(body)
-        target = control === "done" ? one("manageDone")
-          : root.findAll(root.findAll(body, "manageRow")[1], control === "deadmove" ? "moveUp" : "moveDown")[0]
+        target = one("manageDone")
       } else if (control === "symbol") {
         body.openSymbolLists(stub.shown[0])
         waitForRendering(body)

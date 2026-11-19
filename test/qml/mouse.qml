@@ -188,6 +188,40 @@ Harness {
         managed && gutterKept && within(1000, function() { return manage.cursor === 0 }), [managed, gutterKept, manage.cursor].join(" "))
       body.closeViews()
 
+      // Held and carried past the list above it, as a stock's row is, with
+      // All first still.
+      var wasList = service.listName
+      // Your own lists, as Manage lists shows them under All.
+      var listNames = function() { return service.lists.filter(function(l) { return l.name !== "" }).map(function(l) { return l.name }).join(",") }
+      var first = listNames()
+      service.createList("Later")
+      service.switchList(wasList)
+      body.openManageLists()
+      manage = at("manageLists")
+      var three = within(1500, function() { return manageRows().length === 3 && harness.inPlace(manageRows()) })
+      var later = manageRows()[2]
+      var lift = later.mapToItem(body, later.width / 4, later.height / 2)
+      var up = manage.itemHeight * 1.2
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y - up / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, lift.y - up, -1, Qt.LeftButton)
+      var lifted = within(1000, function() { return manage.dragName === "Later" })
+      mouseRelease(body, lift.x, lift.y - up)
+      var carried = within(2000, function() { return listNames() === "Later," + first })
+      // Past All, it stops below it.
+      var firstRow = manageRows()[1]
+      lift = firstRow.mapToItem(body, firstRow.width / 4, firstRow.height / 2)
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y - up / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, lift.y - up * 2, -1, Qt.LeftButton)
+      mouseRelease(body, lift.x, lift.y - up * 2)
+      var kept = !within(500, function() { return listNames() !== "Later," + first }) && within(1500, function() { return manage.dragName === "" })
+      harness.check("in Manage lists a list dragged past the one above takes its place, and none goes above All",
+        three && lifted && carried && kept, [three, lifted, carried, kept, listNames()].join(" "))
+      body.closeViews()
+      service.deleteList("Later")
+      service.switchList(wasList)
+
       // By symbol, A to Z, then Z to A: the rows themselves, not the setting.
       var shown = function() { return body.watchlist.displayedSymbols.join(",") }
       var aToZ = service.symbols.slice().sort()

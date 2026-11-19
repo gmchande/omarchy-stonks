@@ -35,6 +35,7 @@ OverRows {
   // By name: the other surface can reorder, rename or delete it meanwhile.
   property string pendingName: ""
   onChoicesChanged: {
+    syncRows()
     if (!renaming && !confirming) return
     var at = choices.map(function(c) { return c.name }).indexOf(pendingName)
     if (at < 0) { stopEditing(); return }
@@ -63,10 +64,12 @@ OverRows {
     reset()
     pointer.rest()
   }
-  // Closed, it gives up its rename field's keys too.
+  // Closed, it gives up its rename field's keys too, and a lifted list
+  // drops where it was.
   onClosed: {
     nameField.focus = false
     scroll.cancelFlick()
+    cancelDrag()
   }
 
   function reset() {
@@ -85,7 +88,7 @@ OverRows {
   }
 
   function pointAt(x, y) {
-    if (renaming || confirming) return
+    if (renaming || confirming || dragName !== "") return
     var at = scroll.mapFromItem(null, x, y)
     // The scrollbar's gutter beside the rows is no row's.
     if (at.x < 0 || at.x >= column.width || at.y < 0 || at.y >= scroll.height) return
@@ -157,6 +160,80 @@ OverRows {
     cursor = to
     moveRequested(choice.name, delta)
     showCursor()
+  }
+
+  // The lists' names, in order, and a row for each by name, kept as lists
+  // come and go, never moved: a row finds its place by its name.
+  readonly property var names: choices.map(function(c) { return c.name })
+  ListModel { id: rowsModel }
+  function syncRows() {
+    var names = root.choices.map(function(c) { return c.name })
+    var have = []
+    for (var i = rowsModel.count - 1; i >= 0; i--) {
+      var name = rowsModel.get(i).name
+      if (names.indexOf(name) < 0) rowsModel.remove(i)
+      else have.push(name)
+    }
+    names.forEach(function(name) { if (have.indexOf(name) < 0) rowsModel.append({ name: name }) })
+  }
+  Component.onCompleted: syncRows()
+
+  // A list dragged by its row, as a stock's row is in your own order
+  // (Watchlist): lifted under the pointer, the others making room, and
+  // dropped in the place it is over. All stays first.
+  property string dragName: ""
+  property real dragY: 0
+  property int dragTarget: -1
+  property real dragOffset: 0
+  // So a lifted list stays under the pointer as the wheel scrolls.
+  property real dragPointer: 0
+
+  function beginDrag(name, y) {
+    var from = names.indexOf(name)
+    if (from < 1) return
+    dropAnim.stop()
+    confirming = false
+    cursor = from
+    dragOffset = y - from * itemHeight
+    dragPointer = y - scroll.contentY
+    dragY = from * itemHeight
+    dragTarget = from
+    dragName = name
+  }
+
+  function dragTo(y) {
+    if (dragName === "") return
+    dragPointer = y - scroll.contentY
+    dragY = Math.max(itemHeight, Math.min((choices.length - 1) * itemHeight, y - dragOffset))
+    dragTarget = Math.max(1, Rows.dragSlot(dragY / itemHeight, dragTarget, choices.length))
+  }
+
+  function endDrag() {
+    var from = names.indexOf(dragName)
+    var to = dragTarget
+    if (from < 1 || to < 1) { cancelDrag(); return }
+    if (from !== to) moveRequested(dragName, to - from)
+    cursor = to
+    dropAnim.to = to * itemHeight
+    dropAnim.start()
+  }
+
+  function cancelDrag() {
+    dropAnim.stop()
+    dragName = ""
+  }
+
+  NumberAnimation {
+    id: dropAnim
+    target: root
+    property: "dragY"
+    duration: Motion.duration(Style, 160)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Motion.curve(Style)
+    onFinished: {
+      root.cancelDrag()
+      root.showCursor()
+    }
   }
 
   function askDelete(index) {
@@ -255,41 +332,107 @@ OverRows {
     interactive: contentHeight > height && !root.renaming
     // `moving` stays false for a key's scroll.
     onContentYChanged: {
+      if (root.dragName !== "" && !dropAnim.running) root.dragTo(root.dragPointer + contentY)
       if (!root.active || !(moving || manageBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
     Controls.ScrollBar.vertical: ViewScrollBar { id: manageBar; scrolls: scroll.interactive }
 
-    Column {
+    // The rows, one per list by name, so a list that moves slides to its
+    // place as a stock's row does.
+    Item {
       id: column
       width: scroll.width - root.gutter
+      implicitHeight: root.rowsHeight
 
       Repeater {
-        // By count: a change to the lists rebinds the rows, not rebuilds them.
-        model: root.choices.length
+        model: rowsModel
 
         Item {
           id: entry
           objectName: "manageRow"
-          required property int index
-          readonly property var choice: root.choices[index]
-          readonly property bool named: choice.name !== ""
+          required property string name
+          readonly property int index: root.names.indexOf(name)
+          readonly property var choice: root.choices[index] || ({ name: name, label: "", count: 0 })
+          readonly property bool named: name !== ""
           readonly property bool isCursor: index === root.cursor
           readonly property bool editing: isCursor && root.renaming
           readonly property bool asking: isCursor && root.confirming
-          readonly property bool showsActions: named && !editing && !asking && isCursor
+          readonly property bool showsActions: named && !editing && !asking && isCursor && !lifted
+          readonly property bool lifted: named && name === root.dragName
           width: column.width
           height: root.itemHeight * (editing && root.problem !== "" ? 2 : 1)
+          visible: index >= 0
 
+          // Where the list sits while another is dragged (`Rows.slotOf`), and
+          // below a rename's problem, a row lower. It slides from one place
+          // to the next, as a stock's row does (WatchlistRow).
+          readonly property int place: Rows.slotOf(root.names, name, root.dragName, root.dragTarget)
+          y: lifted ? root.dragY : place * root.itemHeight + shift
+            + (root.renaming && root.problem !== "" && place > root.cursor ? root.itemHeight : 0)
+          property int lastPlace: -1
+          property real shift: 0
+          onPlaceChanged: {
+            var from = lastPlace
+            lastPlace = place
+            if (lifted || from < 0 || place < 0) { slide.stop(); shift = 0; return }
+            shift += (from - place) * root.itemHeight
+            slide.restart()
+          }
+          Component.onCompleted: lastPlace = place
+          NumberAnimation { id: slide; target: entry; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+          z: lifted ? root.choices.length + 2 : slide.running ? 1 : 0
+
+          // Lifted or sliding, the row lays the card's ground under its fill,
+          // so the rows it passes never show through.
           Rectangle {
             width: parent.width
             height: root.itemHeight
             radius: root.look.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-            border.width: entry.isCursor ? Style.hoverBorderWidth : 0
-            border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
+            visible: entry.lifted || slide.running
+            color: root.look.ground
+          }
+
+          // Lifted, the row wears the resting control border, as a stock's
+          // row does; under the cursor, the shell's cursor outline.
+          Rectangle {
+            width: parent.width
+            height: root.itemHeight
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: entry.lifted ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+              : entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+            border.width: entry.lifted ? 1 : entry.isCursor ? Style.hoverBorderWidth : 0
+            border.color: entry.lifted ? Style.normalBorderFor(root.look.foreground, Commons.Color.accent)
+              : Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
+          }
+
+          // A drag lifts a named list and carries it among the others, as a
+          // stock's row in your own order; All stays first.
+          MouseArea {
+            width: parent.width
+            height: root.itemHeight
+            enabled: entry.named && !root.renaming && !root.confirming
+            preventStealing: true
+            cursorShape: entry.lifted ? Qt.ClosedHandCursor : Qt.ArrowCursor
+            property real pressY: -1
+            property bool dragged: false
+            onPressed: function(event) {
+              pressY = event.y
+              dragged = false
+            }
+            onPositionChanged: function(event) {
+              if (!pressed || pressY < 0) return
+              if (!dragged) {
+                if (Math.abs(event.y - pressY) < 6) return
+                dragged = true
+                root.beginDrag(entry.name, entry.mapToItem(column, event.x, pressY).y)
+              }
+              root.dragTo(entry.mapToItem(column, event.x, event.y).y)
+            }
+            onReleased: if (dragged) root.endDrag()
+            onCanceled: if (dragged) root.cancelDrag()
           }
 
           Text {
@@ -329,25 +472,6 @@ OverRows {
             height: root.itemHeight
             spacing: Style.space(14)
 
-            // An arrow with nowhere to move its list can't act, and is faded.
-            ListAction {
-              look: root.look
-              objectName: "moveUp"
-              anchors.verticalCenter: parent.verticalCenter
-              text: "↑"
-              enabled: entry.index > 1
-              opacity: entry.index > 1 ? 1 : 0.4
-              onActivated: root.move(entry.index, -1)
-            }
-            ListAction {
-              look: root.look
-              objectName: "moveDown"
-              anchors.verticalCenter: parent.verticalCenter
-              text: "↓"
-              enabled: entry.index < root.choices.length - 1
-              opacity: entry.index < root.choices.length - 1 ? 1 : 0.4
-              onActivated: root.move(entry.index, 1)
-            }
             ListAction {
               look: root.look
               anchors.verticalCenter: parent.verticalCenter
