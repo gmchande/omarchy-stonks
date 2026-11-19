@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # A stand-in for dd, first on PATH inside the walks: the real one, but while
-# STONKS_FAKE_STATE/dd.hold exists, what it read waits until that file goes,
-# as a read held up by a busy disk, so a step can land a save while a read
-# is out. It touches STONKS_FAKE_STATE/dd.read once it has read.
+# STONKS_FAKE_STATE/dd.hold exists, what it read from a file waits until that
+# file goes, as a read held up by a busy disk, so a step can land a save while
+# a read is out. It touches STONKS_FAKE_STATE/dd.read once it has read. The dd
+# that caps a request's output reads no file, and passes as it comes.
 real=$(PATH=${PATH#*:} command -v dd)
-[ -e "$STONKS_FAKE_STATE/dd.hold" ] || exec "$real" "$@"
+[ -e "$STONKS_FAKE_STATE/dd.hold" ] && [[ " $* " == *" if="* ]] || exec "$real" "$@"
 read=$(mktemp)
 trap 'rm -f "$read"' EXIT
 trap 'exit 143' TERM
