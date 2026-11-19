@@ -290,7 +290,7 @@ Item {
     function(t) { return Market.tradeClock(featuredQuote, t, calendars) }) : null
   // Said under the price: what a scrub's move counts from, the dashed line
   // under the pointer, or since the open the day's open.
-  readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
+  readonly property string baselineText: historyShown ? History.baselineLegend(history, featuredQuote ? featuredQuote.priceDigits : undefined)
     : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars, changeMode, featuredNewest) : "")
 
   // The moment shown against the baseline; the pill's reads the day.

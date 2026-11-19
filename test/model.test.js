@@ -2097,7 +2097,10 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "a trade in a session Robinhood never sends", call: nest, answer: { results: [result([{ ...trade, session: "__proto__" }])] }, want: 0 },
     { name: "instruments, as sent", call: "M.parseAllDay(json, ['NEST'])", answer: { results: [{ symbol: "NEST", all_day_tradability: "tradable" }] }, want: { NEST: true } },
     { name: "instruments posing", call: "M.parseAllDay(json, ['NEST'])", answer: { results: POSING } },
-    { name: "instruments over budget", call: "M.parseAllDay(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", all_day_tradability: "tradable" })) } }
+    { name: "instruments over budget", call: "M.parseAllDay(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", all_day_tradability: "tradable" })) } },
+    { name: "a listing date, as sent", call: "M.listDates(json, ['NEST'])", answer: { results: [{ symbol: "NEST", list_date: "2026-11-19" }] }, want: { NEST: "2026-11-19" } },
+    { name: "listing dates posing", call: "M.listDates(json, ['NEST'])", answer: { results: POSING }, want: {} },
+    { name: "a listing date posing as a list", call: "M.listDates(json, ['NEST'])", answer: { results: [{ symbol: "NEST", list_date: ["2026-11-19"] }] }, want: {} }
   ]
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)

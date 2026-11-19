@@ -188,6 +188,17 @@ every_state() (
   for moment in sydney-2026-11-03-1755 sydney-2026-11-03-1803 sydney-2026-11-03-1820 sydney-2026-11-03-1830; do
     states="$states popup-sweep-$moment-bhp.ax-smooth popup-sweep-$moment-bhp.ax-retro"
   done
+  # ANT on its first day, Thursday 19 November: at 11:41, before its first
+  # trade, its IPO price on top, named, and nothing that didn't trade; at
+  # 11:52 and 12:43, its move from its IPO price, named; on 1W and All at
+  # 12:17, since its IPO, and 1W scrubbed on the screenshot, the dashed line
+  # its IPO price. The screenshot and the pill before and after.
+  for moment in 1141 1152 1243; do
+    states="$states popup-sweep-ipo-2026-11-19-$moment-ant-smooth popup-sweep-ipo-2026-11-19-$moment-ant-retro"
+  done
+  states="$states popup-sweep-ipo-2026-11-19-1217-ant-1w-smooth popup-sweep-ipo-2026-11-19-1217-ant-all-smooth"
+  states="$states share-of-sweep-ipo-2026-11-19-1141-ant-smooth share-of-sweep-ipo-2026-11-19-1243-ant-smooth pill-sheet-ipo-1141 pill-sheet-ipo-1243"
+  states="$states share-scrub-of-sweep-ipo-2026-11-19-1217-ant-1w-smooth"
   # Sunday 1 November at 21:48, when Friday's line and tonight's stood apart
   # on every chart: each runs on from Friday's last trade to tonight's first,
   # the weekend taking no room; SHOP's Friday ended at 18:35.
@@ -424,13 +435,14 @@ for state in $states; do
   # picture this run wrote counts. It is judged in this run's own folder,
   # where no other run's picture can stand in for it, then moved to $out.
   rm -f "$dest"
-  # A sweep of a saved moment's folder (render.qml): the answers it holds,
-  # each by its file's name, since QML can't list a folder.
+  # A sweep of a saved moment's folder (render.qml): its listings' chart
+  # answers, each by its file's name, since QML can't list a folder. Not
+  # Robinhood's answers, nor Yahoo's spark, which holds several listings.
   saved=""
   if [[ $state =~ sweep-([a-z]+-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4})- ]]; then
     for answer in "$STONKS_FIXTURES/moments/${BASH_REMATCH[1]}"/*.json; do
       name=${answer##*/}
-      [[ -e $answer && $name != robinhood-* ]] && saved="$saved ${name%.json}"
+      [[ -e $answer && $name != robinhood-* && $name != spark.json ]] && saved="$saved ${name%.json}"
     done
   fi
   # The stand-ins in bin/ first on PATH: the shell asks hyprctl for the

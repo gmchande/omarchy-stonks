@@ -51,7 +51,7 @@ function freshness(entry, quote, now, owedSince, inGrace, newest, nightFailed) {
   var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now)
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
-    : !quote || !head ? "unavailable"
+    : !quote || (!head && !quote.untraded) ? "unavailable"
     : nightFailed ? "failed"
     : entry && entry.status === "saved" ? "saved"
     : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
@@ -65,8 +65,10 @@ function freshnessText(fresh, quote, calendars) {
   if (!fresh) return ""
   var head = quote ? Quote.headlineQuote(quote) : null
   if (!fresh.asOf) {
-    if (head) return (fresh.state === "failed" ? "REFRESH FAILED · "
-      : fresh.state === "overdue" ? "NOT UPDATING · " : "") + "TIME UNKNOWN"
+    // A listing yet to trade has no price, and isn't missing one.
+    var unsaid = head ? "TIME UNKNOWN" : quote && quote.untraded ? "NOT TRADED YET" : ""
+    if (unsaid) return (fresh.state === "failed" ? "REFRESH FAILED · "
+      : fresh.state === "overdue" ? "NOT UPDATING · " : "") + unsaid
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
   // Where Yahoo sent no price, what's on top is a trade, not the close, so

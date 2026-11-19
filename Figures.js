@@ -68,6 +68,7 @@ function dayNote(day, now, calendars) {
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades today"
+  if (day.untraded) return "No trades yet"
   var head = Quote.headlineQuote(day)
   var tradedToday = !!head && head.t !== null && head.t >= regular.start
   if (now < regular.start || tradedToday) return ""
@@ -222,7 +223,8 @@ function reading(quote, scrubT, newest) {
 // Every price on screen comes from here. It carries no drawing and reads no
 // clock, so a row isn't derived again every second; `scrubT` comes snapped.
 // `dayUp` counts from the close whatever the mode, so the chart's fill
-// doesn't flip with it.
+// doesn't flip with it. A listing yet to trade shows its IPO price, named
+// as such (`heroLines`), with no move: `price` stays null, as no trade is.
 function rowModel(quote, scrubT, mode, newest) {
   var since = !scrubT && newest ? newest : null
   var read = reading(quote, scrubT, newest || null)
@@ -232,7 +234,7 @@ function rowModel(quote, scrubT, mode, newest) {
     symbol: quote.symbol,
     name: quote.name,
     price: read.price,
-    priceText: Format.money(read.price, quote.priceDigits),
+    priceText: Format.money(quote.untraded ? quote.prevClose : read.price, quote.priceDigits),
     asOf: read.t,
     // The close the day's change counts from, the dashed line's for a scrub.
     close: read.base.prevClose,
@@ -351,9 +353,11 @@ function moveName(quote, newest, from, today) {
 
 // A close named by its day, the trading day before the one `t` falls in:
 // FRI CLOSE within the week, 4 SEP CLOSE beyond, and PREV CLOSE where no
-// calendar can say which day that was. The panel's lines, the scrub's
-// legend and the screenshot all name a close this one way.
+// calendar can say which day that was. On a listing's first day it is the
+// offer price (`Quote.listingDay`). The panel's lines, the scrub's legend and
+// the screenshot all name a close this one way.
 function closeName(quote, t, today, calendars) {
+  if (Quote.listingDay(quote)) return "IPO PRICE"
   var cal = Calendar.calendarFor(calendars, quote)
   var date = Calendar.closeBeforeDate(cal, t)
   return date === null ? "PREV CLOSE" : dayName(quote, Calendar.epochAt(cal, date, "12:00"), today) + " CLOSE"
@@ -397,7 +401,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   var from = closeCountedFrom(quote, view, today, calendars)
   var close = null
   if (!scrubbing && newest) close = closeLine(quote, today, changeMode, view, calendars)
-  else if (!scrubbing) close = extendedStack(quote, latest, now, day, changeMode, calendars) || closeOnly(from)
+  else if (!scrubbing) close = extendedStack(quote, latest, now, day, changeMode, calendars) || closeOnly(from, quote.untraded)
   var whole = !!close && !!newest && newest.closed && !newest.joined
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
@@ -417,8 +421,10 @@ function inMoney(quote, text, unit) {
   return unit === "abs" && quote.currency && quote.instrumentType !== "INDEX" ? text + " " + currencyLabel(quote.currency) : text
 }
 
-function closeOnly(from) {
-  return from ? { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false } : null
+// The close the move counts from, or only its name where the price on top
+// is it (`shown`), as a listing's IPO price before its first trade.
+function closeOnly(from, shown) {
+  return from ? { label: from.label, time: "", price: shown ? "" : from.price, changeText: "", tone: "flat", stale: false } : null
 }
 
 // A price of the session with no close to count from: for minutes after an
@@ -427,6 +433,18 @@ function closeOnly(from) {
 function moveAwaited(quote, view) {
   var reg = quote.session.regular
   return !!reg && !Format.isFiniteNumber(view.close) && Format.isFiniteNumber(view.asOf) && view.asOf >= reg.start
+}
+
+// The pill's hover on a listing's first day: before its first trade, that
+// there is none yet, with the IPO price the pill shows; after it, the IPO
+// price, while the pill's move (`row`, `listRow`) counts from it: not since
+// the open, nor from the close just gone once the next day's pre-market
+// trades.
+function listingNote(quote, row, mode) {
+  if (!Quote.listingDay(quote) || !Format.isFiniteNumber(quote.prevClose)) return ""
+  var price = Format.money(quote.prevClose, quote.priceDigits)
+  if (quote.untraded) return "Not traded yet · IPO price " + price
+  return mode !== "open" && !!row && row.close === quote.prevClose ? "From its IPO price, " + price : ""
 }
 
 var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]

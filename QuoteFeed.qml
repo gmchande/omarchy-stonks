@@ -1,6 +1,7 @@
 import QtQuick
 import "Asks.js" as Asks
 import "Fetch.js" as Fetch
+import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 // Every symbol due goes in one curl run over one connection, and the
 // symbols waiting for their first answer go in a run of their own.
@@ -40,6 +41,15 @@ Item {
   function twoDays(symbol) { return Asks.twoDays(quotes[symbol] || null, stamp(), calendars) }
 
   property var quotes: ({})
+  // Robinhood's all-day check, whose listing dates each quote carries
+  // however it landed (`Overnight.withListDates`).
+  property var allDay: ({})
+  function tagListDates() {
+    var tagged = Overnight.withListDates(quotes, allDay, stamp())
+    if (tagged !== quotes) root.quotes = tagged
+  }
+  onQuotesChanged: tagListDates()
+  onAllDayChanged: tagListDates()
   // Each symbol's last answer, by the service's clock. "saved": a quote kept
   // from an earlier session, until its first answer. receivedAt is the last
   // usable answer, so a failed row keeps its price; answeredAt, any answer.

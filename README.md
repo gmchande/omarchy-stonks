@@ -108,6 +108,12 @@ moves in points, so its amount names none. On a longer range, the move
 counts from the range's start. A coin never closes, so its day is its
 last 24 hours.
 
+On a US stock's first day, the move counts from its IPO price, as Yahoo
+counts it, and the line under the price names it: IPO PRICE 83.00. Every
+range counts from it that day, and says SINCE IPO. Until any new listing
+first trades, the large price is its IPO price, with IPO PRICE under it,
+no move, and nothing in the chart.
+
 The 1D chart starts at the open and runs by the clock to the close, or for
 a US stock to the end of its after hours, 20:00 on most days. The line
 stops at the newest price and the hours still to come stay empty, so the
@@ -310,6 +316,8 @@ again.
   five-minute bar, a few minutes into any market's day.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
+- **"Not traded yet".** A new listing hasn't had its first trade. Its IPO
+  price shows until it does.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't send
   that chart or those results. Click RETRY, or in search reach it with `↓`
   and press `⏎`. After "server busy", RETRY works once Yahoo lets Stonks
@@ -399,12 +407,13 @@ empty.
   once while search is open.
 - `api.robinhood.com` for overnight prices, and for trades that fill a
   stretch Yahoo left empty. It asks once a day which stocks trade
-  overnight, again 5 minutes later if that fails, and once for each stock
-  the pill shows. Through the night it asks every 5 minutes for the pill's
-  stock and, with the panel or the window open, for the stock on show and
-  the rows in sight, with one past each edge. It asks once more on a
-  morning Yahoo has no prices for half an hour or more of the pre-market,
-  and the same for a US stock or ETF you pause on in search.
+  overnight and the day each listed, again 5 minutes later if that fails,
+  and once for each stock the pill shows. Through the night it asks every
+  5 minutes for the pill's stock and, with the panel or the window open,
+  for the stock on show and the rows in sight, with one past each edge. It
+  asks once more on a morning Yahoo has no prices for half an hour or more
+  of the pre-market, and the same for a US stock or ETF you pause on in
+  search.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

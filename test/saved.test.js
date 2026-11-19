@@ -164,7 +164,72 @@ test("a bar with shares traded in it is a trade, never stray", () => {
   expect(toy.droppedTimes).toEqual([close + 900, close + 1200])
 })
 
-test("a young listing's ranges start at its first trade and keep its thin trades, and agree on its high and low", () => {
+test("a young listing shows only what traded: on its first day the IPO price, named, and nothing else before its first trade; its ranges from its first trade", () => {
+  // ANT on Thursday 19 November, its first day: Yahoo sends its 83.00 IPO
+  // price as its price, its close, its day's and its 52 weeks' low and high,
+  // and in a bar at 09:35 with no shares, before its first trade at 11:45.
+  // At 11:41 its IPO price is on top, named, with no move, no open, no low
+  // or high and no bar: not 83.00 "As of 09:37" over "WED CLOSE 83.00 0.00%".
+  const ipo = (hhmm, file) => fixture(`moments/ipo-2026-11-19-${hhmm}/${file}.json`)
+  const listed = (hhmm, listDate) => M.withListDates({ ANT: M.parseChart(ipo(hhmm, "ant"), cents) }, { ANT: { listDate } }, M.epochAt(US, "2026-11-19", "12:00")).ANT
+  const robinhood = M.listDates(ipo("1141", "robinhood-instruments"), ["ANT", "NBIS"])
+  expect(robinhood).toEqual({ ANT: "2026-11-19", NBIS: "2011-05-24" })
+  const lines = (q, hhmm) => M.heroLines(q, M.rowModel(q, 0, "pct"), null, M.epochAt(US, "2026-11-19", hhmm), q, calendars, "pct", false)
+  const before = M.parseChart(ipo("1141", "ant"), cents)
+  expect([before.price, before.dayOpen, before.dayLow, before.dayHigh, before.fiftyTwoWeekLow, before.fiftyTwoWeekHigh, before.points])
+    .toEqual([null, null, null, null, null, null, []])
+  expect([M.rowModel(before, 0, "pct").priceText, M.rowModel(before, 0, "pct").pct]).toEqual(["83.00", null])
+  expect(lines(before, "11:41").close).toMatchObject({ label: "IPO PRICE", price: "" })
+  const fresh = M.freshness({ status: "ok", receivedAt: 0 }, before, M.epochAt(US, "2026-11-19", "11:41"), 0, false, null, false)
+  expect(M.freshnessText(fresh, before, calendars)).toBe("NOT TRADED YET")
+  expect(M.dayNote(before, M.epochAt(US, "2026-11-19", "11:41"), calendars)).toBe("No trades yet")
+  const note = (q, mode, newest) => M.listingNote(q, M.rowModel(q, 0, mode, newest), mode)
+  expect([note(before, "pct"), note(before, "open")]).toEqual(["Not traded yet · IPO price 83.00", "Not traded yet · IPO price 83.00"])
+  // Its ranges then hold the IPO price twice, at the bell and at Yahoo's
+  // live moment, as its day does (here its day's answer stands in for the
+  // range's, from the same endpoint): no 0.00% from it, no 83.00 to 83.00,
+  // but the IPO price on top, named, as on 1D.
+  const early = M.viewChart("ANT", "1W", { ANT: before }, {}, { "ANT|1W": { status: "ok", history: M.parseHistory(ipo("1141", "ant"), "1W", cents) } }, {}, undefined, calendars).history
+  const earlyView = M.historyRowModel(early, before, 0)
+  expect([early.bars, earlyView.priceText, earlyView.pct, earlyView.periodLabel]).toEqual([[], "83.00", null, ""])
+  expect(M.heroLines(before, earlyView, null, M.epochAt(US, "2026-11-19", "11:41"), before, calendars, "pct", false).close)
+    .toMatchObject({ label: "IPO PRICE", price: "" })
+  // At 11:52 its move counts from the IPO price, named as Robinhood's listing
+  // date shows it is: not "WED CLOSE 83.00". Its open is its first trade's,
+  // not the IPO price's bar, and its 52 weeks are Yahoo's, not from 83.00.
+  const after = listed("1152", robinhood.ANT)
+  expect([after.price, after.dayOpen, after.points.some(p => p.p === 83)]).toEqual([108.24, 111.5, false])
+  expect(M.yearLine(after, null, null, null, after.points).range).toMatchObject({ lowText: "107.19", highText: "114.99" })
+  expect(lines(after, "11:52")).toMatchObject({ close: { label: "IPO PRICE", price: "83.00" }, caption: { label: "TODAY" }, move: "+30.41%" })
+  expect([note(after, "pct"), note(after, "open")]).toEqual(["From its IPO price, 83.00", ""])
+  // The next morning's pre-market counts from its first close, so the pill
+  // no longer names the IPO price, though its quote is still that day's.
+  const evening = listed("1314", robinhood.ANT)
+  const friday = { t: M.epochAt(US, "2026-11-20", "04:05"), p: 102, phase: "pre", base: M.regularClose(evening), stepped: true }
+  expect(note(evening, "pct", friday)).toBe("")
+  // A row's spark answer sends no shares: the chart answer's verdict leaves
+  // the IPO price's bar out of its line too.
+  const spark = M.sparkQuote(M.sparkResults(ipo("1152", "spark")).ANT, after.verdict, cents)
+  expect([spark.quote.points.length > 0, spark.quote.points.some(p => p.p === 83)]).toEqual([true, false])
+  // A day that isn't its listing day names its close as any listing's.
+  expect(lines(listed("1152", "2026-11-18"), "11:52").close.label).toBe("WED CLOSE")
+  // A quote stays on its listing day until the next session, a Friday
+  // listing's through the weekend and a Monday holiday: Thursday's, standing
+  // in, still names its IPO price on the Tuesday morning after.
+  const tuesday = M.withListDates({ ANT: M.parseChart(ipo("1152", "ant"), cents) }, { ANT: { listDate: robinhood.ANT } }, M.epochAt(US, "2026-11-24", "08:00")).ANT
+  expect(lines(tuesday, "11:52").close.label).toBe("IPO PRICE")
+  // Its ranges count from the IPO price that day, so say so: SINCE IPO, not
+  // 1W, its start IPO 83.00, and no 83.00 low from the bar at 09:30.
+  const quotes = { ANT: listed("1217", robinhood.ANT) }
+  for (const [file, range] of [["5d", "1W"], ["1mo", "1M"], ["1y", "1Y"], ["max", "All"]]) {
+    const entry = { status: "ok", history: M.parseHistory(fixture(`history/ant-2026-11-19-1217-${file}.json`), range, cents) }
+    const history = M.viewChart("ANT", range, quotes, {}, { [`ANT|${range}`]: entry }, {}, undefined, calendars).history
+    const line = M.rangeLine(history, M.rangeEnds(history, M.periodStats(history), quotes.ANT), quotes.ANT)
+    expect([range, M.historyRowModel(history, quotes.ANT, 0).periodLabel, line.facts[0], history.bars.some(b => b.l === 83)])
+      .toMatchObject([range, "SINCE IPO", { label: "IPO", value: "83.00" }, false])
+    expect([range, M.barDay(history, history.start).date, M.baselineLegend(history, quotes.ANT.priceDigits)]).toEqual([range, "IPO PRICE", "┄ IPO PRICE 83.00"])
+  }
+
   // WREN, first traded Friday 16 October: Yahoo's 1W and 1M open with its
   // 18.00 offer at 09:30, no shares traded, its first trade 23.00 at 11:45.
   // 1W must not say "18.00 23.00", nor drop the week's 23.875 high on
@@ -1728,6 +1793,11 @@ test("a run's answers show their quotes, give nothing to a stock removed while i
   const held = { ...first, asked: { NEST: now + 55 } }
   const again = M.quotesLanded(held, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
   expect([again.quotes === first.quotes, again.entries.NEST.receivedAt]).toEqual([true, now + 60])
+  // So does one whose quote carries its listing date, as a new listing's
+  // does: the unchanged answer keeps it, and the quote on screen.
+  const dated = { ...held, quotes: M.withListDates(first.quotes, { NEST: { listDate: "2026-09-11" } }, now) }
+  const datedAgain = M.quotesLanded(dated, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
+  expect([dated.quotes.NEST.listDate, datedAgain.quotes === dated.quotes]).toEqual(["2026-09-11", true])
   // Tokyo's first answer a quarter hour into Monday 2 November, with no
   // close of Friday's held: Yahoo may still count from Thursday's, so the
   // row leaves the move out (`carryClose`).
