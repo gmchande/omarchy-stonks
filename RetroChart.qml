@@ -12,9 +12,9 @@ import "Chart.js" as Chart
 // day adds dimmer hours, the bell and the night's edges, and the lit last
 // trade. Once tonight has traded, the baseline steps at the bell to
 // the close just gone (`geometry.step`), and the columns from there stand on
-// it. The grid and the columns paint when the data changes; the draw-in
-// widens a clip a whole column at a time, and the ticks and the scrub are
-// cells laid over them.
+// it. The unlit cells paint when the size changes, the baseline and the
+// columns when the data changes; the draw-in widens a clip a whole column
+// at a time, and the ticks and the scrub are cells laid over them.
 Item {
   id: root
 
@@ -80,7 +80,11 @@ Item {
 
   onGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()
-  onGhostColorChanged: base.requestPaint()
+  // The unlit cells change only with the chart's size, so a new price
+  // repaints none of them.
+  readonly property string ghostCells: ghostColor.a > 0 ? [grid.columns, grid.rows, pixel, gap].join(" ") : ""
+  onGhostCellsChanged: ghost.requestPaint()
+  onGhostColorChanged: ghost.requestPaint()
   onAboveColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
   onAboveStemChanged: ink.requestPaint()
@@ -122,6 +126,30 @@ Item {
     return { top: Math.min.apply(null, rows) * pixel, bottom: (Math.max.apply(null, rows) + 1) * pixel }
   }
 
+  // One fill, then the seams between the cells cleared: a fill for each
+  // cell is 72,000 of them on a big window.
+  Canvas {
+    id: ghost
+    anchors.fill: parent
+    onWidthChanged: requestPaint()
+    onHeightChanged: requestPaint()
+    onPaint: {
+      var ctx = getContext("2d")
+      ctx.clearRect(0, 0, width, height)
+      if (root.ghostColor.a <= 0) return
+      var g = root.grid
+      var pixel = root.pixel
+      var gap = root.gap
+      var w = g.columns * g.pitch - gap
+      var h = g.rows * pixel - gap
+      ctx.fillStyle = root.ghostColor
+      ctx.fillRect(0, 0, w, h)
+      if (gap <= 0) return
+      for (var c = 1; c < g.columns; c++) ctx.clearRect(c * g.pitch - gap, 0, gap, h)
+      for (var r = 1; r < g.rows; r++) ctx.clearRect(0, r * pixel - gap, w, gap)
+    }
+  }
+
   Canvas {
     id: base
     anchors.fill: parent
@@ -130,12 +158,6 @@ Item {
       ctx.clearRect(0, 0, width, height)
       var g = root.grid
       var pixel = root.pixel
-      if (root.ghostColor.a > 0) {
-        ctx.fillStyle = root.ghostColor
-        for (var gc = 0; gc < g.columns; gc++) {
-          for (var gr = 0; gr < g.rows; gr++) ctx.fillRect(gc * g.pitch, gr * pixel, pixel, pixel - root.gap)
-        }
-      }
       if (!root.hasBaseline && g.stepCol >= g.columns) return
       // Every other cell, so it lives on the bars' grid, not as a hairline
       // across them.
