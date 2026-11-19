@@ -133,6 +133,14 @@ Harness {
       service.switchList("")
       quiet()
 
+      // The menu covers rows: a right-click on it reaches none of them.
+      click("listControl")
+      var reopened = within(1500, function() { return body.listMenuOpen && harness.inPlace(choices()) })
+      click(choices()[0], Qt.RightButton)
+      harness.check("a right-click on the list menu opens no row's menu under it",
+        reopened && within(500, function() { return !body.listMenuOpen }) && body.rowMenu === null, [reopened, body.listMenuOpen, JSON.stringify(body.rowMenu)].join(" "))
+      body.closeViews()
+
       // By symbol, A to Z, then Z to A: the rows themselves, not the setting.
       var shown = function() { return body.watchlist.displayedSymbols.join(",") }
       var aToZ = service.symbols.slice().sort()

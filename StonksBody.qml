@@ -1456,6 +1456,7 @@ Item {
     anchors.fill: parent
     visible: root.listMenuOpen
     hoverEnabled: true
+    acceptedButtons: Qt.AllButtons
     z: 9
     onClicked: listMenu.typedName.trim() !== "" ? root.createList(listMenu.typedName) : root.closeListMenu()
     onWheel: function(wheel) { wheel.accepted = true }
