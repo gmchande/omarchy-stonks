@@ -191,12 +191,14 @@ every_state() (
   # ANT on its first day, Thursday 19 November: at 11:41, before its first
   # trade, its IPO price on top, named, and nothing that didn't trade; at
   # 11:52 and 12:43, its move from its IPO price, named; on 1W and All at
-  # 12:17, since its IPO. The screenshot and the pill before and after.
+  # 12:17, since its IPO, and 1W scrubbed on the screenshot, the dashed line
+  # its IPO price. The screenshot and the pill before and after.
   for moment in 1141 1152 1243; do
     states="$states popup-sweep-ipo-2026-11-19-$moment-ant-smooth popup-sweep-ipo-2026-11-19-$moment-ant-retro"
   done
   states="$states popup-sweep-ipo-2026-11-19-1217-ant-1w-smooth popup-sweep-ipo-2026-11-19-1217-ant-all-smooth"
   states="$states share-of-sweep-ipo-2026-11-19-1141-ant-smooth share-of-sweep-ipo-2026-11-19-1243-ant-smooth pill-sheet-ipo-1141 pill-sheet-ipo-1243"
+  states="$states share-scrub-of-sweep-ipo-2026-11-19-1217-ant-1w-smooth"
   # Sunday 1 November at 21:48, when Friday's line and tonight's stood apart
   # on every chart: each runs on from Friday's last trade to tonight's first,
   # the weekend taking no room; SHOP's Friday ended at 18:35.

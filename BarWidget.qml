@@ -42,9 +42,9 @@ BarWidget {
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
-  // On a listing's first day, the hover names the IPO price the move counts
-  // from, which the pill has no room to.
-  readonly property string listingNote: featuredQuote && service.changeMode !== "open" ? Figures.listingNote(featuredQuote) : ""
+  // On a listing's first day, the hover names the IPO price, which the pill
+  // has no room to.
+  readonly property string listingNote: featured ? Figures.listingNote(featuredQuote, featured, service.changeMode) : ""
   // The day the 1D chart draws, once Robinhood has said which. Only the
   // day's five-minute clock redraws it, never the second.
   // Built only for the form that draws it, and handed only to the look on
@@ -81,11 +81,12 @@ BarWidget {
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
-  // to the bar again while it stays: a warning's, a new symbol's, and the
-  // newest price's, its time and, at night, tonight's price and move, which
-  // the pill shows nowhere else. Qt.callLater runs a function once, so
-  // changes together show once. A new figure on the pill alone never does,
-  // so a resting pointer sees no blink for what it can read on the pill.
+  // to the bar again while it stays: a warning's, a new symbol's, a new
+  // listing's IPO price, and the newest price's, its time and, at night,
+  // tonight's price and move, which the pill shows nowhere else.
+  // Qt.callLater runs a function once, so changes together show once. A new
+  // figure on the pill alone never does, so a resting pointer sees no blink
+  // for what it can read on the pill.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
@@ -93,6 +94,7 @@ BarWidget {
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
   onNewestNoteChanged: Qt.callLater(reshowTooltip)
   onOpenNoteChanged: Qt.callLater(reshowTooltip)
+  onListingNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground

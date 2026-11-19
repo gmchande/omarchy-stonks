@@ -183,7 +183,17 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   const fresh = M.freshness({ status: "ok", receivedAt: 0 }, before, M.epochAt(US, "2026-11-19", "11:41"), 0, false, null, false)
   expect(M.freshnessText(fresh, before, calendars)).toBe("NOT TRADED YET")
   expect(M.dayNote(before, M.epochAt(US, "2026-11-19", "11:41"), calendars)).toBe("No trades yet")
-  expect(M.listingNote(before)).toBe("Not traded yet · IPO price 83.00")
+  const note = (q, mode, newest) => M.listingNote(q, M.rowModel(q, 0, mode, newest), mode)
+  expect([note(before, "pct"), note(before, "open")]).toEqual(["Not traded yet · IPO price 83.00", "Not traded yet · IPO price 83.00"])
+  // Its ranges then hold the IPO price twice, at the bell and at Yahoo's
+  // live moment, as its day does (here its day's answer stands in for the
+  // range's, from the same endpoint): no 0.00% from it, no 83.00 to 83.00,
+  // but the IPO price on top, named, as on 1D.
+  const early = M.viewChart("ANT", "1W", { ANT: before }, {}, { "ANT|1W": { status: "ok", history: M.parseHistory(ipo("1141", "ant"), "1W", cents) } }, {}, undefined, calendars).history
+  const earlyView = M.historyRowModel(early, before, 0)
+  expect([early.bars, earlyView.priceText, earlyView.pct, earlyView.periodLabel]).toEqual([[], "83.00", null, ""])
+  expect(M.heroLines(before, earlyView, null, M.epochAt(US, "2026-11-19", "11:41"), before, calendars, "pct", false).close)
+    .toMatchObject({ label: "IPO PRICE", price: "" })
   // At 11:52 its move counts from the IPO price, named as Robinhood's listing
   // date shows it is: not "WED CLOSE 83.00". Its open is its first trade's,
   // not the IPO price's bar, and its 52 weeks are Yahoo's, not from 83.00.
@@ -191,7 +201,12 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   expect([after.price, after.dayOpen, after.points.some(p => p.p === 83)]).toEqual([108.24, 111.5, false])
   expect(M.yearLine(after, null, null, null, after.points).range).toMatchObject({ lowText: "107.19", highText: "114.99" })
   expect(lines(after, "11:52")).toMatchObject({ close: { label: "IPO PRICE", price: "83.00" }, caption: { label: "TODAY" }, move: "+30.41%" })
-  expect(M.listingNote(after)).toBe("From its IPO price, 83.00")
+  expect([note(after, "pct"), note(after, "open")]).toEqual(["From its IPO price, 83.00", ""])
+  // The next morning's pre-market counts from its first close, so the pill
+  // no longer names the IPO price, though its quote is still that day's.
+  const evening = listed("1314", robinhood.ANT)
+  const friday = { t: M.epochAt(US, "2026-11-20", "04:05"), p: 102, phase: "pre", base: M.regularClose(evening), stepped: true }
+  expect(note(evening, "pct", friday)).toBe("")
   // A row's spark answer sends no shares: the chart answer's verdict leaves
   // the IPO price's bar out of its line too.
   const spark = M.sparkQuote(M.sparkResults(ipo("1152", "spark")).ANT, after.verdict, cents)
@@ -207,7 +222,7 @@ test("a young listing shows only what traded: on its first day the IPO price, na
     const line = M.rangeLine(history, M.rangeEnds(history, M.periodStats(history), quotes.ANT), quotes.ANT)
     expect([range, M.historyRowModel(history, quotes.ANT, 0).periodLabel, line.facts[0], history.bars.some(b => b.l === 83)])
       .toMatchObject([range, "SINCE IPO", { label: "IPO", value: "83.00" }, false])
-    expect([range, M.barDay(history, history.start).date]).toEqual([range, "IPO PRICE"])
+    expect([range, M.barDay(history, history.start).date, M.baselineLegend(history, quotes.ANT.priceDigits)]).toEqual([range, "IPO PRICE", "┄ IPO PRICE 83.00"])
   }
 
   // WREN, first traded Friday 16 October: Yahoo's 1W and 1M open with its
@@ -1773,6 +1788,11 @@ test("a run's answers show their quotes, give nothing to a stock removed while i
   const held = { ...first, asked: { NEST: now + 55 } }
   const again = M.quotesLanded(held, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
   expect([again.quotes === first.quotes, again.entries.NEST.receivedAt]).toEqual([true, now + 60])
+  // So does one whose quote carries its listing date, as a new listing's
+  // does: the unchanged answer keeps it, and the quote on screen.
+  const dated = { ...held, quotes: M.withListDates(first.quotes, { NEST: { listDate: "2026-09-11" } }, now) }
+  const datedAgain = M.quotesLanded(dated, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
+  expect([dated.quotes.NEST.listDate, datedAgain.quotes === dated.quotes]).toEqual(["2026-09-11", true])
   // Tokyo's first answer a quarter hour into Monday 2 November, with no
   // close of Friday's held: Yahoo may still count from Thursday's, so the
   // row leaves the move out (`carryClose`).

@@ -157,7 +157,10 @@ function quotesLanded(held, requests, got, symbols, calendars, now) {
   var retry = [], back = [], warnings = []
   var show = function(symbol, answered) {
     var previous = held.quotes[symbol]
-    var quote = CarriedClose.carryClose(previous, answered, calendars, now)
+    var carried = CarriedClose.carryClose(previous, answered, calendars, now)
+    // It keeps the listing date its quote was given (`Overnight.withListDates`),
+    // so an unchanged answer stays the same quote.
+    var quote = previous && previous.listDate ? Object.assign({}, carried, { listDate: previous.listDate }) : carried
     var dropped = Quote.bucketTimes(quote.droppedTimes)
     if (dropped && dropped !== Quote.bucketTimes(previous ? previous.droppedTimes : null) && !quote.closesOnly)
       warnings.push(symbol + " dropped stray buckets " + dropped)

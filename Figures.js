@@ -435,12 +435,16 @@ function moveAwaited(quote, view) {
   return !!reg && !Format.isFiniteNumber(view.close) && Format.isFiniteNumber(view.asOf) && view.asOf >= reg.start
 }
 
-// The pill's hover on a listing's first day, where its move counts from the
-// IPO price: that price, and before the first trade that there is none yet.
-function listingNote(quote) {
+// The pill's hover on a listing's first day: before its first trade, that
+// there is none yet, with the IPO price the pill shows; after it, the IPO
+// price, while the pill's move (`row`, `listRow`) counts from it: not since
+// the open, nor from the close just gone once the next day's pre-market
+// trades.
+function listingNote(quote, row, mode) {
   if (!Quote.listingDay(quote) || !Format.isFiniteNumber(quote.prevClose)) return ""
   var price = Format.money(quote.prevClose, quote.priceDigits)
-  return quote.untraded ? "Not traded yet · IPO price " + price : "From its IPO price, " + price
+  if (quote.untraded) return "Not traded yet · IPO price " + price
+  return mode !== "open" && !!row && row.close === quote.prevClose ? "From its IPO price, " + price : ""
 }
 
 var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]

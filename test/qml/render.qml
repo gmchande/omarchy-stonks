@@ -165,7 +165,7 @@ Harness {
   function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
   // The pill at night (pill-sheet-night), { quote, newest }.
   property var nightPill: null
-  // The pill on a listing's first day (pill-sheet-ipo-<hhmm>), { quote }.
+  // The pill on a listing's first day (pill-sheet-ipo-<hhmm>), { quote, allDay }.
   property var ipoPill: null
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
   // <popup-help|popup-help-sorted|window-help|min-window-help>-<look>: the
@@ -503,7 +503,9 @@ Harness {
         }
         var at = Calendar.epochAt(stub.calendars.calendars.US, "2026-11-19", ipo[1] + ":" + ipo[2])
         var ant = Quote.parseChart(load("ant"), Calendar.centExchanges(stub.calendars), at)
-        root.ipoPill = { quote: Object.assign({}, ant, { listDate: Overnight.listDates(load("robinhood-instruments"), ["ANT"]).ANT }) }
+        var instruments = load("robinhood-instruments")
+        root.ipoPill = { quote: Object.assign({}, ant, { listDate: Overnight.listDates(instruments, ["ANT"]).ANT }),
+          allDay: Overnight.parseAllDay(instruments, ["ANT"]).ANT }
         root.now = at
       }
       return
@@ -1540,7 +1542,8 @@ Harness {
                 readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
                 property var newestTrades: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
-                property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
+                property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } })
+                  : own ? ({ [featuredSymbol]: { status: "ok", allDay: own.allDay, at: 0 } }) : ({})
                 property var nightFailed: ({})
                 property var calendars: own ? stub.calendars : null
               }

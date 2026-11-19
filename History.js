@@ -97,11 +97,14 @@ function parseHistory(json, range, centExchanges) {
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
   // Yahoo opens a new listing's history with its offer price: one price, no
-  // shares, at its first day's bell, hours before its first trade. On that
-  // day it has no first trade on record, and the bar comes first.
+  // shares, at its first day's bell, hours before its first trade. That day
+  // it has no first trade on record, and repeats the price at its live
+  // moment too until shares trade (`Quote.offerTimes`).
   var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
-  var offerAt = firstTrade !== null ? firstTrade : meta.firstTradeDate === null && bars.length ? bars[0].t : null
-  bars = bars.filter(function(b) { return !(b.t === offerAt && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
+  var offered = Quote.offerTimes(meta, bars)
+  bars = bars.filter(function(b) {
+    return offered.indexOf(b.t) < 0 && !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c)
+  })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
   // A daily bar never carries a stray close.
@@ -437,6 +440,14 @@ function rangeFacts(widest, start, volume, offered) {
   ]
 }
 
+// What a scrubbed range's move counts from, said under the price by the
+// panel and the screenshot: the range's start, or on a listing's first day
+// its IPO price (`offered`).
+function baselineLegend(history, digits) {
+  var price = Format.money(history.baseline, digits)
+  return "┄ " + (history.offered ? "IPO PRICE " : String(history.range || "").toUpperCase() + " START ") + price
+}
+
 function rangeLine(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
@@ -518,12 +529,16 @@ function historyRowModel(history, quote, scrubT) {
   var head = !bar && !tail && quote ? Quote.headlineQuote(quote) : null
   var price = bar && Format.isFiniteNumber(bar.c) ? bar.c
     : tail ? tail.c : (head ? head.price : stats.last)
-  var chg = Quote.change({ prevClose: history.baseline, points: [] }, price, "pct", quote ? quote.priceDigits : undefined)
+  // A listing yet to trade shows its IPO price, named under it as on 1D
+  // (`Figures.heroLines`), with no move.
+  var untraded = !!quote && !!quote.untraded
+  var chg = Quote.change({ prevClose: untraded ? null : history.baseline, points: [] }, price, "pct", quote ? quote.priceDigits : undefined)
   return {
     symbol: history.symbol || (quote ? quote.symbol : ""),
     name: quote ? quote.name : (history.symbol || ""),
     price: price,
-    priceText: Format.money(price, quote ? quote.priceDigits : undefined),
+    priceText: Format.money(untraded ? quote.prevClose : price, quote ? quote.priceDigits : undefined),
+    close: untraded ? quote.prevClose : null,
     asOf: bar ? bar.t : tail ? tail.t : (head ? head.t : stats.coverage.to),
     pct: chg.pct,
     abs: chg.abs,
@@ -535,7 +550,7 @@ function historyRowModel(history, quote, scrubT) {
     changeLine: Format.pct(chg.pct),
     // Said under the change, as the day's move names its day
     // (`Figures.heroLines`).
-    periodLabel: history.offered ? "SINCE IPO"
+    periodLabel: untraded ? "" : history.offered ? "SINCE IPO"
       : stats.coverage.short && history.range !== "All" ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
     newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest, closed: tail.closed } : null
