@@ -2307,12 +2307,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(said(under(noon, "NBIS", "abs"))).toEqual(["FRI CLOSE 158.74", "TODAY +2.88%"])
     expect(under(noon, "NBIS", "abs").move).toBe("+4.57 USD")
     expect(said(under(noon, "NBIS", "open"))).toEqual(["FRI CLOSE 158.74", "SINCE OPEN +9.34 USD"])
-    // An index's points name the currency its listing's line names.
-    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42 USD"])
+    // An index moves in points, so its move names no unit.
+    expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42"])
     expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00 JPY"])
     expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57 AUD"])
     const evening = topsAt("watch-2026-10-26-1605")
-    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09 USD"])
+    expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09"])
     // Power Solutions' only after-hours trade repeats its close, so the
     // close it counts from stands under it; J&J's moved the price, so that
     // close and its day's move go under the price, then the part since it,
@@ -2323,7 +2323,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     // last after-hours trade was at its close; the move is Friday's, from
     // Thursday's close, and named so.
     const saturday = topsAt("watch-2026-10-25-1000")
-    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75 USD"])
+    expect(said(under(saturday, "^GSPC"))).toEqual(["THU CLOSE 7,663.43", "FRI \u221239.75"])
     expect(said(under(saturday, "NBIS"))).toEqual(["THU CLOSE 159.17", "FRI \u22120.43 USD"])
     // Monday 07:00, the pre-market: Friday's close and its day's move, as
     // before, and the pre-market's move from that close under the change.

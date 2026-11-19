@@ -410,9 +410,11 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
 }
 
 // A move in money beside a percent names its currency, as the listing's
-// line does (`listingMeta`), so +4.75 USD never reads as a percent.
+// line does (`listingMeta`), so +4.75 USD never reads as a percent. An
+// index moves in points, so its move names none, as the screenshot's
+// (`Share.js`).
 function inMoney(quote, text, unit) {
-  return unit === "abs" && quote.currency ? text + " " + currencyLabel(quote.currency) : text
+  return unit === "abs" && quote.currency && quote.instrumentType !== "INDEX" ? text + " " + currencyLabel(quote.currency) : text
 }
 
 function closeOnly(from) {

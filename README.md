@@ -103,9 +103,10 @@ While the large price is still the close, that line shows the pre-market
 or after-hours price instead. The line under the move names the move and
 gives it in the other unit, an amount in the listing's currency: TODAY
 ▲4.57 USD, OVERNIGHT ▼1.83 USD or PRE-MARKET ▼5.74 USD. Shown as an
-amount, the move beside the price names its currency too. On a longer
-range, the move counts from the range's start. A coin never closes, so
-its day is its last 24 hours.
+amount, the move beside the price names its currency too, but an index
+moves in points, so its amount names none. On a longer range, the move
+counts from the range's start. A coin never closes, so its day is its
+last 24 hours.
 
 The 1D chart starts at the open and runs by the clock to the close, or for
 a US stock to the end of its after hours, 20:00 on most days. The line
