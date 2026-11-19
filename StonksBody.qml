@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "Chart.js" as Chart
 import "ChartSound.js" as ChartSound
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
@@ -318,12 +319,17 @@ Item {
 
   // ---- The rows
 
-  // The rows follow a scrub of the day (`Figures.rowsScrub`).
-  readonly property int watchlistScrubShown: historyActive || !featuredQuote ? 0 : Figures.rowsScrub(featuredQuote, featuredDay, scrubShown)
+  // The rows follow a scrub of the day, each reading its own line
+  // (`Figures.listRow`).
+  readonly property int watchlistScrubShown: historyActive ? 0 : scrubShown
+  // Every row's line, worked out as the rows start following a scrub and
+  // when an answer lands during one, never at each step.
+  readonly property bool rowsScrubbed: watchlistScrubShown !== 0
+  readonly property var rowLines: rowsScrubbed ? Chart.lineDays(view.rows, quotes, nights, allDay, calendars, dayClock) : null
 
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestTrades))
+    Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
 
   // ---- The header's words
 
@@ -506,7 +512,7 @@ Item {
   // shows at rest. Asked only while search is open.
   readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
-    var row = quote ? Figures.listRow(quote, 0, changeMode, newestTrades[symbol] || null) : null
+    var row = quote ? Figures.listRow(quote, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
       move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
   }) : []

@@ -1,6 +1,5 @@
 .pragma library
 .import "Calendar.js" as Calendar
-.import "CarriedClose.js" as CarriedClose
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
@@ -180,13 +179,15 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
 }
 
 // The rows' own price and tone rules, so the breadth never disagrees with
-// them (`listRow`).
-function listBreadth(symbols, quotes, scrubT, mode, newest) {
+// them (`listRow`). `lines` holds each row's line while the rows are
+// scrubbed at `scrubT`.
+function listBreadth(symbols, quotes, lines, scrubT, mode, newest) {
   var out = { up: 0, flat: 0, down: 0, none: 0 }
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
+    var line = scrubT && lines ? lines[symbols[i]] || null : null
     var trade = newest ? newest[symbols[i]] || null : null
-    var read = quote ? reading(quote, scrubT, scrubT ? trade : Overnight.restingNewest(trade)) : null
+    var read = !quote ? null : line ? reading(line, scrubT, trade) : reading(quote, 0, Overnight.restingNewest(trade))
     var chg = read ? Quote.change(read.base, read.price, mode, quote.priceDigits) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
@@ -197,34 +198,17 @@ function listBreadth(symbols, quotes, scrubT, mode, newest) {
 // A row, and the pill, which shows its row: at rest, once tonight has
 // traded, the day's close and move until 04:00, as the panel's line under
 // the price says them (`closeLine`), while the panel's price on top is
-// tonight's. A scrubbed moment reads as the panel's.
-function listRow(quote, scrubT, mode, newest) {
-  return rowModel(quote, scrubT, mode, scrubT ? newest : Overnight.restingNewest(newest))
-}
-
-// The day a row reads a scrub against: while the 1D chart holds the day
-// just closed, that day, as the panel reads it (`CarriedClose.heldDay`).
-function scrubbedDay(quote) {
-  return CarriedClose.heldDay(quote) || quote
+// tonight's. Scrubbed at `scrubT`, a row reads its own line, `line`, the
+// day it draws (`Chart.lineDay`), where its dot sits, as the panel reads
+// the stock's chart; one whose line isn't drawn yet has no dot, and rests.
+function listRow(quote, mode, newest, line, scrubT) {
+  return scrubT && line ? rowModel(line, scrubT, mode, newest) : rowModel(quote, 0, mode, Overnight.restingNewest(newest))
 }
 
 function reading(quote, scrubT, newest) {
   if (!scrubT) return Quote.restingRead(quote, newest)
-  var day = scrubbedDay(quote)
-  var read = Quote.readingAt(day, scrubT)
-  return { price: read.price, t: read.t, base: scrubbedBase(day, scrubT, newest) }
-}
-
-// The moment the rows follow while the 1D chart is scrubbed at `scrubT`, 0
-// for none. They stay on now for hours outside Yahoo's day, but not the
-// coming day's pre-market, which each row's quote holds too. The quote can
-// change before the day does: until the day comes, the scrub stands. While
-// the chart holds the day just closed, Yahoo's day is that one
-// (`scrubbedDay`).
-function rowsScrub(quote, day, scrubT) {
-  var rows = scrubbedDay(quote)
-  var tail = Quote.tailStart(rows)
-  return scrubT < Quote.dayStart(rows) || (!!day && !!day.axis && scrubT >= Quote.dayEnd(rows) && !(tail !== null && scrubT >= tail)) ? 0 : scrubT
+  var read = Quote.readingAt(quote, scrubT)
+  return { price: read.price, t: read.t, base: scrubbedBase(quote, scrubT, newest) }
 }
 
 // Every price on screen comes from here. It carries no drawing and reads no

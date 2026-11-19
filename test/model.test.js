@@ -892,12 +892,12 @@ test("the rule under the list name counts up, flat, and down as the rows' tones 
   for (const mode of ["pct", "open"]) {
     const rows = { up: 0, flat: 0, down: 0, none: 1 }
     for (const symbol of symbols.slice(0, 3)) rows[M.rowModel(quotes[symbol], 0, mode).tone]++
-    expect([mode, M.listBreadth(symbols, quotes, 0, mode)]).toEqual([mode, rows])
+    expect([mode, M.listBreadth(symbols, quotes, null, 0, mode)]).toEqual([mode, rows])
   }
-  expect(M.listBreadth(symbols, quotes, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
-  expect(M.listBreadth(symbols, quotes, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
+  expect(M.listBreadth(symbols, quotes, null, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
+  expect(M.listBreadth(symbols, quotes, null, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
   // A row whose quote has no close to count from yet counts as none, not flat.
-  expect(M.listBreadth(["NEW"], { NEW: q("NEW", null, null, 50) }, 0, "pct")).toEqual({ up: 0, flat: 0, down: 0, none: 1 })
+  expect(M.listBreadth(["NEW"], { NEW: q("NEW", null, null, 50) }, null, 0, "pct")).toEqual({ up: 0, flat: 0, down: 0, none: 1 })
 })
 
 // What ends the undo on offer: a data file, hand-edited or another

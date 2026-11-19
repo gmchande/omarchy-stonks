@@ -83,6 +83,18 @@ function lineDay(symbol, quote, nights, allDay, calendars, dayClock) {
   return drawn.waiting ? null : drawn.day
 }
 
+// Each of `symbols`' lines (`lineDay`), the rows' while they follow a scrub,
+// so the breadth reads what each row reads (`Figures.listBreadth`).
+function lineDays(symbols, quotes, nights, allDay, calendars, dayClock) {
+  var out = {}
+  for (var i = 0; i < symbols.length; i++) {
+    var quote = quotes[symbols[i]]
+    var day = quote ? lineDay(symbols[i], quote, nights, allDay, calendars, dayClock) : null
+    if (day) out[symbols[i]] = day
+  }
+  return out
+}
+
 // Measured from the dashed line of the day each chart draws. While that day
 // waits on Robinhood, Yahoo's own trades make it. Until the next open that
 // is the day that closed, as the chart will draw it, with its after hours
