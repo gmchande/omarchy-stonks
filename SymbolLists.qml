@@ -7,7 +7,8 @@ import qs.Commons as Commons
 import "Motion.js" as Motion
 import "Rows.js" as Rows
 
-// A symbol's lists, in the rows' place: a tick box for each list, All first.
+// A symbol's lists, in the rows' place: a tick box for each list, All
+// first, and New list…, which makes a list holding the symbol.
 OverRows {
   id: root
 
@@ -19,6 +20,10 @@ OverRows {
   property string note: ""
 
   property int cursor: 0
+  property bool naming: false
+  // Why the typed name can't be made, said under it.
+  property string problem: ""
+  readonly property int newIndex: choices.length
 
   readonly property int itemHeight: Style.space(30)
   function rowSize() { return { pitch: itemHeight, height: itemHeight } }
@@ -26,10 +31,14 @@ OverRows {
   // the rows underneath.
   property int gutter: 0
   readonly property int inset: Style.space(10)
-  readonly property int contentHeight: itemHeight + choices.length * itemHeight
+  readonly property int contentHeight: itemHeight + (choices.length + 1 + (problem !== "" ? 1 : 0)) * itemHeight
 
   signal toggled(string name, bool member)
+  signal createRequested(string name)
   signal dismissed()
+
+  // While a name is typed, the field keeps the keys.
+  keysTo: naming ? null : root
 
   function member(index) {
     return !!choices[index] && choices[index].symbols.indexOf(symbol) >= 0
@@ -40,19 +49,24 @@ OverRows {
     pointer.rest()
     opening.restart()
   }
-  onClosed: scroll.cancelFlick()
+  onClosed: {
+    nameField.focus = false
+    scroll.cancelFlick()
+  }
 
   function reset() {
-    cursor = choices.length > 1 ? 1 : -1
+    stopNaming()
+    cursor = choices.length > 1 ? 1 : newIndex
     scroll.contentY = 0
   }
 
   function pointAt(x, y) {
+    if (naming) return
     var at = scroll.mapFromItem(null, x, y)
     // The scrollbar's gutter beside the rows is no row's.
     if (at.x < 0 || at.x >= column.width || at.y < 0 || at.y >= scroll.height) return
     var index = Math.floor((at.y + scroll.contentY) / itemHeight)
-    if (index < choices.length) cursor = index
+    if (index <= newIndex) cursor = index
   }
 
   // The view opens under the pointer that Ctrl-clicked to open it.
@@ -62,14 +76,34 @@ OverRows {
   }
 
   function toggle(index) {
+    if (index === newIndex) return startNaming()
     if (index < 0 || index >= choices.length) return
     cursor = index
     showCursor()
     toggled(choices[index].name, !member(index))
   }
 
+  function startNaming() {
+    cursor = newIndex
+    showCursor()
+    naming = true
+    problem = ""
+    Qt.callLater(function() { if (root.active && root.naming) nameField.forceActiveFocus() })
+  }
+
+  // Back to the line, the field emptied. After a make, the cursor stays on
+  // the place the new list takes, ticked.
+  function stopNaming() {
+    naming = false
+    problem = ""
+    nameField.text = ""
+    // The field drops its focus first, or the scope hands it straight back.
+    nameField.focus = false
+    if (root.active) root.forceActiveFocus()
+  }
+
   function moveCursor(delta) {
-    cursor = Math.max(0, Math.min(choices.length - 1, cursor + delta))
+    cursor = Math.max(0, Math.min(newIndex, cursor + delta))
     showCursor()
   }
 
@@ -81,12 +115,13 @@ OverRows {
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle.
   function keepCursorInSight() {
-    if (cursor < 0) return
-    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
+    cursor = Rows.cursorKeptInSight(cursor, newIndex + 1, rowSize(), scroll.contentY, scroll.height)
   }
 
   Keys.onPressed: function(event) {
     event.accepted = true
+    // While naming, the field has the keys; what it lets past goes nowhere.
+    if (root.naming) return
     if (event.key === Qt.Key_Escape) root.dismissed()
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.toggle(root.cursor)
     else if (event.key === Qt.Key_Down) root.moveCursor(1)
@@ -294,6 +329,94 @@ OverRows {
             onClicked: root.toggle(entry.index)
           }
         }
+      }
+
+      Item {
+        id: newRow
+        width: column.width
+        height: root.itemHeight
+
+        // The line gives way whole to the field while a name is typed.
+        MenuLine {
+          objectName: "symbolNewList"
+          anchors.fill: parent
+          visible: !root.naming
+          look: root.look
+          isCursor: root.cursor === root.newIndex
+          onTaken: root.startNaming()
+
+          Text {
+            x: root.inset + Style.space(22)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "New list…"
+            color: root.look.dim
+            font.family: root.look.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+        }
+
+        Field {
+          id: nameField
+          objectName: "symbolListNameField"
+          anchors.left: parent.left
+          anchors.right: namingChoices.left
+          anchors.rightMargin: Style.space(10)
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          visible: root.naming
+          verticalPadding: 0
+          // The typed name starts where the lists' names do.
+          leftPadding: root.inset + Style.space(22)
+          retro: root.look.retro
+          foreground: root.look.foreground
+          dim: root.look.dim
+          font.family: root.look.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          placeholderText: "List name"
+          onTextChanged: root.problem = ""
+          onAccepted: root.createRequested(text)
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape) { root.stopNaming(); event.accepted = true }
+          }
+        }
+
+        // As New list's MAKE and CANCEL in the list menu.
+        Row {
+          id: namingChoices
+          visible: root.naming
+          anchors.right: parent.right
+          anchors.rightMargin: root.inset
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: Style.space(14)
+
+          ListAction {
+            objectName: "symbolListMake"
+            look: root.look
+            text: "MAKE"
+            enterTakes: true
+            onActivated: root.createRequested(nameField.text)
+          }
+          ListAction {
+            look: root.look
+            text: "CANCEL"
+            onActivated: root.stopNaming()
+          }
+        }
+      }
+
+      Text {
+        visible: root.problem !== ""
+        width: column.width
+        height: root.itemHeight
+        leftPadding: root.inset + Style.space(22)
+        verticalAlignment: Text.AlignVCenter
+        textFormat: Text.PlainText
+        text: root.problem
+        color: root.look.foreground
+        font.family: root.look.fontFamily
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
       }
     }
   }

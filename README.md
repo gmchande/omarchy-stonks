@@ -134,7 +134,8 @@ while its market trades, or saved from before and not yet refreshed.
 Click the list's name to switch lists, start one, or manage them. All
 holds every symbol you follow, and your own lists each hold some of them.
 To choose which lists a row is in, right-click it and pick "Choose
-lists…", or Ctrl-click it.
+lists…", or Ctrl-click it. "New list…" there starts a list holding that
+stock.
 
 To find or add a stock, click "+ Find or add a symbol" or press `/`, and
 type a name or a symbol. Stocks in the list you're looking at come first,

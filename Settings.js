@@ -292,10 +292,12 @@ function withManualOrder(settings, symbols) {
   })
 }
 
-function withListCreated(settings, name) {
+// A new list is shown, empty, to fill. Made from a stock's lists, it holds
+// that stock, and the list on show stays.
+function withListCreated(settings, name, symbol) {
   if (listNameProblem(name, settings.lists) !== "") return settings
-  var list = { name: listName(name), symbols: [], order: "manual", reversed: false }
-  return fileSettings(Object.assign({}, settings, { lists: settings.lists.concat([list]), list: list.name }))
+  var list = { name: listName(name), symbols: symbol ? [symbol] : [], order: "manual", reversed: false }
+  return fileSettings(Object.assign({}, settings, { lists: settings.lists.concat([list]), list: symbol ? settings.list : list.name }))
 }
 
 function renameProblem(settings, name, newName) {

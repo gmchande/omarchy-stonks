@@ -99,6 +99,8 @@ every_state() (
   # The buttons that stand in for key hints: a new list's MAKE, and a
   # failed range's RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-history-unavailable-smooth popup-history-unavailable-retro"
+  # A row's lists with All alone, as on a fresh install, and a new list named there.
+  states="$states popup-lists-symbolfresh-smooth popup-lists-symbolnaming-retro"
   # A scrub through where the 1Y high's date rests, and the low's: the mark
   # stays where it rests, under the line and the dot, in both looks.
   states="$states popup-history-1y-crossed-smooth popup-history-1y-crossed-retro"

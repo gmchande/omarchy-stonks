@@ -112,6 +112,21 @@ Harness {
       click(lines[lines.length - 1])
       harness.check("a right click opens the row's menu, and its last line chooses the row's lists",
         menu && within(1500, function() { return body.listsSymbol === rows[0] }), menu + " " + body.listsSymbol)
+      // New list there, a name, MAKE: the list is made holding the row,
+      // and All stays on show.
+      var shield = harness.find(body, "openingShield")
+      within(2000, function() { return !shield.visible })
+      click("symbolNewList")
+      var listField = function() { return harness.find(body, "symbolListNameField") }
+      var namingThere = within(1500, function() { return !!listField() && listField().activeFocus })
+      "Fav".split("").forEach(function(c) { keyClick(c) })
+      click("symbolListMake")
+      var favourite = function() { return service.lists.filter(function(l) { return l.name === "Fav" })[0] }
+      harness.check("in a row's lists, New list, a name and MAKE make a list holding the row, and All stays on show",
+        namingThere && within(1500, function() { return !!favourite() && favourite().symbols.join(",") === rows[0] && !listField().visible })
+          && service.listName === "",
+        [namingThere, JSON.stringify(favourite() || null), service.listName].join(" "))
+      service.deleteList("Fav")
       body.closeViews()
 
       // Its first line removes the row, and UNDO puts it back.

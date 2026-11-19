@@ -421,10 +421,10 @@ Item {
     root.persist({ list: name })
   }
 
-  // Returns why not, or "".
-  function createList(name) {
+  // Returns why not, or "". With a symbol, from its lists: the list holds it.
+  function createList(name, symbol) {
     var problem = Settings.listNameProblem(name, root.fileSettings.lists)
-    if (problem === "") root.save(Settings.withListCreated(root.fileSettings, name))
+    if (problem === "") root.save(Settings.withListCreated(root.fileSettings, name, symbol))
     return problem
   }
 

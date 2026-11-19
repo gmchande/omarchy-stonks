@@ -1192,6 +1192,16 @@ Harness {
           menu.startNaming()
           Qt.callLater(function() { find(menu, "listNameField").text = "Crypto" })
         })
+      } else if (/-symbol(fresh|naming)-/.test(root.stateName)) {
+        // As on a fresh install, All alone: the row's lists offer New list;
+        // -symbolnaming-: a name typed into it.
+        stub.lists = [choice("", all)]
+        body.openSymbolLists(body.watchlist.cursorRow)
+        if (root.stateName.indexOf("-symbolnaming-") > 0) Qt.callLater(function() {
+          var lists = child("symbolLists")
+          lists.startNaming()
+          Qt.callLater(function() { find(lists, "symbolListNameField").text = "Favourites" })
+        })
       } else if (root.stateName.indexOf("-symbol-") > 0) {
         body.openSymbolLists(body.watchlist.cursorRow)
       } else if (/-rowmenu(all)?-/.test(root.stateName)) {

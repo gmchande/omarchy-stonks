@@ -1357,6 +1357,11 @@ Item {
     look: root.look
     gutter: root.gutter
     onToggled: function(name, member) { root.setMembership(name, member) }
+    onCreateRequested: function(name) {
+      var problem = root.service ? root.service.createList(name, root.listsSymbol) : ""
+      if (problem !== "") symbolLists.problem = problem
+      else symbolLists.stopNaming()
+    }
     onDismissed: root.closeListViews()
   }
 

@@ -837,13 +837,16 @@ test("o runs manual, symbol, name, % change and back, and the order word's arrow
   expect(["manual", "symbol", "pct"].map(order => M.orderLabel(order, true))).toEqual(["↕  MANUAL", "↓  SYMBOL", "↑  % CHANGE"])
 })
 
-test("a list's name is refused empty, as All, or taken in any case or padding; a new list is made current and empty, its name trimmed", () => {
+test("a list's name is refused empty, as All, or taken in any case or padding; a new list is made current and empty, its name trimmed, or made from a stock's lists, holds it and leaves the list on show", () => {
   const s = library()
   expect([M.listNameProblem("  ", s.lists), M.listNameProblem(" growth ", s.lists), M.listNameProblem("all", s.lists)])
     .toEqual(["Name the list", "growth already exists", "All already exists"])
   const made = M.withListCreated(s, "  Wins ")
   expect([made.list, M.listSymbols(made), made.lists.map(list => list.name)]).toEqual(["Wins", [], ["My Watchlist", "Growth", "Wins"]])
   expect(M.withListCreated(s, "GROWTH")).toBe(s)
+  const symbol = s.symbols[0]
+  const holding = M.withListCreated(s, "Wins", symbol)
+  expect([holding.list, holding.lists.find(list => list.name === "Wins").symbols]).toEqual([s.list, [symbol]])
   // A rename meets the same rules against the other lists, so a change of
   // case alone renames, and the current list follows its new name.
   expect([M.renameProblem(s, "Growth", "my watchlist"), M.renameProblem(s, "Growth", "GROWTH")]).toEqual(["my watchlist already exists", ""])
