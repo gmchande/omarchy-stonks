@@ -93,7 +93,9 @@ Harness {
       var cached = within(5000, function() { return harness.readFile(service.quotesPath) !== "" })
       var priced = Object.keys(service.quotes)
       var next = restart.createObject(started)
-      var began = within(5000, function() { return next.ready })
+      // Ready once the lists file is read; the saved prices, read beside it,
+      // can land after.
+      var began = within(5000, function() { return next.ready && next.seeded })
       var read = [next.listName, next.symbols.join(","), next.order, next.featuredSymbol, next.range].join(" ")
       var unpriced = priced.filter(function(s) { return !next.quotes[s] })
       next.destroy()
