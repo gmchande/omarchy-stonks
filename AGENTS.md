@@ -42,13 +42,15 @@ truer, lighter, quicker, simpler or better made.
   own for that ground, and it never changes the theme's colors.
 - **Calm.** Nothing jumps: when the look, range, list or stock changes,
   everything keeps its place and size.
-- **1D at night.** A stock that trades at night keeps the day that just
-  closed until 04:00 in its exchange's time, with tonight joined at its end.
-  Tonight's trades belong to the day ahead: from the night's first trade the
-  panel's % counts from the close just gone, and the dashed line steps to
-  that close at the bell. The line breaks only for hours that take room on
-  the chart, such as Tokyo's lunch. The rows and the pill show the day's
-  close and its move until 04:00, with tonight's in the pill's hover.
+- **1D at night.** A stock's day starts at its open, and until the next
+  open the chart keeps the day that closed, with tonight and the pre-market
+  joined at its end. Tonight's trades belong to the day ahead: from the
+  night's first trade the panel's % counts from the close just gone, its one
+  dashed line is that close, and the closed day's session draws grey, as
+  context rather than a move. The line breaks only for hours that take room
+  on the chart, such as Tokyo's lunch. Until 04:00 in its exchange's time,
+  the rows and the pill report how the day ended, its close and its move,
+  with tonight grey on their line and tonight's move in the pill's hover.
 - **Character.** The bull and the bear, their sleep while the market rests,
   the live dot and the day's named moments survive any cleanup: each says
   something true, and none cheers a number.
