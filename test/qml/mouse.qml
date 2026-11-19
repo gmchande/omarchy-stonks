@@ -141,6 +141,20 @@ Harness {
         reopened && within(500, function() { return !body.listMenuOpen }) && body.rowMenu === null, [reopened, body.listMenuOpen, JSON.stringify(body.rowMenu)].join(" "))
       body.closeViews()
 
+      // New list, a name half typed, CANCEL: no list is made, and the menu
+      // is back as it was.
+      click("listControl")
+      within(1500, function() { return body.listMenuOpen && harness.inPlace(choices()) })
+      click("newListLine")
+      var nameField = function() { return harness.find(body, "listNameField") }
+      var namingStarted = within(1500, function() { return !!nameField() && nameField().activeFocus })
+      "Sem".split("").forEach(function(c) { keyClick(c) })
+      click("namingCancel")
+      var cancelled = within(1500, function() { return body.listMenuOpen && !nameField().visible })
+      harness.check("a name half typed in New list, CANCEL makes no list and leaves the menu open",
+        namingStarted && cancelled && service.lists.length === 2, [namingStarted, cancelled, service.lists.map(function(l) { return l.name }).join(",")].join(" "))
+      body.closeViews()
+
       // Beside the lists, the scrollbar's gutter points at none of them.
       body.openManageLists()
       var manage = at("manageLists")

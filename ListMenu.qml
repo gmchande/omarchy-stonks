@@ -310,6 +310,7 @@ OverRows {
 
       // The line gives way whole to the field while a name is typed.
       MenuLine {
+        objectName: "newListLine"
         anchors.fill: parent
         visible: !root.naming
         look: root.look
@@ -331,7 +332,7 @@ OverRows {
         id: nameField
         objectName: "listNameField"
         anchors.left: parent.left
-        anchors.right: makeButton.left
+        anchors.right: namingChoices.left
         anchors.rightMargin: Style.space(10)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -352,16 +353,27 @@ OverRows {
         }
       }
 
-      ListAction {
-        id: makeButton
-        look: root.look
+      // As a rename's SAVE and CANCEL in Manage lists.
+      Row {
+        id: namingChoices
         visible: root.naming
         anchors.right: parent.right
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
-        text: "MAKE"
-        enterTakes: true
-        onActivated: root.createRequested(nameField.text)
+        spacing: Style.space(14)
+
+        ListAction {
+          look: root.look
+          text: "MAKE"
+          enterTakes: true
+          onActivated: root.createRequested(nameField.text)
+        }
+        ListAction {
+          objectName: "namingCancel"
+          look: root.look
+          text: "CANCEL"
+          onActivated: root.stopNaming()
+        }
       }
     }
 
