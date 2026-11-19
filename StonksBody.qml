@@ -573,11 +573,14 @@ Item {
 
   // An add joins the rows once its first answer is in, and is featured once
   // it and the list rest. A result already in the list is shown, not added.
+  // Filling a new list, search stays open for the next: an add is listed
+  // there, and one already added is featured for when it closes.
   function acceptSymbol(symbol, pointed) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
     if (view.rows.indexOf(s) >= 0) {
-      showSymbol(s, pointed)
+      if (filling) service.feature(s)
+      else showSymbol(s, pointed)
       return
     }
     if (putBack && s === putBack.symbol) {
@@ -586,7 +589,7 @@ Item {
       return
     }
     var member = members.indexOf(s) >= 0
-    adding = false
+    if (!filling) adding = false
     if (!member) service.addSymbol(s)
     else service.feature(s)
     previewTo("")
@@ -597,6 +600,7 @@ Item {
     if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
+    if (filling) search.addedOne(s)
   }
 
   // Show features the member before the preview ends, so the chart on show
@@ -1361,6 +1365,7 @@ Item {
     members: root.members
     own: root.ownFound
     putBack: root.putBack
+    filling: root.filling
     onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
     onChose: function(symbol, result) { root.previewTo(symbol, result) }
     onCancelled: root.cancelAdding()

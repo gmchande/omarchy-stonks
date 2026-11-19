@@ -1037,6 +1037,22 @@ Harness {
         root.searchField(body.search).text = "berk"
         body.search.slow = true
       }
+      // popup-search-filled-*: Berkshire and Shopify just added to "Semis",
+      // search kept open, its field empty: the two listed, each ADDED.
+      if (root.stateName.indexOf("-filled-") > 0) {
+        var allOf = stub.symbols.slice()
+        var filled = ["BRK-A", "SHOP.TO"]
+        stub.lists = stub.lists.concat([{ name: "Semis", label: "Semis", count: 2, symbols: filled }])
+        stub.allSymbols = allOf
+        stub.listName = "Semis"
+        stub.symbols = filled
+        stub.shown = filled.slice()
+        body.filling = true
+        body.search.searchText = ""
+        root.searchField(body.search).text = ""
+        body.search.added = filled.map(function(s) { return { symbol: s, name: stub.quotes[s].name, exchange: stub.quotes[s].exchange } })
+        body.search.showEmpty()
+      }
       // popup-search-putback-*: SHOP.TO just removed, and search opened on
       // an empty field: its one result is the removal, chosen, UNDO, the
       // hero showing it.

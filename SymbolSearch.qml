@@ -81,27 +81,40 @@ OverRows {
   property var members: []
   // The removal on offer, the empty field's one result (`StonksBody.putBack`).
   property var putBack: null
+  // Filling a list just made, search stays open after each add: the field
+  // empties for the next, and the stocks added so far are the empty field's
+  // results, each marked ADDED.
+  property bool filling: false
+  property var added: []
   function actionFor(symbol) {
     if (putBack && symbol === putBack.symbol) return "UNDO"
-    return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD"
+    return members.indexOf(symbol) < 0 ? "ADD" : filling ? "ADDED" : "SHOW"
   }
   function showEmpty() {
     chosenSymbol = ""
-    results = putBack ? [putBack] : []
+    results = putBack ? [putBack] : added.slice()
     note = ""
-    answer = putBack ? "results" : ""
+    answer = results.length > 0 ? "results" : ""
     resultsQuery = ""
     choose(0)
+  }
+  // An add while filling: listed, and the field emptied for the next.
+  function addedOne(symbol) {
+    var result = shown.filter(function(r) { return r.symbol === symbol })[0] || { symbol: symbol, name: "", exchange: "" }
+    added = added.filter(function(r) { return r.symbol !== symbol }).concat([{ symbol: result.symbol, name: result.name, exchange: result.exchange }])
+    searchField.text = ""
+    if (searchText.trim() === "") showEmpty()
   }
   onPutBackChanged: if (searchText.trim() === "" && active) showEmpty()
   // Every label takes the widest word's slot, so the exchange codes keep
   // their column whichever shows.
   readonly property font buttonFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth,
-    putBack ? putBackMetrics.advanceWidth : 0)) + Style.space(12)
+    putBack ? putBackMetrics.advanceWidth : 0, filling ? addedMetrics.advanceWidth : 0)) + Style.space(12)
   TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
   TextMetrics { id: showMetrics; font: root.buttonFont; text: "SHOW" }
   TextMetrics { id: putBackMetrics; font: root.buttonFont; text: "UNDO" }
+  TextMetrics { id: addedMetrics; font: root.buttonFont; text: "ADDED" }
   readonly property int rowPadding: Style.space(10)
   readonly property int columnGap: Style.space(10)
   readonly property int exchangeWidth: {
@@ -147,6 +160,7 @@ OverRows {
     resultsScroll.contentY = 0
     feed.forget()
     enterFor = ""
+    added = []
     searchField.text = ""
     showEmpty()
     var kept = resumed
@@ -392,19 +406,22 @@ OverRows {
               font.pixelSize: Style.font.caption
               elide: Text.ElideRight
             }
+            // The chosen row's action; while filling, each stock added says
+            // so, plainly unless chosen.
             Rectangle {
-              opacity: resultRow.chosen && !resultRow.dimmed ? 1 : 0
+              readonly property bool marked: root.actionFor(resultRow.modelData.symbol) === "ADDED"
+              opacity: (resultRow.chosen || marked) && !resultRow.dimmed ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
               height: addLabel.implicitHeight + Style.space(4)
               radius: root.look.retro ? 0 : Style.cornerRadius
-              color: Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+              color: resultRow.chosen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
               Text {
                 id: addLabel
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: root.actionFor(resultRow.modelData.symbol)
-                color: Style.selectedStateColor(root.look.foreground, Commons.Color.accent)
+                color: resultRow.chosen ? Style.selectedStateColor(root.look.foreground, Commons.Color.accent) : root.look.dim
                 font: root.buttonFont
               }
             }
@@ -508,7 +525,8 @@ OverRows {
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding
       anchors.verticalCenter: parent.verticalCenter
-      text: "CANCEL"
+      // Filling a new list, the adds stay: DONE ends it.
+      text: root.filling ? "DONE" : "CANCEL"
       onActivated: root.cancel()
     }
   }

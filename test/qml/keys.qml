@@ -427,7 +427,8 @@ Harness {
 
       // w, down to New list, Enter, a name, Enter: the list is made and
       // shown, with search open to fill it. With Yahoo's search down, a
-      // stock All holds is offered at once, and Enter adds it.
+      // stock All holds is offered at once, and Enter adds it; search stays
+      // open, its field empty, for the next, and Esc ends it.
       quiet()
       press("w")
       press("↓")
@@ -440,10 +441,18 @@ Harness {
       type("shop")
       var offered = within(2000, function() { return b.search.chosenSymbol === "SHOP" })
       press("⏎")
-      var filled = within(5000, function() { return service.symbols.join(",") === "SHOP" && !b.adding })
+      var kept = within(5000, function() { return service.symbols.join(",") === "SHOP" && b.adding && b.search.searchText === "" })
+      var second = service.allSymbols.filter(function(s) { return s !== "SHOP" && /^[A-Z]+\d*$/.test(s) })[0]
+      type(second.toLowerCase())
+      var offeredNext = within(2000, function() { return b.search.chosenSymbol === second })
+      press("⏎")
+      var filled = within(5000, function() { return service.symbols.join(",") === "SHOP," + second && b.adding })
       fault(false)
-      harness.check("by keys alone, w makes a list, its search finds a stock All holds with Yahoo's search down, and Enter fills the list with it",
-        naming && made && offered && filled, [naming, made, offered, service.listName, service.symbols.join(",")].join(" "))
+      press("Esc")
+      var done = within(2000, function() { return !b.adding })
+      harness.check("by keys alone, w makes a list, its search finds stocks All holds with Yahoo's search down, Enter adds each with search kept open, and Esc ends it",
+        naming && made && offered && kept && offeredNext && filled && done,
+        [naming, made, offered, kept, offeredNext, filled, done, service.listName, service.symbols.join(",")].join(" "))
 
       // w, down past the lists and New list to Manage lists, Enter; Delete
       // asks, Enter deletes, and All keeps the stock.
