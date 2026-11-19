@@ -724,7 +724,7 @@ Item {
     else if (key === Qt.Key_Left) nudgeScrub(-1)
     else if (key === Qt.Key_Right) nudgeScrub(1)
     else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
-    else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
+    else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeSelected()
     else if (t === "?") toggleHelp()
     else if (t === "a" || t === "/") startAdding()
     else if (t === "r") refreshRequested()
@@ -778,6 +778,13 @@ Item {
   function moveCursor(delta) {
     showingHelp = false
     watchlist.moveCursor(delta)
+  }
+
+  // Delete, Backspace and x remove the selected row, but not one hidden
+  // under the `?` sheet: there they only close it.
+  function removeSelected() {
+    if (showingHelp) showingHelp = false
+    else removeRow(watchlist.cursorRow)
   }
 
   function moveSelected(delta) {

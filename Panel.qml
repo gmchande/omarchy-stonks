@@ -163,7 +163,7 @@ Panel {
         if (dx !== 0) root.body.nudgeScrub(dx)
       }
       onActivateRequested: root.body.featureSymbol(root.body.watchlist.cursorRow)
-      onDeleteRequested: root.body.removeRow(root.body.watchlist.cursorRow)
+      onDeleteRequested: root.body.removeSelected()
       onCloseRequested: {
         if (root.body.showingHelp) root.body.showingHelp = false
         else if (!root.body.endScrub()) root.close()

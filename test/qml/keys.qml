@@ -292,6 +292,22 @@ Harness {
       Style.fontBaseSize = size
       harness.check("in the " + s.name + ", a bigger text size keeps keys on the row you chose, in sight, at every moment",
         shown && rows.every(function(r) { return r === last }), rows.join(" ") + " | " + last)
+      // The sheet hides the rows: a key that removes one only closes it.
+      var removers = ["Delete", "Backspace"].concat(s.name === "popup" ? ["x"] : [])
+      var removing = removers.filter(function(token) {
+        base(s)
+        s.body.watchlist.cursorSymbol = "LONG1"
+        var held = service.symbols.join(",")
+        press("?")
+        if (!within(1500, function() { return s.body.showingHelp })) return true
+        press(token)
+        var closed = within(1500, function() { return !s.body.showingHelp })
+        // Time for a removal that must not come.
+        var removed = within(300, function() { return service.symbols.join(",") !== held })
+        return !closed || removed
+      })
+      harness.check("in the " + s.name + ", with the ? sheet open, " + removers.join(", ") + " close it and remove no row",
+        removing.length === 0, "wrong: " + removing.join(" "))
       escapeOrder(s)
     }
 
