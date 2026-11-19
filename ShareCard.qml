@@ -106,9 +106,10 @@ Rectangle {
     font.pixelSize: 24 * root.u
     font.bold: true
   }
+  // Starts where the name's drawn text ends, as the panel's does.
   Text {
     id: metaText
-    x: nameText.x + nameText.width
+    x: nameText.x + nameText.contentWidth
     anchors.baseline: symbolText.baseline
     textFormat: Text.PlainText
     text: root.quote ? " · " + root.quote.exchange : ""
@@ -326,11 +327,14 @@ Rectangle {
       letterSpacing: root.u
       spacing: 1.8 * root.u
     }
+    // Beside a lone trade it stands in the other half, as the panel's does.
     Rectangle {
       readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
+      readonly property real tradeX: root.geometry && root.geometry.points.length === 1 ? root.geometry.points[0].x : -1
       visible: text !== ""
-      anchors.centerIn: parent
-      width: noteText.implicitWidth + 32 * root.u
+      x: (tradeX < 0 ? parent.width / 2 : tradeX > 0.5 ? parent.width / 4 : parent.width * 3 / 4) - width / 2
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.min(parent.width / (tradeX < 0 ? 1 : 2), noteText.implicitWidth + 32 * root.u)
       height: noteText.implicitHeight
       color: root.ground
       Text {
