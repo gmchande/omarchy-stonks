@@ -328,8 +328,8 @@ Item {
   // again only when what it is drawn from changes, as the newest prices are
   // (`Service.newestFrom`), and only as many a frame as fit in
   // `rowLinesBudget` ms, so a long list's first scrub stalls no frame.
-  // Until every line is in, the rule shows the breadth it had for the list
-  // (`shownBreadth`).
+  // Until every line is in, the rule is plain: it counts nothing rather
+  // than a count the rows don't say.
   property var rowLines: null
   property var rowLinesFrom: ({})
   // The lines being worked out: what they are drawn from, the next row's
@@ -371,14 +371,8 @@ Item {
   }
 
   // Read from the view: `symbols` may lag a switch.
-  readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
-  property var shownBreadth: breadth
-  Binding on shownBreadth {
-    value: root.breadth
-    when: root.rowLinesWork === null || root.breadth.list !== root.shownBreadth.list
-    restoreMode: Binding.RestoreNone
-  }
+  readonly property var breadth: Object.assign({ list: view.list }, rowLinesWork ? { up: 0, flat: 0, down: 0, none: 0 }
+    : Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
 
   // ---- The header's words
 
@@ -1254,7 +1248,7 @@ Item {
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel
-    breadth: root.shownBreadth
+    breadth: root.breadth
     listMenuOpen: root.listMenuOpen
     rowsCovered: root.adding || root.listViewOpen
     replayRunning: motion.replayRunning
