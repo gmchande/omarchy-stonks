@@ -705,10 +705,12 @@ function extendedTrade(quote, latest) {
 // own stamp, which can come later: London's 16:30 close has come stamped
 // 17:20, after its after-hours buckets. The coming day's trades after it
 // (`tailStart`), or those a 1D chart joined to it (`tonight`), are no part
-// of the session.
+// of the session. `at` is where on the line the price read sits: its
+// trade, or the close's bell where the line runs on past it, else the
+// session's last trade, where the line ends.
 function readingAt(quote, t) {
   var pts = quote.points
-  if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
+  if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false, at: null }
   // Search by halves: walking from the first trade would cost every row a
   // step per trade on each scrub step.
   var k = 0
@@ -724,8 +726,8 @@ function readingAt(quote, t) {
   var inSession = function(p) { return pointSession(quote, p) === "reg" && (tail === null || p.t < tail) }
   if (!quote.crypto && head && head.source === "quote" && reg && head.t >= reg.end
       && inSession(pts[k]) && (k + 1 === pts.length || !inSession(pts[k + 1])))
-    return { price: head.price, t: reg.end, close: true }
-  return { price: pts[k].p, t: t, close: false }
+    return { price: head.price, t: reg.end, close: true, at: k + 1 === pts.length ? pts[k].t : reg.end }
+  return { price: pts[k].p, t: t, close: false, at: pts[k].t }
 }
 
 // `digits`, the price's, makes the move the price shown less the close or

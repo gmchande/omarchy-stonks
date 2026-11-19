@@ -302,30 +302,32 @@ test("a bucket stamped at the bell is post-market, unless it holds the closing t
 test("after the close, the session's last trade reads the close at the bell, and the bucket after it reads itself", () => {
   // London on Wednesday 7 October, fetched 14:55 New York: its last regular
   // bucket is 16:25 at 3,646.50, its close 3,648.00 stamped 17:20:32 BST,
-  // after its 16:30 and 16:35 buckets.
+  // after its 16:30 and 16:35 buckets. A row's dot sits at the bell, where
+  // the line runs on to the bucket after it.
   const london = M.parseChart(fixture("moments/listings-2026-10-07-1455/shel.l.json"))
   const bell = london.session.regular.end
   expect(london.marketTime).toBeGreaterThan(bell)
-  expect(M.readingAt(london, bell - 300)).toEqual({ price: 3648, t: bell, close: true })
+  expect(M.readingAt(london, bell - 300)).toEqual({ price: 3648, t: bell, close: true, at: bell })
   expect(marketStatus(london, at("2026-10-07", "14:55"), bell - 300, calendars)).toBe("At 16:30 BST · Closing bell")
-  expect(M.readingAt(london, bell)).toEqual({ price: 3657, t: bell, close: false })
+  expect(M.readingAt(london, bell)).toEqual({ price: 3657, t: bell, close: false, at: bell })
 })
 
 test("a scrub reads the trade at or before it, from the day's first trade through Tokyo's lunch to its last", () => {
   // Toyota on Wednesday 7 October, its whole day: 30 morning trades, the
   // last 11:30's at 2,915, then none until 12:30's at 2,917, and the day
-  // closing at 2,900.50 at 15:30, after its last trade, 15:20's.
+  // closing at 2,900.50 at 15:30, after its last trade, 15:20's, where its
+  // line ends and a row's dot sits.
   const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
   const pts = toyota.points
   const read = t => M.readingAt(toyota, t)
   const reopen = pts.findIndex((p, i) => i > 0 && p.t - pts[i - 1].t > 1800)
   expect([pts.length, reopen, pts[reopen - 1].p, pts[reopen].p]).toEqual([65, 30, 2915, 2917])
-  expect(read(pts[0].t - 60)).toEqual({ price: 2930.5, t: pts[0].t - 60, close: false })
-  expect(read(pts[0].t)).toEqual({ price: 2939.5, t: pts[0].t, close: false })
-  expect(read(pts[3].t + 30)).toEqual({ price: 2927.5, t: pts[3].t + 30, close: false })
+  expect(read(pts[0].t - 60)).toEqual({ price: 2930.5, t: pts[0].t - 60, close: false, at: null })
+  expect(read(pts[0].t)).toEqual({ price: 2939.5, t: pts[0].t, close: false, at: pts[0].t })
+  expect(read(pts[3].t + 30)).toEqual({ price: 2927.5, t: pts[3].t + 30, close: false, at: pts[3].t })
   expect(read(pts[reopen].t - 1800).price).toBe(2915)
   expect(read(pts[reopen].t).price).toBe(2917)
-  expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true })
+  expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true, at: pts[pts.length - 1].t })
 })
 
 test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
@@ -2392,13 +2394,16 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect(M.listBreadth(["NBIS"], monday.quotes, null, 0, "pct", monday.newest)).toEqual({ up: 0, flat: 0, down: 1, none: 0 })
   // At rest, and scrubbed: Sunday 22:00 and Monday noon; Monday 18:55 seen
   // at 04:05 the next day, where SPY's last trade before it is above
-  // Friday's close and its next below; and Friday's open seen at 04:05 on
-  // Monday, before Toyota's line, Monday in Tokyo, has a trade. A row
-  // scrubbed reads its own line, its dot on the trade it reads, on the side
-  // of the dashed line its move says; before its line's first trade it has
-  // no dot and rests. The count reads the rows.
+  // Friday's close and its next below; Friday's open seen at 04:05 on
+  // Monday, before Toyota's line, Monday in Tokyo, has a trade; and a second
+  // before London's Friday close, seen on Sunday, where Shell's last bar is
+  // 4,033.50 and its close 4,033.00. A row scrubbed reads its own line, its
+  // dot on the price it says, on the side of the dashed line its move says;
+  // before its line's first trade it has no dot and rests. The count reads
+  // the rows.
   const scrubs = [[sunday, at("2026-10-25", "22:00")], [monday, at("2026-10-26", "12:00")],
-    [topsAt("watch-2026-10-27-0405"), at("2026-10-26", "18:55")], [topsAt("watch-2026-10-26-0405"), at("2026-10-23", "09:30")]]
+    [topsAt("watch-2026-10-27-0405"), at("2026-10-26", "18:55")], [topsAt("watch-2026-10-26-0405"), at("2026-10-23", "09:30")],
+    [topsAt("watch-2026-10-25-1000"), at("2026-10-23", "11:29") + 59]]
   for (const [moment, t] of scrubs) {
     const lines = Object.fromEntries(moment.symbols.map(s => [s, M.lineDay(s, moment.quotes[s], moment.nights, moment.allDay, calendars, moment.now)]))
     for (const scrubT of [0, t]) {
@@ -2414,9 +2419,14 @@ test("in every phase, a stock that has traded since its close shows that newest 
         expect([t, s, row]).toEqual([t, s, M.listRow(moment.quotes[s], "pct", moment.newest[s] || null)])
         continue
       }
+      // A close after the line's last trade, as an index's 15:55 bar, has no
+      // place on the line: the dot sits where it ends.
       const geometry = M.chartGeometry(line, calendars)
       const y = M.yAt(geometry.points, x), base = M.baseAt(geometry, x)
-      expect([t, s, row.tone]).toEqual([t, s, y < base ? "up" : y > base ? "down" : row.tone])
+      const last = line.points.at(-1)
+      const said = M.readingAt(line, t).at === last.t && row.price !== last.p ? M.money(last.p, line.priceDigits) : row.priceText
+      expect([t, s, row.tone === "up" ? y < base : row.tone === "down" ? y > base : true, said])
+        .toEqual([t, s, true, M.money(geometry.lo + (1 - y) * (geometry.hi - geometry.lo), line.priceDigits)])
     }
   }
   expect(scrubs[3][0].symbols.includes("7203.T") && M.tradeFraction(M.lineDay("7203.T", scrubs[3][0].quotes["7203.T"], {}, {}, calendars, scrubs[3][0].now), scrubs[3][1])).toBe(-1)
