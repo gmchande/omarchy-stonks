@@ -141,6 +141,24 @@ Harness {
         reopened && within(500, function() { return !body.listMenuOpen }) && body.rowMenu === null, [reopened, body.listMenuOpen, JSON.stringify(body.rowMenu)].join(" "))
       body.closeViews()
 
+      // Beside the lists, the scrollbar's gutter points at none of them.
+      body.openManageLists()
+      var manage = at("manageLists")
+      var manageRows = function() { return harness.findAll(body, "manageRow").sort(function(a, b) { return a.y - b.y }) }
+      var managed = within(1500, function() { return manageRows().length === 2 && harness.inPlace(manageRows()) && manage.cursor === 1 })
+      var top = manageRows()[0]
+      // A hand's move, from the row the cursor is on, to the gutter beside
+      // the row above it.
+      mouseMove(manageRows()[1], top.width / 2, top.height / 2)
+      mouseMove(manageRows()[1], top.width / 2, top.height / 3)
+      var gutterAt = top.mapToItem(body, top.width + body.gutter / 2, top.height / 2)
+      mouseMove(body, gutterAt.x, gutterAt.y)
+      var gutterKept = !within(300, function() { return manage.cursor !== 1 })
+      mouseMove(top, top.width / 2, top.height / 2)
+      harness.check("in Manage lists the scrollbar's gutter moves no cursor, and the row beside it does",
+        managed && gutterKept && within(1000, function() { return manage.cursor === 0 }), [managed, gutterKept, manage.cursor].join(" "))
+      body.closeViews()
+
       // By symbol, A to Z, then Z to A: the rows themselves, not the setting.
       var shown = function() { return body.watchlist.displayedSymbols.join(",") }
       var aToZ = service.symbols.slice().sort()

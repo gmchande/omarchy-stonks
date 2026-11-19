@@ -87,7 +87,8 @@ OverRows {
   function pointAt(x, y) {
     if (renaming || confirming) return
     var at = scroll.mapFromItem(null, x, y)
-    if (at.x < 0 || at.x >= scroll.width || at.y < 0 || at.y >= scroll.height) return
+    // The scrollbar's gutter beside the rows is no row's.
+    if (at.x < 0 || at.x >= column.width || at.y < 0 || at.y >= scroll.height) return
     var index = Math.floor((at.y + scroll.contentY) / itemHeight)
     if (index < choices.length) cursor = index
   }
