@@ -584,6 +584,7 @@ Item {
     clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
+    holding: root.drawing.length > 0
     onEntriesChanged: {
       var next = Asks.nextHistory(root.historyCharts(), root.view.range, historyFeed.entries, root.historyOwed)
       if (next) historyFeed.request(next.symbol, root.view.range, next.force)

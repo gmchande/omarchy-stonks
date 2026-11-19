@@ -150,10 +150,37 @@ Item {
     try { return History.parseHistory(JSON.parse(answer.body), range, root.centExchanges) } catch (e) { return null }
   }
 
+  // Answers are read about 8 ms a turn, a two-year chart's in under 1 ms,
+  // so a tall list's run ahead never holds the shell's thread for long.
+  // While a chart draws itself in, charts fetched ahead wait.
+  property bool holding: false
+  onHoldingChanged: if (!holding && landing) landTimer.start()
+  property var landing: null
   function receive(got) {
     var request = job
-    var answers = request.charts.map(function(c, i) { return got.filter(function(a) { return a.index === i })[0] || null })
-    var histories = answers.map(function(a) { return root.parse(a, request.range) })
+    root.landing = {
+      request: request,
+      answers: request.charts.map(function(c, i) { return got.filter(function(a) { return a.index === i })[0] || null }),
+      histories: []
+    }
+    landTimer.start()
+  }
+
+  function landStep() {
+    var job = landing
+    if (holding && job.request.ahead) return
+    var until = Date.now() + 8
+    while (job.histories.length < job.answers.length && Date.now() < until)
+      job.histories.push(root.parse(job.answers[job.histories.length], job.request.range))
+    if (job.histories.length < job.answers.length) {
+      landTimer.start()
+      return
+    }
+    root.landing = null
+    root.land(job.request, job.answers, job.histories)
+  }
+
+  function land(request, answers, histories) {
     if (stopped || !covers(request, wanted)) {
       // A click that stops a run ahead finds its chart here if it came.
       var kept = root.goodEntries(request, histories)
@@ -208,6 +235,12 @@ Item {
     id: retryTimer
     interval: 2500
     onTriggered: root.run()
+  }
+
+  Timer {
+    id: landTimer
+    interval: 0
+    onTriggered: root.landStep()
   }
 
   Timer {
