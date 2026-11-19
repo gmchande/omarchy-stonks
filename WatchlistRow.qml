@@ -29,6 +29,9 @@ Rectangle {
   property real scrubX: -1
   property real reveal: 1
   property var calendars: null
+  // The look the day line wears, which the list may hold back a moment
+  // after a switch (`Watchlist.lineSweep`).
+  property bool lineRetro: look.retro
 
   // Where the list puts the row: its place among the rows shown, -1 while
   // it isn't one; the rows' pitch; where a lifted row is held; and how many
@@ -183,7 +186,7 @@ Rectangle {
     width: row.sparkWidth
     height: Style.space(22)
     anchors.verticalCenter: parent.verticalCenter
-    sourceComponent: row.look.retro ? cellsLine : smoothLine
+    sourceComponent: row.lineRetro ? cellsLine : smoothLine
   }
 
   Component {

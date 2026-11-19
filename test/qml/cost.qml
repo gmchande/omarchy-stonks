@@ -241,6 +241,38 @@ Harness {
         moved && [atTop, atEnd, back].every(function(n) { return n > 0 && n <= nearSight }) && nearSight < 154 && passedOver.length === 0,
         [atTop, atEnd, back].join(", ") + " built of " + nearSight + " near sight; " + passedOver.length + " built only to be passed over")
 
+      // A look switch swaps at once only the lines of the rows near sight,
+      // the rest soon after, and a jump through the list straight after
+      // shows no row in the old look.
+      list.contentY = 0
+      rested()
+      var body = app.body
+      var wearing = function() {
+        var rows = list.rowItems()
+        return Object.keys(rows).filter(function(s) { return rows[s].lineRetro === body.look.retro })
+      }
+      body.toggleStyle()
+      var swapped = wearing().length
+      var oldSeen = {}
+      var framesSeen = 0
+      harness.onFrame = function() {
+        framesSeen++
+        var rows = list.rowItems()
+        for (var s in rows) if (rows[s].inSight && rows[s].visible && rows[s].lineRetro !== body.look.retro) oldSeen[s] = true
+      }
+      list.takeOver()
+      list.contentY = list.clampY(list.contentHeight)
+      // A frame drawn at the end, then a jump to the middle.
+      within(1000, function() { return framesSeen > 0 })
+      list.contentY = list.clampY(list.contentHeight / 2)
+      var swept = within(3000, function() { return wearing().length === service.allSymbols.length })
+      harness.onFrame = null
+      body.toggleStyle()
+      within(3000, function() { return wearing().length === service.allSymbols.length })
+      harness.check("a look switch swaps at once only the lines of rows near sight, the rest soon after, and a jump straight after shows no row in the old look",
+        swapped > 0 && swapped <= nearSight && swept && Object.keys(oldSeen).length === 0,
+        swapped + " swapped at once of " + nearSight + " near sight; all swapped " + swept + "; old look seen on " + Object.keys(oldSeen).slice(0, 5).join(","))
+
       // Every row into sight once, then back at the top Robinhood answers.
       list.takeOver()
       for (var y = 0; y <= list.contentHeight; y += list.sightHeight / 2) list.contentY = list.clampY(y)

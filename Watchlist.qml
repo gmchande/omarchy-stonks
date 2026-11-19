@@ -575,6 +575,7 @@ Flickable {
   Component.onCompleted: {
     lastPitch = rowPitch
     arrangedView = view
+    lineLook = look.retro
     syncRows()
     display(view.shown.slice(), false)
   }
@@ -591,6 +592,33 @@ Flickable {
     }
     for (j = 0; j < allSymbols.length; j++) {
       if (have[allSymbols[j]] !== true) rowsModel.append({ symbol: allSymbols[j] })
+    }
+  }
+
+  // A look switch swaps each row's day line, a canvas, which a long All
+  // builds for every row. Rows near sight swap at once, the rest a few a
+  // frame after (`lineSweep`, the rows by index it has reached), and a row
+  // that comes near sight first swaps as it does: none shows the old look.
+  property bool lineLook: false
+  readonly property int everyRow: 1 << 30
+  property int lineSweep: everyRow
+  Connections {
+    target: root.look
+    function onRetroChanged() {
+      root.lineSweep = 0
+      root.lineLook = root.look.retro
+      lineSweeper.restart()
+    }
+  }
+  Timer {
+    id: lineSweeper
+    interval: 16
+    repeat: true
+    onTriggered: {
+      root.lineSweep += 8
+      if (root.lineSweep < rowRepeater.count) return
+      root.lineSweep = root.everyRow
+      stop()
     }
   }
 
@@ -624,6 +652,12 @@ Flickable {
         onRested: root.rowRested(symbol)
         look: root.look
         width: parent.width
+        required property int index
+        Binding on lineRetro {
+          value: root.lineLook
+          when: rowDelegate.built || rowDelegate.index < root.lineSweep
+          restoreMode: Binding.RestoreNone
+        }
         // Whether the row lies within `above` and `below` of the view at
         // `top`. From its place, not `y`, which a new place may not have
         // reached yet.
