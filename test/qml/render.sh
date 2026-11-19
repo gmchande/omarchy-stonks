@@ -213,10 +213,12 @@ every_state() (
   # counts from named, at text size 16 too; J&J's thin night; Power
   # Solutions' finished day, edge to edge; bitcoin's two-day answer, its
   # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
-  # and its night, the dashed line stepping to Monday's close at its bell;
-  # Tuesday 03:50 and 04:05, the count carrying on; Monday 07:00, Friday
-  # with the night and the pre-market joined, the pre-market bright; and at
-  # noon Monday's move as an amount, its currency named.
+  # and its night, dashed at Monday's close, Monday grey, the rows keeping
+  # Monday's move and greying tonight; Tuesday 03:50 and 04:05, the count
+  # carrying on; Monday 07:00, Friday with the night and the pre-market
+  # joined, the pre-market bright; and at noon Monday's move as an amount,
+  # its currency named. The grey on the faintest light theme and on
+  # Catppuccin Latte, the selected row's too.
   for moment in thu-2026-10-29-2155-nbis thu-2026-10-29-2155-jnj thu-2026-10-29-2155-psix thu-2026-10-29-2155-btc-usd \
     watch-2026-10-25-2100-nbis watch-2026-10-27-0130-nbis watch-2026-10-27-0350-nbis watch-2026-10-27-0405-nbis \
     watch-2026-10-26-0700-nbis watch-2026-10-26-1200-nbis-abs; do
@@ -224,6 +226,7 @@ every_state() (
   done
   states="$states popup-sweep-thu-2026-10-29-2155-nbis-smooth-size-16 popup-sweep-thu-2026-10-29-2155-nbis-retro-size-16"
   states="$states window-sweep-thu-2026-10-29-2155-nbis-smooth"
+  states="$states popup-sweep-watch-2026-10-27-0130-nbis-retro-white popup-sweep-watch-2026-10-27-0405-nbis-smooth-catppuccin-latte"
   # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
   # line starts at its start and ends on the newest price, the one on top.
   # And the week it gapped, from Wednesday 4 November's close to Thursday's

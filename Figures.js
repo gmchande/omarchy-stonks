@@ -255,7 +255,7 @@ function rowModel(quote, scrubT, mode, newest) {
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
 // reads what the hero does. Once a trade has joined the day that closed,
 // tonight's or the pre-market's, a moment past the bell counts from the
-// close just gone, where the dashed line steps: the day drawn says so
+// close just gone, the panel's dashed line: the day drawn says so
 // (`Day.nightBell`), and a row's quote by its newest price
 // (`newest.stepped`). A day abroad just opened, joined to the day before
 // it, has its own open already (`CarriedClose.heldDay`).
@@ -280,8 +280,8 @@ function dayBaselineText(day, today, calendars) {
   return (reg ? closeName(day, reg.start, today, calendars) : "PREV CLOSE") + " " + base
 }
 
-// The dashed line under a scrubbed moment `t`, in words: past the bell of a
-// day tonight has traded on, the close just gone, where the line steps
+// What a scrubbed moment `t` counts from, in words: past the bell of a day
+// tonight has traded on, the close just gone, the panel's dashed line
 // (`Day.nightBell`).
 function scrubBaselineText(day, t, today, calendars) {
   var bell = Day.nightBell(day)

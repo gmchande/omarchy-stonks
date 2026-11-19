@@ -8,9 +8,9 @@ import "Motion.js" as Motion
 // the price the change is measured from, and the line and its wash in the up
 // colour above it and the down colour below, as the retro columns fall. The day
 // adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
-// dot on the newest bright trade. Once tonight has traded, the baseline steps
-// at the bell to the close just gone (`geometry.step`), and the line past it
-// takes its colours from there. Three layers, so each paints only when what
+// dot on the newest bright trade. Once tonight has traded, what the number
+// beside the chart doesn't count draws in grey, with no wash
+// (`geometry.grey`). Three layers, so each paints only when what
 // it draws changes: the baseline, the ink under a clip the draw-in widens, and
 // the scrub.
 Item {
@@ -20,6 +20,9 @@ Item {
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
+  // What the number beside the chart doesn't count (`geometry.grey`): a step
+  // stronger than the baseline's ink, so the two read apart.
+  property color greyColor: Tones.dim(Commons.Color.foreground, ground)
   property color hairlineColor: Commons.Color.foreground
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
@@ -53,13 +56,10 @@ Item {
   readonly property var lastPoint: Chart.lastLitPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
   // Against the dashed line under it, and in the line's own ink with none.
-  readonly property color dotColor: {
-    var base = lastPoint ? Chart.baseAt(geometry, lastPoint.x) : null
-    return base === null ? baselineColor : lastPoint.y > base ? belowColor : aboveColor
-  }
+  readonly property color dotColor: !lastPoint || !hasBaseline ? baselineColor
+    : lastPoint.y > geometry.baselineY ? belowColor : aboveColor
   readonly property bool drawable: Chart.drawable(geometry)
   readonly property bool hasBaseline: Chart.hasBaseline(geometry)
-  readonly property bool hasStep: !!geometry && !!geometry.step
   // The draw-in sweeps to the newest trade's dot: the line's width and a half,
   // and a pixel.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
@@ -76,6 +76,7 @@ Item {
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
   onAboveColorChanged: ink.requestPaint()
+  onGreyColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
   onHairlineColorChanged: marks.requestPaint()
   onScrubXChanged: marks.requestPaint()
@@ -101,7 +102,6 @@ Item {
       bottom = Math.max(bottom, pad + y * h + r)
     }
     if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) reach(g.baselineY, weight)
-    if (g && g.step) reach(g.step.y, weight)
     var pts = g && g.points ? g.points : []
     for (var i = 0; i < pts.length; i++) {
       var lone = (i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)
@@ -114,19 +114,16 @@ Item {
   }
 
   // Ticks the line has reached draw in with it; those ahead, in hours still to
-  // come, are there with the baseline. The bell's stays on the day's line;
-  // with no line under them, none.
+  // come, are there with the baseline; with no baseline, none.
   function strokeTicks(ctx, ahead) {
     var w = width - pad * 2
     var h = height - pad * 2
-    var step = geometry.step
     ctx.strokeStyle = baselineColor
     ctx.lineWidth = weight
     for (var k = 0; k < geometry.ticks.length; k++) {
-      var base = step && geometry.ticks[k] > step.x ? step.y : geometry.baselineY
-      if ((geometry.ticks[k] > inkLast) !== ahead || base === null) continue
+      if ((geometry.ticks[k] > inkLast) !== ahead) continue
       var cx = pad + geometry.ticks[k] * w
-      var cy = pad + base * h
+      var cy = pad + geometry.baselineY * h
       ctx.beginPath()
       ctx.moveTo(cx, cy - 4 * weight)
       ctx.lineTo(cx, cy + 4 * weight)
@@ -142,23 +139,15 @@ Item {
     onPaint: {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
-      if (!root.hasBaseline && !root.hasStep) return
+      if (!root.hasBaseline) return
       var h = height - root.pad * 2
-      var step = root.geometry.step
-      var sx = step ? root.xAt(step.x) : width - root.pad
       ctx.strokeStyle = root.baselineColor
       ctx.lineWidth = root.weight
       ctx.lineCap = "round"
       ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
       ctx.beginPath()
-      if (root.hasBaseline) {
-        ctx.moveTo(root.pad, root.pad + root.geometry.baselineY * h)
-        ctx.lineTo(sx, root.pad + root.geometry.baselineY * h)
-      }
-      if (step) {
-        ctx.moveTo(sx, root.pad + step.y * h)
-        ctx.lineTo(width - root.pad, root.pad + step.y * h)
-      }
+      ctx.moveTo(root.pad, root.pad + root.geometry.baselineY * h)
+      ctx.lineTo(width - root.pad, root.pad + root.geometry.baselineY * h)
       ctx.stroke()
       ctx.setLineDash([])
       root.strokeTicks(ctx, true)
@@ -188,39 +177,41 @@ Item {
         var pts = geometry.points
         var w = width - pad * 2
         var h = height - pad * 2
-        var by = pad + geometry.baselineY * h
         // The fill is about the day up to its last regular trade. A range has
         // no extended trades.
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
-        // Each side of the step counts from its own baseline, as the retro
-        // columns do: the wash and the line take their colours from it, or
-        // with none, the line takes its own ink and there is no wash.
-        var stepX = geometry.step ? pad + geometry.step.x * w : width
-        var parts = [{ from: 0, to: stepX, by: root.hasBaseline ? by : null }]
-        if (geometry.step) parts.push({ from: stepX, to: width, by: pad + geometry.step.y * h })
+        // The stretch the number beside the chart doesn't count takes the
+        // grey ink and no wash; the rest takes its colours from the dashed
+        // line, or with none, the line's own ink, and there is no wash.
+        var grey = geometry.grey
+        var gx0 = !grey || grey.from <= 0 ? 0 : pad + grey.from * w
+        var gx1 = !grey ? 0 : grey.to >= 1 ? width : pad + grey.to * w
+        var parts = !grey ? [{ from: 0, to: width, grey: false }]
+          : [{ from: 0, to: gx0, grey: false }, { from: gx0, to: gx1, grey: true }, { from: gx1, to: width, grey: false }]
+        var clipped = parts.length > 1
+        var by = root.hasBaseline ? pad + geometry.baselineY * h : null
 
-        for (var s = 0; s < parts.length; s++) {
-          var base = parts[s].by
-          if (base === null) continue
+        for (var s = 0; by !== null && s < parts.length; s++) {
+          if (parts[s].grey || parts[s].to <= parts[s].from) continue
           ctx.save()
-          if (geometry.step) {
+          if (clipped) {
             ctx.beginPath()
             ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
             ctx.clip()
           }
-          ctx.fillStyle = sides(ctx, base, root.aboveWash, root.belowWash)
+          ctx.fillStyle = sides(ctx, by, root.aboveWash, root.belowWash)
           for (var r = 0; r < filled.length; r++) {
             var run = filled[r]
             if (run.length < 2) continue
             ctx.beginPath()
-            ctx.moveTo(pad + run[0].x * w, base)
+            ctx.moveTo(pad + run[0].x * w, by)
             for (var i = 0; i < run.length; i++) {
               if (i > 0 && run[i].untraded) ctx.lineTo(pad + run[i].x * w, pad + run[i - 1].y * h)
               ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
             }
-            ctx.lineTo(pad + run[run.length - 1].x * w, base)
+            ctx.lineTo(pad + run[run.length - 1].x * w, by)
             ctx.closePath()
             ctx.fill()
           }
@@ -233,20 +224,21 @@ Item {
         // The whole series in dim ink, then the bright part over it (`dim`),
         // so the rest reads as the quieter part of one line.
         for (var p = 0; p < parts.length; p++) {
+          if (parts[p].to <= parts[p].from) continue
           ctx.save()
-          if (geometry.step) {
+          if (clipped) {
             ctx.beginPath()
             ctx.rect(parts[p].from, 0, parts[p].to - parts[p].from, height)
             ctx.clip()
           }
-          ctx.strokeStyle = sides(ctx, parts[p].by, 0.45, 0.45)
+          ctx.strokeStyle = parts[p].grey ? Util.alpha(root.greyColor, 0.45) : sides(ctx, by, 0.45, 0.45)
           strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-          ctx.strokeStyle = sides(ctx, parts[p].by, 1, 1)
+          ctx.strokeStyle = parts[p].grey ? root.greyColor : sides(ctx, by, 1, 1)
           strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
           ctx.restore()
         }
 
-        if (root.hasBaseline || root.hasStep) root.strokeTicks(ctx, false)
+        if (root.hasBaseline) root.strokeTicks(ctx, false)
       }
 
       // A point `keep` refuses, or a break (`brk`), ends a stretch.

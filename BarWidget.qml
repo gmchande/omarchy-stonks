@@ -48,7 +48,7 @@ BarWidget {
   // show.
   readonly property var lineDay: featuredQuote && barStyle === "sparkline"
     ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.dayClock) : null
-  readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
+  readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars, Overnight.keepsDay(newest)) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a middle-click picks another, as the
   // clock keeps verticalFormat beside format: a move brings each one's back.
@@ -295,6 +295,7 @@ BarWidget {
         geometry: root.retro ? null : root.lineGeometry
         lineColor: root.trendColor
         baselineColor: Util.alpha(button.foreground, 0.25)
+        greyColor: root.dimColor
         lineWidth: 1.5
       }
 
@@ -309,6 +310,7 @@ BarWidget {
         upColor: root.trendColor
         downColor: root.trendColor
         baselineColor: Util.alpha(button.foreground, 0.25)
+        greyColor: root.dimColor
         pixel: 2
         gap: 1
         solid: true

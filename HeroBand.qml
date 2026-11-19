@@ -147,6 +147,7 @@ Item {
         upColor: root.look.upColor
         downColor: root.look.downColor
         baselineColor: root.look.dimmer
+        greyColor: root.look.dim
         hairlineColor: root.look.foreground
         ground: root.look.ground
         scrubX: root.look.retro ? -1 : root.scrubX
@@ -167,6 +168,7 @@ Item {
         downColor: root.look.downColor
         up: root.view ? root.view.dayUp : true
         baselineColor: root.look.dimmer
+        greyColor: root.look.dim
         glow: true
         live: root.live && root.look.retro
         newestPrice: root.newestPrice

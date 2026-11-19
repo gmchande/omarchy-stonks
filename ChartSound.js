@@ -212,7 +212,7 @@ function retro(grid, from, to, seconds) {
           wave = pulseBar(note)
           step = f / RATE * TABLE
         }
-        var side = Math.sign((col >= grid.stepCol ? grid.stepRow : grid.baseRow) - row)
+        var side = Math.sign(grid.baseRow - row)
         if (side && lastSide && side !== lastSide) ticks.push(i)
         if (side) lastSide = side
       }

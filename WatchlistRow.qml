@@ -7,6 +7,7 @@ import "Chart.js" as Chart
 import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Motion.js" as Motion
+import "Tones.js" as Tones
 // A row, set as Apple's Stocks sets one: symbol over name, price over
 // change, the day line between.
 Rectangle {
@@ -142,7 +143,14 @@ Rectangle {
   // minutes that slide its start, never with each second, the change mode,
   // or another symbol's quote.
   property var day: null
-  readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
+  // Whether the row keeps the day's move (`Overnight.keepsDay`), so its line
+  // greys tonight.
+  property bool keepsDay: false
+  readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars, keepsDay) : null
+  // The line's grey, as the name's dim reads on the row's own ground, the
+  // selected row's fill too. A line with no grey keeps one colour, so a hover
+  // repaints none.
+  readonly property color lineGrey: geometry && geometry.grey ? Tones.dim(look.foreground, Qt.tint(look.ground, fill)) : look.dim
 
   readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
   property var freshness: null
@@ -201,6 +209,7 @@ Rectangle {
       downColor: row.look.downColor
       lineColor: row.look.dim
       baselineColor: row.look.dimmer
+      greyColor: row.lineGrey
       cursorX: row.scrubX
       reveal: row.reveal
     }
@@ -215,6 +224,7 @@ Rectangle {
       upColor: row.look.upColor
       downColor: row.look.downColor
       baselineColor: row.look.dimmer
+      greyColor: row.lineGrey
       hairlineColor: row.look.foreground
       ground: Qt.tint(row.look.ground, row.fill)
       pixel: 2

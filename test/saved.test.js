@@ -2027,10 +2027,12 @@ test("the 1D chart is the trading day from its open to its 20:00, the hours to c
 
 test("through a night the chart keeps the day that closed with tonight at its end, and tonight counts from the close just gone", () => {
   // Wednesday 00:05: Robinhood's newest bar is Tuesday 23:55. The chart is
-  // Tuesday's, from its open to that bar, dashed at Monday's close until
-  // the bell, then at Tuesday's. The price on top counts from Tuesday's
+  // Tuesday's, from its open to that bar, dashed at Tuesday's close, the
+  // day before the bell grey. The price on top counts from Tuesday's
   // close; Tuesday's close and its day are under the price, and the
-  // night's move in money under the change.
+  // night's move in money under the change. The row, which keeps the day's
+  // move, is dashed at Monday's close, tonight grey, on the same scale, so
+  // nothing moves when one turns into the other.
   const built = dayAt("2026-10-07-0005", "nest")
   const { day, latest, quote } = built
   expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "09:30"), end: at("2026-10-06", "23:55") })
@@ -2046,11 +2048,15 @@ test("through a night the chart keeps the day that closed with tonight at its en
   expect([top.changeText, lines.close.label, lines.close.price, lines.close.changeText, lines.caption.label, lines.caption.changeText])
     .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64 USD"])
   const geometry = M.chartGeometry(day, calendars)
-  expect([geometry.step.x, geometry.step.y < geometry.baselineY]).toEqual([M.axisFraction(M.chartSpan(day), day.session.regular.end), true])
+  const row = M.chartGeometry(day, calendars, M.keepsDay(newest))
+  const bellX = M.axisFraction(M.chartSpan(day), day.session.regular.end)
+  const dashedAt = g => M.money(g.lo + (1 - g.baselineY) * (g.hi - g.lo))
+  expect([geometry.grey, dashedAt(geometry), row.grey, dashedAt(row), row.lo === geometry.lo && row.hi === geometry.hi])
+    .toEqual([{ from: 0, to: bellX }, "249.87", { from: bellX, to: 1 }, "232.57", true])
   // Yahoo can send the close without the one before it: the night keeps its
   // line, and its price on top stands below it, as the move says.
   const unanchored = M.chartGeometry({ ...day, prevClose: null }, calendars)
-  expect([unanchored.baselineY, unanchored.points.at(-1).y > unanchored.step.y, top.changeText.startsWith("\u2212")]).toEqual([null, true, true])
+  expect([dashedAt(unanchored), unanchored.points.at(-1).y > unanchored.baselineY, top.changeText.startsWith("\u2212")]).toEqual(["249.87", true, true])
   // Yahoo still on Friday while Robinhood answers Monday's night (Tuesday
   // 01:30): the night is joined to Monday all the same, but Yahoo holds no
   // close of Monday's, so the move counts from Friday's, named under the
@@ -2066,9 +2072,9 @@ test("through a night the chart keeps the day that closed with tonight at its en
 })
 
 // Wherever the pointer is on a 1D chart, its change and its animal say
-// where that price stands against the dashed line under it, as the price on
+// where that price stands against the close it counts from, as the price on
 // top does at rest: past the bell of a day tonight has traded on, the close
-// just gone.
+// just gone, the dashed line.
 const againstDashedLine = (day, where) => {
   const bell = M.nightBell(day)
   const under = t => bell !== null && t >= bell ? M.regularClose(day) : M.dayBase(day)
@@ -2085,10 +2091,10 @@ const againstDashedLine = (day, where) => {
 test("once a listing trades after its close, its newest price is on top, measured from the chart's dashed line, and a scrub of the night reads the same", () => {
   // Wednesday 01:00: NEST closed Tuesday at 249.87, +7.44%, and traded at
   // 248.04 at 00:50, joined to Tuesday's chart. The price on top is 248.04,
-  // −0.73% from Tuesday's close, where the dashed line steps at the bell,
-  // with a bear; Tuesday's close and move go on the line beneath, and the
-  // night's move in money under the change. A scrub of that trade reads the
-  // same −0.73%, and one of Tuesday's session reads from Monday's close.
+  // −0.73% from Tuesday's close, the dashed line, with a bear; Tuesday's
+  // close and move go on the line beneath, and the night's move in money
+  // under the change. A scrub of that trade reads the same −0.73%, and one
+  // of Tuesday's session reads from Monday's close.
   const quote = savedDay("2026-10-07-0100", "nest")
   const built = dayAt("2026-10-07-0100", "nest")
   const { day, latest } = built
@@ -2232,14 +2238,17 @@ test("in every phase, a stock that has traded since its close shows that newest 
     }
   }
   // Sunday 23:35: JNJ's row and pill draw Friday and tonight's trades,
-  // ending on its newest price above Friday's close, where the dashed line
-  // steps at Friday's bell, beside its +0.11%; Friday itself stays below
-  // Thursday's close.
+  // ending on its newest price above Friday's close, while they keep
+  // Friday's move, down from Thursday's close: their dashed line is
+  // Thursday's close, and tonight, which that move doesn't count, is grey,
+  // so its rise never reads green beside a red number.
   {
     const at = topsAt("watch-2026-10-25-2335")
     const day = M.lineDay("JNJ", at.quotes.JNJ, at.nights, at.allDay, calendars)
-    const line = M.chartGeometry(day, calendars)
-    expect([day.points.at(-1).p, line.points.at(-1).y < line.step.y, line.step.y > line.baselineY]).toEqual([264.11, true, true])
+    const line = M.chartGeometry(day, calendars, M.keepsDay(at.newest.JNJ))
+    const row = M.listRow(at.quotes.JNJ, "pct", at.newest.JNJ)
+    expect([day.points.at(-1).p > M.regularClose(day), row.changeText, M.money(line.lo + (1 - line.baselineY) * (line.hi - line.lo)),
+      M.greyAt(line, line.points.at(-1).x), M.greyAt(line, 0)]).toEqual([true, "\u22121.42%", "267.61", true, false])
   }
   // The list's header names the day the rows measure: Friday all weekend,
   // Sunday night too, today until midnight, then Monday until the new day's
@@ -2424,12 +2433,13 @@ test("in every phase, a stock that has traded since its close shows that newest 
         continue
       }
       // A close after the line's last trade, as an index's 15:55 bar, has no
-      // place on the line: the dot sits where it ends.
-      const geometry = M.chartGeometry(line, calendars)
-      const y = M.yAt(geometry.points, x), base = M.baseAt(geometry, x)
+      // place on the line: the dot sits where it ends. A dot on the grey says
+      // no side.
+      const geometry = M.chartGeometry(line, calendars, M.keepsDay(moment.newest[s] || null))
+      const y = M.yAt(geometry.points, x), base = geometry.baselineY
       const last = line.points.at(-1)
       const said = M.readingAt(line, t).at === last.t && row.price !== last.p ? M.money(last.p, line.priceDigits) : row.priceText
-      expect([t, s, row.tone === "up" ? y < base : row.tone === "down" ? y > base : true, said])
+      expect([t, s, M.greyAt(geometry, x) || (row.tone === "up" ? y < base : row.tone === "down" ? y > base : true), said])
         .toEqual([t, s, true, M.money(geometry.lo + (1 - y) * (geometry.hi - geometry.lo), line.priceDigits)])
     }
   }
@@ -2623,7 +2633,7 @@ test("before the open the pre-market is measured from the last session's close, 
   const days = [M.dayChart(quote, { bars: [], through: null }, calendars).day, M.sessionDay(quote)]
   for (const day of days) {
     const line = M.chartGeometry(day)
-    expect(line.points.at(-1).y).toBeGreaterThan(line.step.y)
+    expect([line.points.at(-1).y > line.baselineY, M.money(line.lo + (1 - line.baselineY) * (line.hi - line.lo))]).toEqual([true, "348.22"])
   }
   // A row scrubbed there reads the same.
   for (const day of [quote, ...days]) expect(M.rowModel(day, fourFortyFive, "pct")).toMatchObject({ priceText: "345.92", changeText: "\u22120.66%", dayUp: false })
@@ -2807,8 +2817,8 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   // Monday 01:00: still Friday and the night, ticked at Friday's close,
   // the night's open and its midnight. 04:20: still Friday, the night and
   // now the pre-market joined, bright, the dot on its newest trade, the
-  // dashed line stepping at Friday's bell to the close the pre-market
-  // counts from. JNJ at 04:05 too: nothing turns at 04:00.
+  // dashed line at the close the pre-market counts from, Friday's, Friday
+  // itself grey. JNJ at 04:05 too: nothing turns at 04:00.
   const one = dayAt("watch-2026-10-26-0100", "nbis").day
   expect(M.chartGeometry(one).ticks).toEqual([at("2026-10-23", "16:00"), at("2026-10-25", "20:00"), at("2026-10-26", "00:00")]
     .map(t => M.fractionAtTime(one, t)))
@@ -2824,7 +2834,7 @@ test("a weekend shows Friday from its open to its last trade, then Sunday's nigh
   expect(M.chartSpan(dayAt("watch-2026-10-26-0405", "jnj").day).start).toBe(at("2026-10-23", "09:30"))
   // 07:00 from Yahoo's two-day answer: a scrub of Friday's after hours
   // reads the same in the panel and in the row, both from Friday's close,
-  // where the dashed line steps.
+  // the dashed line.
   const twoDay = M.parseChart(fixture("moments/watch-2026-10-26-0700/2d/nbis.json"), cents)
   const seven = M.dayChart(twoDay, robinhood("watch-2026-10-26-0700"), calendars)
   const sevenNewest = M.newestTrade(twoDay, seven.latest, calendars, seven.day)
@@ -2998,11 +3008,10 @@ test("until the next open a listing Robinhood trades all day shows the day that 
   // Friday 23 October at 01:00 and 02:30: every headline is Thursday's
   // close and move. NVDA, AAPL and JNJ (a thin night) have traded since
   // Thursday's 20:00: their charts are Thursday's, the night so far joined
-  // at its end and bright, dashed at Wednesday's close until Thursday's
-  // bell and at Thursday's close after it. WREN, which Robinhood doesn't
-  // trade all day, and the S&P 500 draw Thursday too, dashed at Wednesday's
-  // close, with no night. A scrub anywhere says where the price stands
-  // against the dashed line under it.
+  // at its end and bright, dashed at Thursday's close, Thursday before its
+  // bell grey. WREN, which Robinhood doesn't trade all day, and the S&P 500
+  // draw Thursday too, dashed at Wednesday's close, with no night. A scrub
+  // anywhere says where the price stands against the close it counts from.
   for (const set of ["night-2026-10-23-0100", "night-2026-10-23-0230"]) {
     const charts = chartsAt(set, ["nvda", "aapl", "jnj", "wren", "gspc"])
     const [nvda, aapl, jnj, wren, gspc] = charts
@@ -3327,10 +3336,10 @@ test("at the open the chart holds the last session, with the new one's first tra
   // new one's first trades joined after it, the dot at the newest, until the
   // new one has three bars. One or two alone, scaled to the chart's height,
   // drew a dot, a line from top to bottom, or, from BHP's close above, a
-  // crash. At the bell the dashed line steps to the close the move counts
-  // from, as at night, where that is known. A shell started in those minutes
-  // drew no dashed line before the open, and draws none for the last
-  // session.
+  // crash. Once the new one trades, the dashed line is the close the move
+  // counts from, as at night, where that is known. A shell started in those
+  // minutes drew no dashed line before the open, and knows no close before
+  // the last session.
   const charted = (place, symbol, times, started = false) => {
     let held = null
     return times.map(time => {
@@ -3339,7 +3348,7 @@ test("at the open the chart holds the last session, with the new one's first tra
       const day = M.viewChart(held.symbol, "1D", { [held.symbol]: held }, {}, {}, {}, {}, calendars).day
       const weekday = M.WEEKDAYS[M.localClock(day.session.regular.start, day.gmtoffset).weekday]
       const money = p => M.money(p, day.priceDigits) || "\u2014"
-      const step = M.chartGeometry(day, calendars).step ? money(M.regularClose(day)) : "\u2014"
+      const step = M.chartGeometry(day, calendars).grey ? money(M.regularClose(day)) : "\u2014"
       return `${time} ${weekday} ${money(M.dayBase(day))} ${step} ${money(day.points.at(-1).p)}`
     })
   }

@@ -68,7 +68,7 @@ it for what it has no room for, such as the time of the newest price.
 
 At night, after the stock's first trade, the pill keeps the day's close
 and move until the new day's first prices arrive, soon after 04:00, and
-pointing at it shows tonight's.
+pointing at it shows tonight's. Until then its line draws tonight in grey.
 
 ## Reading the chart
 
@@ -119,18 +119,19 @@ traded since at its end: tonight's trades, for a US stock Robinhood trades
 at night, then any US stock's pre-market. The day that closed narrows as
 those hours add up, and hours the market is shut take no room, so a
 weekend or a holiday adds nothing. Those trades belong to the day ahead:
-from the first of them, the move counts from the close just gone, and the
-dashed line steps to that close at the bell. For about ten minutes after
-the open, until the new day has three five-minute bars, the chart keeps the
-day just closed, with the new day's first trades at its end, so a day of one
+from the first of them, the move counts from the close just gone, the
+dashed line marks that close, and the day before the bell turns grey,
+since the move doesn't count it. For about ten minutes after the open,
+until the new day has three five-minute bars, the chart keeps the day
+just closed, with the new day's first trades at its end, so a day of one
 or two trades doesn't fill the chart.
 
 For a US stock that Robinhood trades at night, the chart brightens the
 session trading now, such as tonight or the pre-market. The rows, like the
 pill, keep the day's close and move until the pre-market's first prices
-arrive, soon after 04:00. Where Yahoo has no prices for half an hour or
-more of the pre-market or after hours, the chart draws Robinhood's trades
-there, never in place of Yahoo's.
+arrive, soon after 04:00, and draw tonight in grey. Where Yahoo has no
+prices for half an hour or more of the pre-market or after hours, the
+chart draws Robinhood's trades there, never in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
 while its market trades, or saved from before and not yet refreshed.

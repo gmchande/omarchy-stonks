@@ -115,10 +115,16 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // trades, which `Overnight.fillsBetween` calls a stretch too. The line holds
 // the trade before it there and steps to the one after (`untraded`), where a
 // slope would draw trading that never happened. The scale holds every trade
-// and the close, so the baseline stays in view. Once tonight has traded, the
-// dashed line steps at the bell to the close just gone (`Day.nightBell`),
-// which the scale holds too: `step`.
-function chartGeometry(quote, calendars) {
+// and the close, so the baseline stays in view.
+//
+// Once tonight has traded (`Day.nightBell`), the day holds two closes, and
+// the one dashed line is the one the number beside the chart counts from:
+// the panel's, the close just gone, so the day before the bell draws grey;
+// a row's or the pill's while it keeps the day's move (`dayMove`), the
+// close before the day, so what traded since the bell draws grey: `grey`.
+// The scale holds both closes, so nothing moves when one look turns into
+// the other.
+function chartGeometry(quote, calendars, dayMove) {
   var pts = quote.points
   var axis = chartSpan(quote)
   var reg = quote.session.regular
@@ -128,13 +134,17 @@ function chartGeometry(quote, calendars) {
   }
   // An unknown close has no place on the scale: as zero it would flatten the
   // day against a baseline.
-  var base = Quote.dayBase(quote)
-  var known = Format.isFiniteNumber(base)
+  var dayBase = Quote.dayBase(quote)
   var bell = Day.nightBell(quote)
-  var stepBase = bell !== null ? Quote.regularClose(quote) : null
+  // Known apart from the day's: Yahoo can send the close without the one before.
+  var gone = bell !== null ? Quote.regularClose(quote) : null
+  var stepped = Format.isFiniteNumber(gone)
+  var base = stepped && !dayMove ? gone : dayBase
+  var known = Format.isFiniteNumber(base)
   var lo = known ? base : (pts.length ? pts[0].p : 0)
   var hi = lo
-  if (Format.isFiniteNumber(stepBase)) { lo = Math.min(lo, stepBase); hi = Math.max(hi, stepBase) }
+  if (stepped) { lo = Math.min(lo, gone); hi = Math.max(hi, gone) }
+  if (Format.isFiniteNumber(dayBase)) { lo = Math.min(lo, dayBase); hi = Math.max(hi, dayBase) }
   for (var j = 0; j < pts.length; j++) {
     if (pts[j].p < lo) lo = pts[j].p
     if (pts[j].p > hi) hi = pts[j].p
@@ -161,11 +171,11 @@ function chartGeometry(quote, calendars) {
     var x = axisFraction(axis, axis.ticks[n])
     if (x > 0 && x < 1) ticks.push(x)
   }
+  var bellX = stepped ? axisFraction(axis, bell) : 0
   return {
     points: out,
     baselineY: known ? 1 - (base - lo) / (hi - lo) : null,
-    // Known apart from the day's: Yahoo can send the close without the one before.
-    step: Format.isFiniteNumber(stepBase) ? { x: axisFraction(axis, bell), y: 1 - (stepBase - lo) / (hi - lo) } : null,
+    grey: !stepped ? null : dayMove ? { from: bellX, to: 1 } : { from: 0, to: bellX },
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true
@@ -184,10 +194,11 @@ function hasBaseline(geometry) {
   return !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
 }
 
-// The dashed line's height at `x`: the step's height once `x` is past the
-// bell, the day's before it, and null where there is no line.
-function baseAt(geometry, x) {
-  return geometry.step && x >= geometry.step.x ? geometry.step.y : geometry.baselineY
+// Whether `x` is in the stretch the number beside the chart doesn't count
+// (`chartGeometry`'s `grey`).
+function greyAt(geometry, x) {
+  var grey = geometry.grey
+  return !!grey && x >= grey.from && (x < grey.to || grey.to >= 1)
 }
 
 // Without the drawing: a scrub step asks it of every row. A quote with the
@@ -251,26 +262,29 @@ function stepTime(quote, t, steps, last) {
 
 // Retro's cells for a chart `width` by `height`, of `pixel` cells `gap`
 // apart: each column's level, whether it is dim, which side of the close
-// it is on (`above`), the last column lit, and the baseline's row, which
-// steps to `stepRow` from `stepCol` on. The last
-// trade in a column wins: the price at the end of that stretch. A range's
-// start (`rangeStart`) keeps the first column to itself, so the column the
-// line starts from is always there (`ownStart`, `retroColumn`). A column
-// between two trades the line joins holds the one before it; a break (`brk`)
-// and a stretch with no trade (`untraded`) leave columns dark. With no previous
-// close known, the columns stand on the floor, until a step to a close that
-// is known. A column's side is its own price's against the close, unrounded,
-// as smooth's line is: a price a hair under the close, on the close's row, is
-// below; one at the close is above, as smooth's line there is up.
+// it is on (`above`), the last column lit, the baseline's row, and the
+// columns from `greyFrom` to before `greyTo`, which draw grey
+// (`chartGeometry`'s `grey`). The last trade in a column wins: the price at
+// the end of that stretch. A range's start (`rangeStart`) keeps the first
+// column to itself, so the column the line starts from is always there
+// (`ownStart`, `retroColumn`). A column between two trades the line joins
+// holds the one before it; a break (`brk`) and a stretch with no trade
+// (`untraded`) leave columns dark. With no previous close known, the columns
+// stand on the floor. A column's side is its own price's against the close,
+// unrounded, as smooth's line is: a price a hair under the close, on the
+// close's row, is below; one at the close is above, as smooth's line there
+// is up.
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, greyFrom: columns, greyTo: columns, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
-  var step = geometry.step
-  g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
-  g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
+  var grey = geometry.grey
+  if (grey) {
+    g.greyFrom = Math.floor(grey.from * columns)
+    g.greyTo = grey.to >= 1 ? columns : Math.floor(grey.to * columns)
+  }
   var pts = geometry.points
   g.ownStart = pts.length > 1 && columns > 1 && !!pts[0].rangeStart
   // Halfway to the next point, where a scrub, which reads the nearest
@@ -288,17 +302,12 @@ function retroGrid(geometry, width, height, pixel, gap) {
       g.dim[held] = g.dim[last]
     }
     g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
-    g.above[col] = pts[i].y <= (col >= g.stepCol ? step.y : hasBaseline(geometry) ? geometry.baselineY : 1)
+    g.above[col] = pts[i].y <= (hasBaseline(geometry) ? geometry.baselineY : 1)
     g.dim[col] = pts[i].dim
     last = col
   }
   if (last >= 0 && !g.dim[last]) g.lastLit = last
   return g
-}
-
-// The baseline's row under column `c`.
-function retroBaseRow(g, c) {
-  return c >= g.stepCol ? g.stepRow : g.baseRow
 }
 
 // The column a place `x` along the chart stands in: a point's, a scrub's or

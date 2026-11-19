@@ -693,11 +693,14 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         day: sightDay
+        // Read once for both: every row reads it again on each new trade.
+        readonly property var newestTrade: root.newestTrades[symbol] || null
+        keepsDay: Overnight.keepsDay(newestTrade)
         // Only rows in sight follow the scrub, or each step repaints every
         // row; each reads its own line, where its dot sits. At rest a new
         // line, as a refresh brings, leaves the figures be.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
-        view: quote ? Figures.listRow(quote, root.changeMode, root.newestTrades[symbol] || null, sightScrub ? day : null, sightScrub) : null
+        view: quote ? Figures.listRow(quote, root.changeMode, newestTrade, sightScrub ? day : null, sightScrub) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: inSight ? root.freshnessOf(symbol) : null
