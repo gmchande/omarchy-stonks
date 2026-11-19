@@ -175,8 +175,11 @@ Item {
           var color = !root.hasBaseline && c < g.stepCol ? root.baselineColor : above ? root.aboveColor : root.belowColor
           var dim = g.dim[c] ? 0.45 : 1
           var x = c * g.pitch
-          var top = Math.min(y, baseY)
-          var h = Math.abs(y - baseY)
+          // The stem fills the rows between the baseline's and the cap's, on
+          // both sides alike, so equal moves stand equally long and the
+          // baseline's dots show under every column.
+          var top = Math.min(y, baseY) + pixel
+          var h = Math.abs(y - baseY) - pixel
           if (h > 0) {
             var stem = g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
