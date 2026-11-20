@@ -1741,6 +1741,33 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
 })
 
+test("Robinhood's quote is asked each minute while a night trades, for the pill's stock with nothing open and the US stocks on show with a surface open, once it trades them all day, and with their trades", () => {
+  const now = at(WED, "21:00")
+  const trades = { status: "ok", allDay: true, at: now - 60 }
+  const base = {
+    open: false, pill: true, featured: "AAPL", overnightSymbols: ["AAPL", "MSFT", "NVDA"], allSymbols: ["AAPL", "MSFT", "NVDA", "SHEL.L"], inSight: [],
+    preview: "", previewShown: false, previewQuote: null, allDay: { AAPL: trades, MSFT: trades, NVDA: trades }, lastTrades: {}, interval: 60, now, calendars
+  }
+  const asks = (changes, alongside = []) => M.lastTradeAsks({ ...base, ...changes }, alongside)
+  const askedAgo = (ago, symbols = ["AAPL"]) => Object.fromEntries(symbols.map(s => [s, { status: "ok", trade: null, at: now - ago }]))
+  // Nothing open: the pill's stock, each minute; with no pill, nothing.
+  expect([asks({}), asks({ lastTrades: askedAgo(30) }), asks({ lastTrades: askedAgo(60) }), asks({ pill: false })]).toEqual([["AAPL"], [], ["AAPL"], []])
+  // By day, and on a Saturday night, nothing.
+  expect([asks({ now: at(WED, "14:00") }), asks({ now: at("2026-10-24", "21:00") })]).toEqual([[], []])
+  // A surface open: the stock on show and the rows in sight, one Robinhood
+  // trades only by day or hasn't said left out. It goes once one is a
+  // minute old or the stock on show has none, so a row coming into sight
+  // waits for it; with it go those not yet asked, those due within half a
+  // minute, and those whose trades go now.
+  const open = { open: true, inSight: ["MSFT", "NVDA"] }
+  expect(asks(open)).toEqual(["AAPL", "MSFT", "NVDA"])
+  expect(asks({ ...open, allDay: { AAPL: trades, MSFT: { ...trades, allDay: false } } })).toEqual(["AAPL"])
+  expect(asks({ ...open, lastTrades: askedAgo(10) })).toEqual([])
+  expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(30, ["MSFT"]), ...askedAgo(10, ["NVDA"]) } })).toEqual(["AAPL", "MSFT"])
+  expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(10, ["MSFT"]) } })).toEqual(["AAPL", "NVDA"])
+  expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(10, ["MSFT", "NVDA"]) } }, ["NVDA"])).toEqual(["AAPL", "NVDA"])
+})
+
 test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {
   // The window previews NVDA while the panel shows AAPL; the window alone
   // charts only its preview, once it rests.

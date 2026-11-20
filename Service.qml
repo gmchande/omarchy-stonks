@@ -137,8 +137,8 @@ Item {
   function chartOf(symbol, range, quoteFeed) {
     var quotes = quoteFeed.quotes
     return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
-      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewDayClock),
-      overnightFeed.entries, allDayFeed.entries)
+      range === "1D" ? ({}) : historyFeed.entries, root.nights, allDayFeed.entries, calendars, root.viewDayClock),
+      root.nights, allDayFeed.entries)
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
@@ -161,7 +161,7 @@ Item {
   function keepDay(symbol, chart) {
     if (!chart || !chart.quote || chart.day === chart.quote) return
     if (builtDays[symbol] && builtDays[symbol].day === chart.day) return
-    builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, overnightFeed.entries, allDayFeed.entries), { day: chart.day, latest: chart.latest })
+    builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, root.nights, allDayFeed.entries), { day: chart.day, latest: chart.latest })
   }
   function dayMadeFrom(symbol, chart, nights, allDay) {
     var tradability = allDay ? allDay[symbol] : null
@@ -180,7 +180,7 @@ Item {
   // Each stock's newest price, with what it was worked out from.
   property var newestFrom: ({})
   function workOutNewest() {
-    var nights = overnightFeed.entries
+    var nights = root.nights
     var allDay = allDayFeed.entries
     var from = {}
     var out = {}
@@ -213,7 +213,7 @@ Item {
   property var heldOrder: null
   function releaseOrder() {
     if (!root.heldOrder) return
-    var out = feed.landing.length > 0 || overnightFeed.busy || allDayFeed.busy
+    var out = feed.landing.length > 0 || overnightFeed.busy || allDayFeed.busy || lastTradeFeed.busy
     var waiting = out || feed.busy || !!root.overnightWanted()
     if (out || (waiting && !yahooGate.paused && !robinhoodGate.paused)) return
     root.heldOrder = null
@@ -642,10 +642,33 @@ Item {
     id: overnightFeed
     gate: robinhoodGate
     holding: root.drawing.length > 0
-    onEntriesChanged: Qt.callLater(root.askOvernight)
+    onEntriesChanged: {
+      root.joinNights()
+      Qt.callLater(root.askOvernight)
+    }
     onBusyChanged: Qt.callLater(root.releaseOrder)
   }
-  readonly property var nights: overnightFeed.entries
+  LastTradeFeed {
+    id: lastTradeFeed
+    gate: robinhoodGate
+    holding: root.drawing.length > 0
+    onEntriesChanged: {
+      root.joinNights()
+      Qt.callLater(root.askOvernight)
+    }
+    onBusyChanged: Qt.callLater(root.releaseOrder)
+  }
+  // Robinhood's trades with each listing's last trade from its quote
+  // (`Overnight.joinedNights`), set only when one changes.
+  property var nights: ({})
+  property var joins: ({})
+  function joinNights() {
+    var joined = Overnight.joinedNights(overnightFeed.entries, lastTradeFeed.entries, Overnight.overnightMarket(root.calendars),
+      { nights: root.nights, joins: root.joins })
+    root.joins = joined.joins
+    if (joined.nights !== root.nights) root.nights = joined.nights
+  }
+  onCalendarsChanged: joinNights()
   readonly property var allDay: allDayFeed.entries
   // Whether the night trades now, and the listings whose newest price may
   // be a trade Robinhood failed to send meanwhile: their "!".
@@ -654,9 +677,9 @@ Item {
     var night = cal ? Overnight.nightAt(cal, now) : null
     return !!night && night.open
   }
-  readonly property var nightFailed: Overnight.nightFailures(allDayFeed.entries, overnightFeed.entries, nightTrading)
+  readonly property var nightFailed: Overnight.nightFailures(allDayFeed.entries, overnightFeed.entries, lastTradeFeed.entries, nightTrading)
   // The feeds themselves, for whoever waits until no run is out.
-  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed })
+  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
   // it trades each all day.
   readonly property var overnightSymbols: allSymbols.filter(function(s) {
@@ -747,25 +770,34 @@ Item {
   }
   onPreviewRestsChanged: askDue()
   onRefreshIntervalSecChanged: askDue()
-  // Robinhood's two questions go side by side, so a 1D chart waits for one
+  // Robinhood's questions go side by side, so a 1D chart waits for one
   // answer, never two in a row.
   function askOvernight() {
     if (!root.ready) return
     var open = root.openSurfaces.length > 0
-    var asks = root.overnightWanted()
-    if (!asks || !root.screensClear()) return
+    var asking = root.robinhoodAsking()
+    var asks = Asks.overnightAsks(asking)
+    var lastTrades = Asks.lastTradeAsks(asking, asks ? asks.trades : [])
+    if ((!asks && lastTrades.length === 0) || !root.screensClear()) return
     // The pill's own ask waits for a request already out.
-    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
-    // After a pause one request goes alone. While it is out, the other ask
-    // waits for its answer rather than fail unasked and wait five minutes.
+    if (!open && (allDayFeed.busy || overnightFeed.busy || lastTradeFeed.busy)) return
+    // After a pause one request goes alone. While it is out, the other asks
+    // wait for its answer rather than fail unasked and wait five minutes.
     if (robinhoodGate.loneOut) return
-    allDayFeed.fetch(asks.tradability, root.now)
-    if (robinhoodGate.loneOut) return
-    overnightFeed.fetch(asks.trades, root.now)
+    if (asks) {
+      allDayFeed.fetch(asks.tradability, root.now)
+      if (robinhoodGate.loneOut) return
+      overnightFeed.fetch(asks.trades, root.now)
+      if (robinhoodGate.loneOut) return
+    }
+    lastTradeFeed.fetch(lastTrades, root.now)
   }
   function overnightWanted() {
+    return Asks.overnightAsks(root.robinhoodAsking())
+  }
+  function robinhoodAsking() {
     var previewed = root.previewSymbol
-    return Asks.overnightAsks({
+    return {
       open: root.openSurfaces.length > 0,
       pill: root.pillInBar,
       featured: root.view.featured,
@@ -780,9 +812,11 @@ Item {
       previewQuote: previewFeed.quotes[previewed] || feed.quotes[previewed] || root.previewResult,
       allDay: allDayFeed.entries,
       nights: overnightFeed.entries,
+      lastTrades: lastTradeFeed.entries,
+      interval: root.refreshIntervalSec,
       now: root.now,
       calendars: root.calendars
-    })
+    }
   }
   onOvernightSymbolsChanged: askOvernight()
   onAllDaySymbolsChanged: askOvernight()
@@ -867,6 +901,7 @@ Item {
     prune(fundamentalsFeed, function() { return false })
     prune(allDayFeed, function(entry) { return !Overnight.allDayDue(entry, now) })
     prune(overnightFeed, function(entry) { return !!entry.at && now - entry.at < Overnight.OVERNIGHT_INTERVAL })
+    prune(lastTradeFeed, function(entry) { return now - entry.at < root.refreshIntervalSec })
   }
 
   // A user's refresh. A host paused for no answer is tried at once. While

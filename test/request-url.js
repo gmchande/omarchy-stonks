@@ -26,6 +26,7 @@ export function requestUrl(raw) {
   } else if (u.hostname === 'api.robinhood.com') {
     if (u.pathname === '/instruments/') parameters({}, {symbols})
     else if (u.pathname === '/marketdata/historicals/') parameters({interval:'5minute', bounds:'24_5'}, {symbols, span:s=>s === 'day' || s === 'hour'})
+    else if (u.pathname === '/marketdata/quotes/') parameters({bounds:'24_5'}, {symbols})
     else throw new Error('unknown Robinhood route')
   } else if (u.hostname === 'query2.finance.yahoo.com' && u.pathname === '/v1/finance/search') {
     parameters({newsCount:'0'}, {q:s=>s.trim().length > 0,quotesCount:epoch})

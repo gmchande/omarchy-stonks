@@ -9,14 +9,15 @@
 // a 1D chart draws from them is `Day.js`'s.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
+var QUOTES_URL = "https://api.robinhood.com/marketdata/quotes/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
 
 // Robinhood's newest bar arrives five to ten minutes after it starts.
 var OVERNIGHT_LAG = 10 * 60
 
-// A liquid name's newest bar is ten to fifteen minutes old, so a trade
-// dims only once it has missed one.
-var OVERNIGHT_STALE = 20 * 60
+// A night's price says "As of" past two minutes, as a day's does
+// (`Freshness.LIVE_QUOTE_MAX_AGE`): Robinhood's quote is asked every minute.
+var OVERNIGHT_STALE = 2 * 60
 
 // Robinhood's bars are five minutes each.
 var SLOT = 5 * 60
@@ -198,6 +199,78 @@ function sameBars(a, b) {
   return true
 }
 
+// ---- Robinhood's quote: the night's last trade
+
+// Robinhood took 150 symbols a quote request when we measured, at about
+// 840 bytes each; its historicals take 75, and so does this.
+var LAST_TRADE_BATCH = 75
+
+function lastTradeUrl(symbols) {
+  return QUOTES_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",") + "&bounds=24_5"
+}
+
+function lastTradeCap(count) {
+  return 16000 + 4000 * count
+}
+
+// Each listing's last trade outside the regular session, at its venue's
+// time, whole seconds, from a quote's answer; null for one Robinhood sent
+// none for, and null for the whole answer when it can't be read. The bid
+// and ask are never read: a price between them is no trade. Robinhood
+// answers an unknown symbol null, in the order asked.
+function lastTrades(json, symbols) {
+  var results = Format.fetchedList(json && json.results, symbols.length)
+  if (!results) return null
+  var out = {}
+  for (var i = 0; i < symbols.length; i++) {
+    var wanted = robinhoodSymbol(symbols[i])
+    var r = results.filter(function(x) { return x && x.symbol === wanted })[0]
+    // Its venue's clock to the nanosecond, which Date.parse can't read.
+    var stamp = r && typeof r.venue_last_non_reg_trade_time === "string" ? r.venue_last_non_reg_trade_time.replace(/(\.\d{3})\d+/, "$1") : ""
+    var t = Math.floor(Date.parse(stamp) / 1000)
+    var p = r ? Number(r.last_non_reg_trade_price) : NaN
+    out[symbols[i]] = Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0 ? { t: t, p: p, s: "overnight" } : null
+  }
+  return out
+}
+
+// The quote's trade, where it is tonight's and newer than every bar the
+// chart has: one in an open night, from 20:00 to 04:00, since from 04:00
+// Yahoo has the pre-market. A bar's close is its slot's last trade as
+// Robinhood answered, so a trade inside the newest bar's slot is newer only
+// where the quote was asked no earlier than the bars. `entry` is the quote
+// feed's, `night` the trades', `cal` the night's calendar.
+function joinedTrade(night, entry, cal) {
+  var trade = entry ? entry.trade : null
+  var hours = trade && cal ? nightAt(cal, trade.t) : null
+  if (!night || !hours || !hours.open) return null
+  var last = night.bars.length ? night.bars[night.bars.length - 1] : null
+  if (last && (trade.t <= last.t || (trade.t < last.t + SLOT && entry.at < night.at))) return null
+  return trade
+}
+
+// Robinhood's trades, each listing's with its quote's trade at their end
+// where `joinedTrade` takes it: what the chart, the rows' lines and the
+// price on top read. `had` is the last call's { nights, joins }: a listing
+// whose trades and quote didn't change keeps its object, and so do the
+// nights while none does.
+function joinedNights(nights, lastTrades, cal, had) {
+  var joins = {}
+  var out = {}
+  var same = Object.keys(nights).length === Object.keys(had.nights).length
+  for (var symbol in nights) {
+    var night = nights[symbol]
+    var trade = joinedTrade(night, lastTrades[symbol], cal)
+    var join = had.joins[symbol]
+    if (trade) joins[symbol] = join && join.night === night && join.trade === trade ? join
+      : { night: night, trade: trade, joined: Object.assign({}, night, {
+        bars: join && join.night.bars === night.bars && join.trade === trade ? join.joined.bars : night.bars.concat([trade]) }) }
+    out[symbol] = trade ? joins[symbol].joined : night
+    same = same && had.nights[symbol] === out[symbol]
+  }
+  return { nights: same ? had.nights : out, joins: joins }
+}
+
 function marketDay(cal, dateString) {
   return {
     date: dateString,
@@ -228,15 +301,15 @@ function nightTrades(quote, allDay, t, calendars) {
 
 // The listings whose newest price may be a trade Robinhood failed to send,
 // while the night trades (`open`): those it has never said trade all day or
-// not, its last check failed, and those it trades all day whose trades
-// failed. `allDay` and `nights` are Robinhood's entries.
-function nightFailures(allDay, nights, open) {
+// not, its last check failed, and those it trades all day whose trades or
+// quote failed. `allDay`, `nights` and `lastTrades` are Robinhood's entries.
+function nightFailures(allDay, nights, lastTrades, open) {
   var out = {}
   if (!open) return out
+  var failed = function(entry) { return !!entry && entry.status === "failed" }
   for (var symbol in allDay) {
     var tradability = allDay[symbol]
-    var night = nights[symbol]
-    if (tradability.allDay === null ? tradability.status === "failed" : tradability.allDay && !!night && night.status === "failed") out[symbol] = true
+    if (tradability.allDay === null ? tradability.status === "failed" : tradability.allDay && (failed(nights[symbol]) || failed(lastTrades[symbol]))) out[symbol] = true
   }
   return out
 }

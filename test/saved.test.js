@@ -1401,13 +1401,17 @@ test("outside trading an old close is normal, but a failed refresh still shows",
   const failed = { status: "failed", receivedAt: night - 60 }
   expect(M.freshness(failed, closeQuote, night, 0).state).toBe("failed")
   // So does Robinhood's while a night trades: a first check that failed,
-  // leaving unknown whether the night trades the listing, or the trades of
-  // one it trades all day. A failed check after an answer keeps that
-  // answer. By day Yahoo's price is the newest, and nothing is said.
+  // leaving unknown whether the night trades the listing, or the trades or
+  // the quote of one it trades all day. A failed check after an answer
+  // keeps that answer. By day Yahoo's price is the newest, and nothing is
+  // said.
   const firstCheck = M.allDayEntry(null, "AAPL", undefined, night - 60)
-  const allDay = { AAPL: firstCheck, MSFT: { status: "ok", allDay: true, at: 0 }, JNJ: M.allDayEntry(null, "JNJ", { status: "ok", allDay: false, at: 0 }, night - 60) }
-  const nights = { MSFT: { status: "failed", bars: [], through: null, at: night - 60 } }
-  expect([firstCheck.allDay, M.nightFailures(allDay, nights, true), M.nightFailures(allDay, nights, false)]).toEqual([null, { AAPL: true, MSFT: true }, {}])
+  const allDay = { AAPL: firstCheck, MSFT: { status: "ok", allDay: true, at: 0 }, NVDA: { status: "ok", allDay: true, at: 0 },
+    JNJ: M.allDayEntry(null, "JNJ", { status: "ok", allDay: false, at: 0 }, night - 60) }
+  const nights = { MSFT: { status: "failed", bars: [], through: null, at: night - 60 }, NVDA: { status: "ok", bars: [], through: null, at: night - 60 } }
+  const lastTrades = { NVDA: { status: "failed", trade: null, at: night - 30 }, JNJ: { status: "failed", trade: null, at: night - 30 } }
+  expect([firstCheck.allDay, M.nightFailures(allDay, nights, lastTrades, true), M.nightFailures(allDay, nights, lastTrades, false)])
+    .toEqual([null, { AAPL: true, MSFT: true, NVDA: true }, {}])
   const robinhoodFailed = M.freshness(ok, closeQuote, night, 0, false, null, true)
   expect([robinhoodFailed.state, M.freshnessWarns(robinhoodFailed), M.freshnessText(robinhoodFailed, q)]).toEqual(["failed", true, "REFRESH FAILED · AS OF 16:00"])
 })
@@ -2211,14 +2215,15 @@ test("once a listing trades after its close, its newest price is on top, measure
 })
 
 // A watch moment's listings as the service holds them, answered at the
-// moment: their quotes, Robinhood's trades and word on all-day trading, and
-// each one's newest price since its close (`newestTrades`).
+// moment: their quotes, Robinhood's trades, with the last trade from its
+// quote where the moment saved one, and word on all-day trading, and each
+// one's newest price since its close (`newestTrades`).
 const topsAt = set => {
   const now = answeredAt(set)
   const asked = fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)
   const trades = traded(set, asked)
   const ins = M.parseAllDay(fixture(`moments/${set}/robinhood-instruments.json`), asked)
-  const quotes = {}, nights = {}, allDay = {}
+  const quotes = {}, answered = {}, allDay = {}
   for (const file of readdirSync(join(fixtures, "moments", set))) {
     if (!file.endsWith(".json") || file.startsWith("robinhood")) continue
     const q = M.parseChart(fixture(`moments/${set}/${file}`), cents, now)
@@ -2226,9 +2231,15 @@ const topsAt = set => {
     const rs = M.robinhoodSymbol(q.symbol)
     if (rs in ins) {
       allDay[q.symbol] = { status: "ok", allDay: ins[rs], at: 0 }
-      nights[q.symbol] = { status: "ok", ...trades[rs] }
+      answered[q.symbol] = { status: "ok", ...trades[rs], at: now }
     }
   }
+  // A null in the saved answer is a symbol Robinhood doesn't know, asked
+  // with them.
+  const saved = existsSync(join(fixtures, "moments", set, "robinhood-quotes.json")) ? fixture(`moments/${set}/robinhood-quotes.json`) : null
+  const quoted = saved ? M.lastTrades(saved, [...Object.keys(answered), ...saved.results.filter(r => r === null).map((r, i) => "UNKNOWN" + i)]) : {}
+  const lastTrades = Object.fromEntries(Object.keys(answered).map(s => [s, { status: "ok", trade: quoted[s] || null, at: now }]))
+  const nights = M.joinedNights(answered, lastTrades, M.overnightMarket(calendars), { nights: {}, joins: {} }).nights
   const symbols = Object.keys(quotes)
   const newest = newestTrades(symbols, quotes, nights, allDay)
   // The panel's two lines (`heroLines`), each said whole: under the price,
@@ -2254,6 +2265,44 @@ const topsAt = set => {
   }
   return { now, quotes, nights, allDay, symbols, newest, top, lines, pill }
 }
+
+test("at night the price on top is Robinhood's last trade at its venue's second, the line ending on it, never its bid, ask or mid, nor one older than the line's last bar", () => {
+  // Thursday 19 November 22:16 New York, as Robinhood's night traded: its
+  // historicals' newest bar began at 22:10, and its quotes' trades came
+  // within 12 seconds of the answer. Robinhood trades NVDA and AAPL all day,
+  // and BRK-B and BLDP only by day, so those two keep their after hours,
+  // though its quote holds a night trade for each.
+  const set = "night-2026-11-19-2216"
+  const night = topsAt(set)
+  const t = clock => at("2026-11-19", clock)
+  expect(["NVDA", "AAPL", "BRK-B", "BLDP"].map(s => [s, night.newest[s].p, night.newest[s].t, night.newest[s].phase])).toEqual([
+    ["NVDA", 143.83, t("22:16") + 24, "overnight"], ["AAPL", 351.12, t("22:16") + 12, "overnight"],
+    ["BRK-B", 571.89, t("19:58") + 24, "post"], ["BLDP", 1.11, t("18:59") + 58, "post"]])
+  // AAPL's bid was 351.07 and its ask 351.26. The panel's price is the
+  // trade's, up 0.55% on Yahoo's close of 349.21, the pill's hover names its
+  // minute, and the line ends on it.
+  expect(night.top("AAPL").split(" | ")[0]).toBe("351.12 +0.55%")
+  expect(M.newestNote(night.quotes.AAPL, night.newest.AAPL, night.now, calendars)).toBe("Overnight 22:16")
+  expect(M.lineDay("AAPL", night.quotes.AAPL, night.nights, night.allDay, calendars, night.now).points.at(-1))
+    .toEqual({ t: t("22:16") + 12, p: 351.12, s: "overnight" })
+  // A quote asked before the bars, its trade inside their last bar's slot,
+  // the 22:10 one, may be older than that bar's close, which then stays on
+  // top. After that slot it is the newer, however it was asked.
+  const cal = M.overnightMarket(calendars)
+  const bars = { status: "ok", ...traded(set, ["NVDA"]).NVDA, at: night.now }
+  const trade = { t: t("22:14"), p: 143.8, s: "overnight" }
+  expect(bars.bars.at(-1).t).toBe(t("22:10"))
+  expect([M.joinedTrade(bars, { status: "ok", trade, at: night.now }, cal), M.joinedTrade(bars, { status: "ok", trade, at: night.now - 1 }, cal)])
+    .toEqual([trade, null])
+  const later = { ...trade, t: t("22:15") }
+  expect(M.joinedTrade(bars, { status: "ok", trade: later, at: night.now - 600 }, cal)).toBe(later)
+  // A trade before 20:00, after hours, or on a Saturday night is no night's
+  // price, and a symbol Robinhood doesn't know has none.
+  const none = { ...bars, bars: [] }
+  expect([t("19:59"), at("2026-11-21", "21:00")].map(when => M.joinedTrade(none, { status: "ok", trade: { ...trade, t: when }, at: when + 1 }, cal)))
+    .toEqual([null, null])
+  expect(M.lastTrades(fixture(`moments/${set}/robinhood-quotes.json`), ["NVDA", "AAPL", "BRK-B", "BLDP", "ZZZZQ"]).ZZZZQ).toBe(null)
+})
 
 test("in every phase, a stock that has traded since its close shows that newest price on top of the panel, measured from its chart's dashed line, and on its row and the pill but at night", () => {
   // The weekend watch's moments, 25 to 27 October. NBIS and JNJ trade at
@@ -2517,9 +2566,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // Monday 04:20 JNJ's pre-market price, up on Friday's close though Friday fell, counts up.
   const early = topsAt("watch-2026-10-26-0420")
   expect(M.listBreadth(["JNJ"], early.quotes, null, 0, "pct", early.newest)).toEqual({ up: 1, flat: 0, down: 0, none: 0 })
-  // A night's price dims once Robinhood has missed a bar.
+  // A night's price dims once its trade is more than two minutes old, as a
+  // day's says "As of".
   const nbis = sunday.newest.NBIS
-  expect([M.newestStale(nbis, nbis.t + 20 * 60), M.newestStale(nbis, nbis.t + 20 * 60 + 1)]).toEqual([false, true])
+  expect([M.newestStale(nbis, nbis.t + 120), M.newestStale(nbis, nbis.t + 121)]).toEqual([false, true])
   // An after-hours price never dims.
   expect(M.newestStale(sunday.newest.PSIX, sunday.newest.PSIX.t + DAY)).toBe(false)
   // The pill's hover names the newest price's session and its time.
@@ -3520,8 +3570,10 @@ test("an overnight trade is its own line under the price, measured from the clos
   const strip = name => stripAt(dayAt("night", name), now)
   const nest = savedDay("night", "nest")
   const nestDay = dayAt("night", "nest").day
-  // NEST traded to 22:50, ten minutes ago: Robinhood's newest bar.
-  expect(strip("nest")).toEqual({ price: "234.27", changeText: "+0.86%", tone: "up", label: "OVERNIGHT", time: "22:50", stale: false })
+  // NEST traded to 22:50, ten minutes ago: Robinhood's newest bar, past two
+  // minutes old, so it dims.
+  expect(strip("nest")).toEqual({ price: "234.27", changeText: "+0.86%", tone: "up", label: "OVERNIGHT", time: "22:50", stale: true })
+  expect(stripAt(dayAt("night", "nest"), at("2026-10-01", "22:52")).stale).toBe(false)
   expect(M.money(M.regularClose(nest))).toBe("232.28")
   // The night's trades are the line of the day they open, its newest the
   // 22:50 bar; never the headline, which with no newest price given is
@@ -3529,7 +3581,7 @@ test("an overnight trade is its own line under the price, measured from the clos
   expect(nestDay.points.at(-1)).toEqual({ t: at("2026-10-01", "22:50"), p: 234.27, s: "overnight" })
   expect(M.dayLine(nest, M.exchangeDay(nest, now)).range.high).toBe(nest.dayHigh)
   expect(M.rowModel(nest, 0, "pct").priceText).toBe("232.28")
-  // SILK last traded at 22:20: forty minutes old, it dims.
+  // SILK last traded at 22:20: forty minutes old, it dims too.
   expect(strip("silk")).toMatchObject({ label: "OVERNIGHT", time: "22:20", stale: true })
   // REED has not traded tonight: no overnight line, its after-hours stays.
   expect(strip("reed")).toMatchObject({ label: "AFTER HOURS", time: "" })
