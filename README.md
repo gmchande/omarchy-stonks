@@ -24,8 +24,9 @@ the chart and your lists.
 - Everything works by mouse alone, and `?` lists the keys.
 - Light on your computer: with the panel closed, 152 stocks and one
   screen, Stonks uses about 0.1% of one core. It asks for a stock about
-  once a minute while its market trades, less often while it's shut, and
-  not at all while your screens are off.
+  once a minute while its market trades, every 5 minutes while its trades
+  stream, less often while it's shut, and not at all while your screens
+  are off.
 - Free, with no account and no API key.
 
 Stonks doesn't track your holdings, send price alerts or show news.
