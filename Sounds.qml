@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
 import "Commands.js" as Commands
@@ -89,7 +90,7 @@ Item {
   }
 
   function bundled(look, name) {
-    return String(Qt.resolvedUrl("sounds/" + look + "/" + name + ".wav")).replace(/^file:\/\//, "")
+    return Commands.pluginPath(Qt.resolvedUrl("sounds/" + look + "/" + name + ".wav"), Quickshell.shellDir)
   }
 
   // With the whole lead-in when it needs one, from the cache's folder once
@@ -255,7 +256,7 @@ Item {
   // command that fails to start never exits.
   Process {
     id: survey
-    command: Commands.soundSurvey(String(Qt.resolvedUrl(".")).replace(/^file:\/\//, ""), root.folder)
+    command: Commands.soundSurvey(Commands.pluginPath(Qt.resolvedUrl("."), Quickshell.shellDir), root.folder)
     stdout: StdioCollector { id: surveyAnswer }
     onRunningChanged: if (!running) root.takeSurvey(surveyAnswer.text)
   }

@@ -131,6 +131,26 @@ test("a saved file is read only when it is a regular file of at most its cap, at
   }
 }))
 
+// The shell names a plugin's files by qs: URLs, Qt by file: ones, and a
+// harness that loads the plugin inside the shell's folder by "qs:@/qs/": the
+// sounds and the survey of what they're made from find the plugin's files
+// from each.
+test("the sounds and their survey find the plugin's files from the URL the shell, Qt or a harness names them by", () => scratch(dir => {
+  const cache = join(dir, "cache")
+  mkdirSync(cache)
+  const shellDir = join(dir, "shell")
+  mkdirSync(shellDir)
+  symlinkSync(root, join(shellDir, "plugin"))
+  const urls = ["qs://" + root + "/", "file://" + root + "/", "qs:@/qs/plugin/"]
+  for (const url of urls) {
+    const folder = C.pluginPath(url, shellDir)
+    const surveyed = C.readSoundSurvey(run(C.soundSurvey(folder, cache), { PATH: process.env.PATH }).out, 5)
+    expect([url, surveyed.sums.smooth.length, existsSync(C.pluginPath(url + "sounds/smooth/bell.wav", shellDir))]).toEqual([url, 8, true])
+  }
+  // A folder whose name has a space in it, as a URL spells it.
+  expect(C.pluginPath("qs:///home/me/My%20Plugins/grvc.stonks/sounds/smooth/bell.wav", shellDir)).toBe("/home/me/My Plugins/grvc.stonks/sounds/smooth/bell.wav")
+}))
+
 test("the sounds made in an earlier run are used again only while what they're made from is unchanged and they are no newer than its stamp", () => scratch(dir => {
   const cache = join(dir, "cache")
   mkdirSync(cache)
