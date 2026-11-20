@@ -242,6 +242,16 @@ function readSavedFile(code, bytes, text, cap) {
   return { refused: true }
 }
 
+// A file of the plugin's as a path a command can take, from the URL QML
+// resolves it to: the shell names a plugin outside its own folder
+// "qs:///home/…", one inside it, as a harness loads it, "qs:@/qs/…" under
+// `shellDir`, and Qt "file:///…".
+function pluginPath(url, shellDir) {
+  var s = String(url)
+  if (s.indexOf("qs:@/qs/") === 0) return shellDir + "/" + decodeURIComponent(s.slice(8))
+  return decodeURIComponent(s.replace(/^(qs|file):\/\//, ""))
+}
+
 // The sounds': once a run, the md5s of what the sounds are made from, each
 // look's stamp, and the files no newer than it. A newer one was written by
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is
