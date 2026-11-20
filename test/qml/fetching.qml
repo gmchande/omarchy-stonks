@@ -546,6 +546,15 @@ Harness {
         }
       })
       remove("ROBINHOOD.offline")
+      // r asks again at once for the pill's last trade, failed while
+      // Robinhood was gone, with the clock still.
+      var quoteFailed = !!service.feeds.lastTrade.entries.NEST && service.feeds.lastTrade.entries.NEST.status === "failed"
+      var rFromNight = harness.requests().length
+      service.refresh()
+      var reasked = within(3000, function() { return harness.requests().slice(rFromNight).some(function(l) { return /^lasttrade NEST 200$/.test(l) }) })
+      settle()
+      harness.check("r at night asks again at once for the pill's last trade that failed while Robinhood was gone",
+        quoteFailed && reasked && service.feeds.lastTrade.entries.NEST.status === "ok", [quoteFailed, harness.requests().slice(rFromNight).join(", ")].join(" | "))
       var clearedAt = 0
       tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
       harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",

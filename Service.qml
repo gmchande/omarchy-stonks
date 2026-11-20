@@ -778,6 +778,7 @@ Item {
     var asking = root.robinhoodAsking()
     var asks = Asks.overnightAsks(asking)
     var lastTrades = Asks.lastTradeAsks(asking, asks ? asks.trades : [])
+    root.lastTradeDueAt = Asks.lastTradeNext(asking)
     if ((!asks && lastTrades.length === 0) || !root.screensClear()) return
     // The pill's own ask waits for a request already out.
     if (!open && (allDayFeed.busy || overnightFeed.busy || lastTradeFeed.busy)) return
@@ -792,6 +793,9 @@ Item {
     }
     lastTradeFeed.fetch(lastTrades, root.now)
   }
+  // When the next quote falls due, so the clock wakes then with nothing open.
+  property int lastTradeDueAt: 0
+  onLastTradeDueAtChanged: armClock()
   function overnightWanted() {
     return Asks.overnightAsks(root.robinhoodAsking())
   }
@@ -921,12 +925,19 @@ Item {
     root.refreshRest()
   }
   // Only the charts on show: the rows' trades come on their own five-minute
-  // asks, and for 150 rows they are two answers of 4 MB each.
+  // asks, and for 150 rows they are two answers of 4 MB each. While a night
+  // trades, the last trades of what Robinhood's quote is asked about, the
+  // same second as those trades: one asked over 10 s ago, or failed.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
     var trades = Asks.refreshTrades(root.chartsOnShow(), root.allDaySymbols, overnightFeed.askedAt, now)
     if (trades.length > 0) overnightFeed.fetch(trades, now)
+    var entries = lastTradeFeed.entries
+    var lastTrades = Asks.lastTradeListings(root.robinhoodAsking()).filter(function(s) {
+      return !entries[s] || entries[s].status === "failed" || now - entries[s].at > Asks.REFRESH_AGAIN
+    })
+    if (lastTrades.length > 0) lastTradeFeed.fetch(lastTrades, now)
   }
 
   // "Refreshing" while a request a user's refresh made is out, whatever its
@@ -1168,7 +1179,7 @@ Item {
   function armClock() {
     if (!root.ready) return
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
-      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
+      [root.dueAt, root.lastTradeDueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
     clock.restart()
   }
   onDueAtChanged: armClock()

@@ -339,30 +339,47 @@ function shownListings(s) {
   return { listings: s.overnightSymbols.filter(shown).concat(previewing ? [s.preview] : []), previewing: previewing }
 }
 
-// Robinhood's quote, for the night's last trade, only while a night trades:
-// with a surface open for the listings `shownListings` names, with nothing
-// open for the pill's stock, each once Robinhood has said it trades all day.
-// It goes once one asked before is `interval` seconds old, or the chart
-// waited on, the preview's or else the stock on show, has none, so rows
-// coming into sight wait for it rather than each send a request. With it
-// go every listing not yet asked, those due within half an interval, and
-// those whose trades go now (`alongside`): a quote asked before its trades
-// can't say whether its trade is newer than their last bar
-// (`Overnight.joinedTrade`). `lastTrades` is the quote feed's entries,
-// `allDay` Robinhood's word on each.
-function lastTradeAsks(s, alongside) {
+// The listings Robinhood's quote is asked about, for the night's last
+// trade, only while a night trades: with a surface open those
+// `shownListings` names, with nothing open the pill's stock, each once
+// Robinhood has said it trades all day.
+function lastTradeListings(s) {
   var cal = Overnight.overnightMarket(s.calendars)
   var tonight = cal ? Overnight.nightAt(cal, s.now) : null
   if (!tonight || !tonight.open || (!s.open && !s.pill)) return []
-  var shown = shownListings(s)
-  var listings = s.open ? shown.listings : s.overnightSymbols.indexOf(s.featured) >= 0 ? [s.featured] : []
-  var traded = listings.filter(function(x) { return !!s.allDay[x] && s.allDay[x].allDay })
-  var waited = shown.previewing ? s.preview : s.featured
+  var listings = s.open ? shownListings(s).listings : s.overnightSymbols.indexOf(s.featured) >= 0 ? [s.featured] : []
+  return listings.filter(function(x) { return !!s.allDay[x] && s.allDay[x].allDay })
+}
+
+// The quote goes once one asked before is `interval` seconds old, the
+// chart waited on, the preview's or else the stock on show, has none, or
+// one is behind its trades: those asked now (`alongside`), or answered
+// since. A quote asked before its trades can't say whether its trade is
+// newer than their last bar (`Overnight.joinedTrade`). Rows coming into
+// sight with no quote yet wait for it rather than each send a request.
+// With it go every listing not yet asked, those due within half an
+// interval, and those behind. `lastTrades` is the quote feed's entries,
+// `nights` the trades', `allDay` Robinhood's word on each.
+function lastTradeAsks(s, alongside) {
+  var traded = lastTradeListings(s)
+  var waited = shownListings(s).previewing ? s.preview : s.featured
   var dueBy = function(at) {
     return function(x) { return !!s.lastTrades[x] && at - s.lastTrades[x].at >= s.interval }
   }
-  if (!traded.some(dueBy(s.now)) && !(traded.indexOf(waited) >= 0 && !s.lastTrades[waited])) return []
-  return traded.filter(function(x) { return !s.lastTrades[x] || dueBy(s.now + s.interval / 2)(x) || alongside.indexOf(x) >= 0 })
+  var behind = function(x) {
+    var entry = s.lastTrades[x]
+    return !!entry && (alongside.indexOf(x) >= 0 || (!!s.nights[x] && s.nights[x].at > entry.at))
+  }
+  if (!traded.some(dueBy(s.now)) && !traded.some(behind) && !(traded.indexOf(waited) >= 0 && !s.lastTrades[waited])) return []
+  return traded.filter(function(x) { return !s.lastTrades[x] || dueBy(s.now + s.interval / 2)(x) || behind(x) })
+}
+
+// When the next quote falls due, for the clock to wake then; 0 for none.
+function lastTradeNext(s) {
+  return lastTradeListings(s).reduce(function(next, x) {
+    var entry = s.lastTrades[x]
+    return entry && (!next || entry.at + s.interval < next) ? entry.at + s.interval : next
+  }, 0)
 }
 
 // The newest stretch Yahoo left empty in these quotes, once Robinhood's bars
