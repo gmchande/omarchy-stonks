@@ -19,8 +19,9 @@ Item {
   property int pace: Stream.OPEN_PACE
   property bool wanted: false
   property var clock: null
-  // The plugin's folder, where stream.py is.
-  property string folder: String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "")
+  // The plugin's folder, where stream.py is: the shell names it by a qs:
+  // URL, a harness by a file: one.
+  property string folder: decodeURIComponent(String(Qt.resolvedUrl(".")).replace(/^(qs|file):\/\//, ""))
   property var ticks: ({})
   property bool missing: false
   // While a chart draws itself in, trades wait: each changes its line.
