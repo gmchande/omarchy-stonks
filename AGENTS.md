@@ -35,8 +35,8 @@ truer, lighter, quicker, simpler or better made.
   change only when the company reports. A "!" means only that a refresh
   failed or is late.
 - **Sources.** Market data comes only from Yahoo's unofficial endpoints and
-  Robinhood's public price history and quotes, with no account or key, as the README
-  says. Robinhood's logo never shows.
+  Robinhood's public price history and quotes, with no account or key, as
+  the README says. Robinhood's logo never shows.
 - **Color.** Up is the theme's green and down its red, never its accent,
   which means "selected". Where a theme has no usable pair, Stonks uses its
   own for that ground, and it never changes the theme's colors.
