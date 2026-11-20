@@ -242,6 +242,15 @@ function readSavedFile(code, bytes, text, cap) {
   return { refused: true }
 }
 
+// Yahoo's price stream (stream.py) for up to `seconds`, after which Stonks
+// starts another. It reads what Stonks writes to the guard's input, and its
+// output is capped at `cap` bytes where it's made, unbuffered, as a
+// request's is. Without python3 it ends at once with 127.
+function priceStream(seconds, pluginFolder, cap) {
+  return bounded(seconds, ["sh", "-c", "command -v python3 > /dev/null || exit 127\n"
+    + "python3 -I \"$1/stream.py\" | exec stdbuf -o0 head -c " + cap, "sh", pluginFolder])
+}
+
 // The sounds': once a run, the md5s of what the sounds are made from, each
 // look's stamp, and the files no newer than it. A newer one was written by
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is

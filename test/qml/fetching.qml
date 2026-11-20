@@ -504,6 +504,35 @@ Harness {
         [pausedLong, offline, tried, service.now - pressedAt, gate.pause].join(" | "))
       closeWindow()
 
+      // The pill alone from 15:00, after the saved day's last trade, nothing
+      // open: the stream wants the pill's stock alone, reported every 15 s.
+      // Its trades, each two seconds old, are the pill's price, and its
+      // chart is asked once a bar, not every minute. With the window open it
+      // wants the stock on show and the rows in sight, reported every second.
+      var lastLine = function(name) { var lines = record(name).trim().split("\n"); return lines[lines.length - 1] }
+      var streamedPrice = 0
+      var steps = 0
+      countsOver("15:00, nothing open, the pill's stock trading on the stream: its chart every 5 minutes, nothing else",
+        900, counts([3, 0, 0, 0, 0, 0, 0, 0]), startAt(Math.max(service.now + 5, at(harness.wed7, 15, 0))), function() {
+          if (steps++ % 3 !== 0) return
+          streamedPrice = 230 + steps / 100
+          runCommand(["sh", "-c", "echo NEST " + (service.now - 2) + " " + streamedPrice + " 1 >> \"$STONKS_FAKE_STATE/STREAM.trades\""])
+        })
+      var shown = within(3000, function() { return !!service.quotes.NEST && service.quotes.NEST.price === streamedPrice })
+      harness.check("with only the pill on screen, the stream wants its stock alone every 15 s, and the pill shows the stream's newest trade",
+        lastLine("STREAM.wanted") === "15 NEST" && shown,
+        [lastLine("STREAM.wanted"), service.quotes.NEST ? service.quotes.NEST.price : "no quote", streamedPrice].join(" | "))
+      openWindow()
+      settle()
+      var sightNow = [].concat.apply([], service.sights.map(function(s) { return s.symbols }))
+      var openWanted = within(3000, function() {
+        var line = lastLine("STREAM.wanted")
+        return /^1 NEST,/.test(line) && sightNow.length > 0 && sightNow.every(function(s) { return line.split(" ")[1].split(",").indexOf(s) >= 0 })
+      })
+      harness.check("with the window open, the stream wants the stock on show and the rows in sight, every second",
+        openWanted, lastLine("STREAM.wanted") + " | in sight " + sightNow.join(","))
+      closeWindow()
+
       // Midnight, the window left open on a workspace no screen shows: it
       // asks what a closed one asks, the pill's stock every 15 minutes, not
       // Tokyo though it trades, and Robinhood every 5 minutes through the
@@ -609,6 +638,7 @@ Harness {
       service.refresh()
       screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
+      var streamDark = lastLine("STREAM.runs")
       wait(1100)
       inputStandIn.isIdle = true
       screenStandIn.on = true
@@ -620,6 +650,9 @@ Harness {
         woke && harness.listed.every(function(s) { return dark[s] === 0 })
           && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
         (woke ? "" : "not within 2 s | ") + "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+      var streamLit = within(3000, function() { return lastLine("STREAM.runs") === "start" })
+      harness.check("every screen off, the stream stops, and starts again once a screen is on",
+        streamDark === "end" && streamLit, [streamDark, lastLine("STREAM.runs")].join(" | "))
 
       // Words typed into search with every screen off ask Yahoo nothing,
       // and the key that wakes a screen sends them, once.

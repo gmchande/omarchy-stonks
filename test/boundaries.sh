@@ -37,8 +37,9 @@ none() {
   while read -r hit; do fail "$hit: '$pattern' is not allowed here"; done <<< "$hits"
 }
 
-# External commands run only in the feeds' one runner, the version watch's
-# shell restart and update, the sounds' pw-play, its chimes' sh, the bell's
+# External commands run only in the feeds' one runner, the price stream's
+# python3, the version watch's shell restart and update, the sounds'
+# pw-play, its chimes' sh, the bell's
 # omarchy-shell and pw-dump, the silence's pw-cat, the camera's screenshot
 # hand-off, the text field's paste, the file reader's dd, and the sh and
 # chmod that keep Stonks' files its owner's (OwnerOnly). Files are read and
@@ -46,7 +47,7 @@ none() {
 # manifest), the trend colours (the theme's colours), the sounds (their
 # own), OwnerOnly (the cache), and the camera, which writes its screenshot
 # and reads Omasnap's settings.
-only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml Field.qml FileRead.qml
+only '\bProcess\s*\{' FetchRun.qml StreamFeed.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml Field.qml FileRead.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
@@ -72,7 +73,7 @@ none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
 rg -qUP 'function bounded\(seconds, argv\) \{\n  return \["timeout", "-k", "1", String\(seconds\), "setpriv", "--pdeathsig", ' Commands.js \
   || fail "Commands.js: bounded does not start with timeout -k 1 and setpriv --pdeathsig"
 none 'command:\s*\[' Camera.qml OwnerOnly.qml Sounds.qml
-for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved silenceStream; do
+for made in screenshotName createPrivately soundSurvey bellCheck pastedText primaryCopy readSaved silenceStream priceStream; do
   rg -qUP "function $made\\([^)]*\\) \\{\\n  return bounded\\(" Commands.js || fail "Commands.js: $made does not run under bounded"
 done
 rg -qUP 'function curlCommand\([^)]*\) \{\n  return Commands\.bounded\(' Fetch.js || fail "Fetch.js: curlCommand does not run under bounded"
@@ -82,8 +83,9 @@ rg -qUP 'function curlCommand\([^)]*\) \{\n  return Commands\.bounded\(' Fetch.j
 only '^import Quickshell\.Hyprland' Plugin.qml
 only '\.dispatch\s*\(' WindowHost.qml
 none '\.dispatch\s*\((?!"hl\.dsp\.focus\()' WindowHost.qml
-# A request leaves only from the feeds' runner, which only the feeds use,
-# and no QML names an address or asks any other way.
+# A request leaves only from the feeds' runner, which only the feeds use, or
+# the price stream's stream.py, and no QML names an address or asks any
+# other way.
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml LastTradeFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
 # GitHub's address is the release rule's alone: no other file names it.
@@ -100,7 +102,7 @@ done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # after its `timeout`, or at a command's place in a shell script it hands
 # `sh -c`, `bash -c` or Omarchy's terminal. Each here must be in the code
 # and the README, and each the README names must be here.
-programs="curl timeout setpriv stdbuf sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
+programs="curl python3 timeout setpriv stdbuf sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
   omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
 programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
 named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)

@@ -11,6 +11,8 @@ the chart and your lists.
   converted price is one nobody traded at.
 - A price more than two minutes old while its market trades says "As of"
   and its time. A "!" on the pill means a refresh failed or is late.
+- The stocks on screen update as they trade, a few seconds behind, where
+  Yahoo streams them: US and Canadian stocks and ETFs, and crypto.
 - Pre-market and after-hours prices, and overnight prices for the US
   stocks and ETFs that trade at night.
 - Each market's hours on its own clock, with the holidays and early closes
@@ -298,8 +300,9 @@ again.
   we measured, London, São Paulo and the VIX came 15 minutes late, and
   Mexico 20, while Nasdaq, NYSE, Toronto and crypto came within a minute.
   [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html) lists the rest.
-  An overnight price is Robinhood's last trade, which Stonks asks for
-  every minute. It dims once that trade is more than two minutes old, as a
+  An overnight price is the newer of Robinhood's last trade, which Stonks
+  asks for every minute, and the last trade on Yahoo's price stream. It
+  dims once that trade is more than two minutes old, as a
   thinly traded stock's often is at night. By day, a thinly traded stock
   says "As of" when it last traded more than two minutes ago.
 - **A price looks wrong.** Check the currency, since Stonks never converts.
@@ -352,9 +355,9 @@ and what your broker or the exchange showed then.
 
 Stonks isn't investment advice, and isn't affiliated with Yahoo or
 Robinhood. Yahoo's endpoints are unofficial and Robinhood's data is for
-personal use, so either may change or stop without notice. Robinhood fills
-the night, from 20:00 to 04:00 New York time, when Yahoo's charts are
-empty.
+personal use, so either may change or stop without notice. At night, from
+20:00 to 04:00 New York time, when Yahoo's charts are empty, the trades
+come from Robinhood and Yahoo's price stream.
 
 <details>
 <summary>The commands it runs, the sites it asks, and the files it writes</summary>
@@ -363,6 +366,11 @@ empty.
 
 - `curl` for every request, with a time limit and a size cap, and `stdbuf`
   with `head` to stop what it hands on at that cap.
+- `python3` with stream.py, Stonks' own script, which holds Yahoo's price
+  stream open for the stocks on screen, using only Python's standard
+  library: for an hour at most before the next starts, with `stdbuf` and
+  `head` capping what it hands on. Without `python3`, Stonks asks for each
+  price as often as it would without the stream.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln` and `rm`, to make its files and
   keep them readable only by you.
 - `sh` with `dd`, to read your lists, the last prices, your theme's colours
@@ -401,11 +409,20 @@ empty.
   rows in sight first: every minute while a row's market trades and every
   5 minutes before and after the session, but every minute for the stock
   on show, and never for a row whose market hasn't traded since its last
-  price. With no pill in a bar, it asks nothing until you open the panel
-  or the window. It also asks for a search result you pause on. To change
-  "every minute", set `"refreshIntervalSec"` in
-  `~/.config/omarchy/grvc.stonks.json` to a number of seconds from 30 to
-  900.
+  price. A stock whose trades stream, below, is asked every 5 minutes
+  instead of every minute, for its chart. With no pill in a bar, it asks
+  nothing until you open the panel or the window. It also asks for a
+  search result you pause on. To change "every minute", set
+  `"refreshIntervalSec"` in `~/.config/omarchy/grvc.stonks.json` to a
+  number of seconds from 30 to 900.
+- `streamer.finance.yahoo.com` for the trades of the stocks on screen as
+  they happen, a few seconds behind, over one connection: the pill's
+  stock, and with the panel or the window open, the stock on show and the
+  rows in sight. It takes them every 15 seconds with only the pill on
+  screen, and every second with the panel or the window open. A
+  currency's streamed price is a quote, not a trade, so a currency keeps
+  the price above. When the stream drops, Stonks asks for prices as above
+  and tries the stream again, less often the longer it fails.
 - `query2.finance.yahoo.com` for search as you type, asking for each word
   once while search is open.
 - `api.robinhood.com` for overnight prices, and for trades that fill a

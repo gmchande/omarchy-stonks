@@ -46,8 +46,10 @@ function readingOrder(featured, sights, shown, allSymbols) {
 
 // The featured stock skips the quiet wait (`quietUntil`), so a calendar wrong
 // about a session can't leave the pill behind; so does a failed answer,
-// which may answer next time.
-function quotesDue(watched, entries, asked, quotes, charted, featured, now, interval, calNow) {
+// which may answer next time. A listing streaming live (`live`,
+// `Stream.liveSymbols`) is asked once a bar, for the bars: its price comes
+// with each trade.
+function quotesDue(watched, entries, asked, quotes, charted, featured, now, interval, calNow, live) {
   var at = {}
   var dayOf = Calendar.tradingDays()
   watched.forEach(function(s) {
@@ -55,8 +57,9 @@ function quotesDue(watched, entries, asked, quotes, charted, featured, now, inte
     if (!entry || entry.status === "saved" || s in asked) return
     var cal = calNow(quotes[s])
     var quiet = s === featured || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
+    var cadence = quoteCadence(quotes[s], now, interval, charted.indexOf(s) >= 0, cal)
     at[s] = entry.answeredAt > now ? now : quiet
-      || entry.answeredAt + quoteCadence(quotes[s], now, interval, charted.indexOf(s) >= 0, cal)
+      || entry.answeredAt + (live && live[s] ? Math.max(cadence, Quote.BAR) : cadence)
   })
   var symbols = Object.keys(at)
   var asking = symbols.some(function(s) { return at[s] <= now })

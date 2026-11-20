@@ -8,6 +8,7 @@ import "History.js" as History
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
+import "Stream.js" as Stream
 import "Rows.js" as Rows
 // What every surface reads and acts through: what you follow and look at,
 // the lists file that keeps it (~/.config/omarchy/<id>.json, which only this
@@ -118,7 +119,7 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
+      shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, root.quotes, order, reversed,
         fileSettings.changeMode, order === "manual" ? null : root.newestTrades)),
       allSymbols: all,
       // Null while on its way: each surface keeps the chart it has on screen.
@@ -135,7 +136,7 @@ Item {
   // feed's receipts only for a symbol without a quote, and the histories only
   // off 1D, so a receipt for a quoted symbol on the day recomputes nothing.
   function chartOf(symbol, range, quoteFeed) {
-    var quotes = quoteFeed.quotes
+    var quotes = quoteFeed === feed ? root.quotes : root.previewQuotes
     return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
       range === "1D" ? ({}) : historyFeed.entries, root.nights, allDayFeed.entries, calendars, root.viewDayClock),
       root.nights, allDayFeed.entries)
@@ -187,7 +188,7 @@ Item {
     var count = 0
     var same = true
     root.allSymbols.forEach(function(symbol) {
-      var quote = feed.quotes[symbol]
+      var quote = root.quotes[symbol]
       if (!quote) return
       var night = nights[symbol]
       var bars = night ? night.bars : null
@@ -541,8 +542,45 @@ Item {
     centExchanges: root.centExchanges
     calendars: root.calendars
     allDay: allDayFeed.entries
+    // Written once the turn is over: an undo restores the quote before All
+    // takes the symbol back, and a write between them left it out.
+    onQuotesChanged: {
+      root.tickQuotes()
+      root.settleArrivals()
+      root.quotesUnsaved = true
+      Qt.callLater(root.flushQuotes)
+    }
   }
-  readonly property var quotes: feed.quotes
+
+  // Yahoo's price stream for what is on screen (`Stream.streamSymbols`),
+  // while a screen is on.
+  StreamFeed {
+    id: streamFeed
+    wanted: root.ready && !root.screensOff
+    symbols: Stream.streamSymbols(root.openSurfaces.length > 0, root.pillInBar, root.view.featured,
+      root.previewShown ? root.previewSymbol : "", root.rowsInSight())
+    pace: root.openSurfaces.length > 0 ? Stream.OPEN_PACE : Stream.PILL_PACE
+    clock: root
+    holding: root.drawing.length > 0
+    onTicksChanged: {
+      root.tickQuotes()
+      root.joinNights()
+    }
+  }
+  // Yahoo's answers with each streamed trade newer than they hold
+  // (`Stream.tickedQuotes`): what the surfaces show. The preview's apart.
+  property var quotes: ({})
+  property var tickedFrom: ({})
+  property var previewQuotes: ({})
+  property var previewTickedFrom: ({})
+  function tickQuotes() {
+    var ticked = Stream.tickedQuotes(feed.quotes, streamFeed.ticks, { quotes: root.quotes, made: root.tickedFrom })
+    root.tickedFrom = ticked.made
+    if (ticked.quotes !== root.quotes) root.quotes = ticked.quotes
+    var previewed = Stream.tickedQuotes(previewFeed.quotes, streamFeed.ticks, { quotes: root.previewQuotes, made: root.previewTickedFrom })
+    root.previewTickedFrom = previewed.made
+    if (previewed.quotes !== root.previewQuotes) root.previewQuotes = previewed.quotes
+  }
   readonly property var entries: feed.entries
   readonly property var asked: feed.asked
   // Those waiting on Yahoo, from when: freshness's overdue counts from it.
@@ -611,7 +649,10 @@ Item {
     calendars: root.calendars
     allDay: allDayFeed.entries
     bulk: false
-    onQuotesChanged: root.askOvernight()
+    onQuotesChanged: {
+      root.tickQuotes()
+      root.askOvernight()
+    }
   }
   readonly property var previewEntries: previewFeed.entries
 
@@ -658,17 +699,20 @@ Item {
     }
     onBusyChanged: Qt.callLater(root.releaseOrder)
   }
-  // Robinhood's trades with each listing's last trade from its quote
-  // (`Overnight.joinedNights`), set only when one changes.
+  // Robinhood's trades with each listing's last trade, the newer of its
+  // quote's and the stream's (`Overnight.joinedNights`), set only when one
+  // changes.
   property var nights: ({})
   property var joins: ({})
   function joinNights() {
-    var joined = Overnight.joinedNights(overnightFeed.entries, lastTradeFeed.entries, Overnight.overnightMarket(root.calendars),
-      { nights: root.nights, joins: root.joins })
+    var joined = Overnight.joinedNights(overnightFeed.entries, Stream.withNightTicks(lastTradeFeed.entries, streamFeed.ticks),
+      Overnight.overnightMarket(root.calendars), { nights: root.nights, joins: root.joins })
     root.joins = joined.joins
     if (joined.nights !== root.nights) root.nights = joined.nights
   }
-  onCalendarsChanged: joinNights()
+  // A turn later: the calendars are first read inside the view's binding,
+  // which reads the nights.
+  onCalendarsChanged: Qt.callLater(root.joinNights)
   readonly property var allDay: allDayFeed.entries
   // Whether the night trades now, and the listings whose newest price may
   // be a trade Robinhood failed to send meanwhile: their "!".
@@ -764,7 +808,8 @@ Item {
     var calNow = Asks.calendarsAt(root.calendars, now)
     var watched = Asks.watchedSymbols(root.allSymbols, root.pillInBar ? featured : "", open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.chartedOnShow(), featured, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.chartedOnShow(), featured, now, root.refreshIntervalSec, calNow,
+      Stream.liveSymbols(streamFeed.ticks, now, feed.quotes))
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -843,14 +888,7 @@ Item {
     askOvernight()
   }
 
-  // Written once the turn is over: an undo restores the quote before All
-  // takes the symbol back, and a write between them left it out.
-  onQuotesChanged: {
-    workOutNewest()
-    settleArrivals()
-    root.quotesUnsaved = true
-    Qt.callLater(flushQuotes)
-  }
+  onQuotesChanged: workOutNewest()
   // Every run's answers land here, a quote changed or not. Once the run has
   // left the feed's asks, the clock catches up and the next ask falls due.
   onEntriesChanged: {

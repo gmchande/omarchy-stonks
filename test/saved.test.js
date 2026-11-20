@@ -21,7 +21,7 @@ process.env.TZ = "America/New_York"
 // The rule files' names these tests read, under one name. A name two files
 // define is read from its file (test/load.js).
 const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Settings", "Rows", "Search", "Asks"])
+  "Chart", "Settings", "Rows", "Search", "Asks", "Stream"])
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
@@ -2302,6 +2302,44 @@ test("at night the price on top is Robinhood's last trade at its venue's second,
   expect([t("19:59"), at("2026-11-21", "21:00")].map(when => M.joinedTrade(none, { status: "ok", trade: { ...trade, t: when }, at: when + 1 }, cal)))
     .toEqual([null, null])
   expect(M.lastTrades(fixture(`moments/${set}/robinhood-quotes.json`), ["NVDA", "AAPL", "BRK-B", "BLDP", "ZZZZQ"]).ZZZZQ).toBe(null)
+  // Yahoo's stream's trade is the night's price where it is newer than
+  // Robinhood's quote's, and not where it is older.
+  const quoted = { NVDA: { status: "ok", trade: { t: t("22:16") + 24, p: 143.83, s: "overnight" }, at: night.now } }
+  const streamed = when => ({ NVDA: M.parseLine("NVDA " + when + " 143.9 4", night.now).tick })
+  const newer = streamed(t("22:16") + 30)
+  expect([M.withNightTicks(quoted, newer).NVDA.trade, M.withNightTicks(quoted, streamed(t("22:16") + 20))])
+    .toEqual([newer.NVDA.night, quoted])
+})
+
+test("a streamed trade newer than Yahoo's answer is the price on top and the line's last point, and one older, from $131,072 up, or outside the day changes nothing", () => {
+  // Friday 20 November at 12:51 New York: Yahoo's charts, then 12 s of its
+  // price stream, read as stream.py reads it.
+  const set = "stream-2026-11-20-1251"
+  const read = Bun.spawnSync(["python3", "-I", join(import.meta.dir, "..", "stream.py"), "--frames"],
+    { stdin: Bun.file(join(fixtures, "moments", set, "stream-frames.txt")), stdout: "pipe" }).stdout.toString()
+  const now = answeredAt(set) + 12
+  const ticks = Object.fromEntries(read.trim().split("\n").map(line => M.parseLine(line, now)).map(got => [got.symbol, got.tick]))
+  const quote = name => M.parseChart(fixture(`moments/${set}/${name}.json`), cents, answeredAt(set))
+  const t = clock => at("2026-11-20", clock)
+  // AAPL's last trade in those seconds, 345.605 at 12:51:13, newer than the
+  // chart's 12:50:58: its price, its time and the end of its line, as Yahoo
+  // would answer a moment later; the bars stay.
+  const aapl = quote("aapl")
+  const ticked = M.tickedQuote(aapl, ticks.AAPL)
+  expect([aapl.marketTime, ticks.AAPL.t, ticks.AAPL.p.toFixed(3)]).toEqual([t("12:50") + 58, t("12:51") + 13, "345.605"])
+  expect([ticked.price, ticked.marketTime, ticked.points.at(-1)]).toEqual([ticks.AAPL.p, ticks.AAPL.t, { t: ticks.AAPL.t, p: ticks.AAPL.p }])
+  expect(ticked.points.slice(0, -1)).toEqual(aapl.points.filter(p => p.t % 300 === 0))
+  expect(M.listRow(ticked, "pct", null).priceText).toBe("345.61")
+  // A coin's too.
+  expect(M.tickedQuote(quote("btc-usd"), ticks["BTC-USD"]).price).toBe(ticks["BTC-USD"].p)
+  // An older trade, one in tonight's hours, and any price from $131,072 up,
+  // whose cents a 32-bit float can't hold, as BRK-A's, leave the quote.
+  const brk = quote("brk-a")
+  expect([M.tickedQuote(aapl, { ...ticks.AAPL, t: aapl.marketTime - 1 }), M.tickedQuote(aapl, { ...ticks.AAPL, t: t("20:30") }),
+    M.tickedQuote(brk, { ...ticks.AAPL, p: 731000.5 })]).toEqual([aapl, aapl, brk])
+  // A line stream.py can't have printed is read as nothing.
+  expect(["AAPL 1795197073 -1 1", "aapl 1795197073 345.6 1", "AAPL 17.5 345.6 1", "AAPL 1795197073 345.6"].map(line => M.parseLine(line, now)))
+    .toEqual([null, null, null, null])
 })
 
 test("in every phase, a stock that has traded since its close shows that newest price on top of the panel, measured from its chart's dashed line, and on its row and the pill but at night", () => {
