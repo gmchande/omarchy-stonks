@@ -85,6 +85,8 @@ plugin_tree() {
   mkdir -p "$root/plugin"
   cp "$plugin"/*.qml "$plugin"/*.js "$plugin/calendars.json" "$plugin/manifest.json" "$root/plugin/"
   cp -r "$plugin/sounds" "$root/plugin/"
+  # The price stream's script answers from the walk's state, not the network.
+  cp "$here/fake-stream.sh" "$root/plugin/stream.py"
   ln -s "$shell/Ui" "$shell/Commons" "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"

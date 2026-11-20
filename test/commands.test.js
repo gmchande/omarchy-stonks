@@ -187,7 +187,7 @@ test("a request, a bell's check, a paste, the silence or the price stream, stopp
       ["pw-dump", C.bellCheck()],
       ["wl-paste", C.pastedText(false, 4096)],
       ["pw-cat", C.silenceStream(30)],
-      ["python3", C.priceStream(30, dir, 1000)]
+      ["stream.py", C.priceStream(30, bin, 1000)]
     ]
     for (const [name] of commands) standIn(bin, name, `echo $$ > "${dir}/${name}.pid"\nsleep 3600 &\necho $! > "${dir}/${name}.child"\nwait\n`)
     standIn(bin, "omarchy-shell", "echo off\n")
@@ -251,13 +251,13 @@ test("the chimes' player plays each chime it's sent that its names allow, and no
 }))
 
 // The price stream's reports pass on as they come, and stop at its cap
-// where stream.py's output leaves it. Without python3 it ends at once.
-test("the price stream hands on each report as it comes, stops at its cap, and without python3 ends at once with 127", async () => {
+// where stream.py's output leaves it. Without stream.py it ends at once.
+test("the price stream hands on each report as it comes, stops at its cap, and with no stream.py to run ends at once with 127", async () => {
   const dir = mkdtempSync(join(tmpdir(), "stonks-commands-"))
   try {
     const bin = join(dir, "bin")
-    standIn(bin, "python3", "echo 'AAPL 1795197073 345.6 1'\nsleep 0.5\nyes 'AAPL 1795197073 345.6 1'\n")
-    const proc = Bun.spawn(C.priceStream(5, dir, 1000), { env: { PATH: bin + ":" + process.env.PATH }, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
+    standIn(bin, "stream.py", "echo 'AAPL 1795197073 345.6 1'\nsleep 0.5\nyes 'AAPL 1795197073 345.6 1'\n")
+    const proc = Bun.spawn(C.priceStream(5, bin, 1000), { env: { PATH: process.env.PATH }, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
     const reader = proc.stdout.getReader()
     const started = Date.now()
     let text = "", first = -1
@@ -270,8 +270,7 @@ test("the price stream hands on each report as it comes, stops at its cap, and w
     await proc.exited
     expect(first).toBeLessThan(400)
     expect(Buffer.byteLength(text)).toBe(1000)
-    const bare = tools(dir, ["sh", "timeout", "setpriv", "stdbuf", "head"])
-    expect(run(C.priceStream(5, dir, 1000), { PATH: bare }, "").code).toBe(127)
+    expect(run(C.priceStream(5, dir, 1000), { PATH: process.env.PATH }, "").code).toBe(127)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

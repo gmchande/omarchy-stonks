@@ -245,10 +245,13 @@ function readSavedFile(code, bytes, text, cap) {
 // Yahoo's price stream (stream.py) for up to `seconds`, after which Stonks
 // starts another. It reads what Stonks writes to the guard's input, and its
 // output is capped at `cap` bytes where it's made, unbuffered, as a
-// request's is. Without python3 it ends at once with 127.
+// request's is. stream.py runs on the Python Omarchy ships, by its first
+// line, as Omarchy's own scripts do: a python3 earlier on PATH, as a
+// version manager puts there, may not start. Without it, or with stream.py
+// not runnable, it ends at once with 127.
 function priceStream(seconds, pluginFolder, cap) {
-  return bounded(seconds, ["sh", "-c", "command -v python3 > /dev/null || exit 127\n"
-    + "python3 -I \"$1/stream.py\" | exec stdbuf -o0 head -c " + cap, "sh", pluginFolder])
+  return bounded(seconds, ["sh", "-c", "[ -x /usr/bin/python3 ] && [ -x \"$1/stream.py\" ] || exit 127\n"
+    + "\"$1/stream.py\" | exec stdbuf -o0 head -c " + cap, "sh", pluginFolder])
 }
 
 // The sounds': once a run, the md5s of what the sounds are made from, each

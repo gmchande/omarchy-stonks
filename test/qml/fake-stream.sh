@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# stream.py's stand-in in the walks, which lib.sh's plugin_tree puts in its
+# place: it answers as stream.py does, from STONKS_FAKE_STATE, with no
+# network. Each line Stonks writes is logged to STREAM.wanted, every line a
+# step writes to STREAM.trades is printed once, as stream.py prints its
+# reports, and it ends when its input does, or on TERM. Each start and end
+# is logged to STREAM.runs.
+state="${STONKS_FAKE_STATE:?}"
+echo "start" >> "$state/STREAM.runs"
+trap 'echo "end" >> "$state/STREAM.runs"' EXIT
+trap 'exit 143' TERM
+while true; do
+  if read -r -t 0.1 line; then
+    echo "$line" >> "$state/STREAM.wanted"
+  elif [ $? -le 128 ]; then
+    exit 0
+  fi
+  if [ -s "$state/STREAM.trades" ]; then
+    cat "$state/STREAM.trades"
+    : > "$state/STREAM.trades"
+  fi
+done

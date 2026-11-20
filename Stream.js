@@ -22,6 +22,15 @@ var PILL_PACE = 15
 // Yahoo sends a price as a 32-bit float, whose cents are wrong from 2^17 on.
 var EXACT_BELOW = 131072
 
+// The plugin's folder as a path, from the URL QML names it by: the shell's
+// "qs:///home/…/" for a plugin outside it, "qs:@/qs/…" for one inside the
+// shell's own folder (`shellDir`), as a harness loads it, or "file:///…".
+function localFolder(url, shellDir) {
+  var s = String(url)
+  if (s.indexOf("qs:@/qs/") === 0) return shellDir + "/" + decodeURIComponent(s.slice(8))
+  return decodeURIComponent(s.replace(/^(qs|file):\/\//, ""))
+}
+
 // A listing streams live while it has a trade under a minute old on arrival,
 // heard in the last minute: its answers are then asked once a bar.
 var LIVE_AGE = 60

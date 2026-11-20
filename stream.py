@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 # Yahoo's price stream for the listings on screen, read with Python's
 # standard library alone. Stonks runs it under Commands.priceStream and
 # writes a line to its input whenever what it wants changes: the seconds
