@@ -30,10 +30,12 @@ Item {
 
   property var gate: Gate.openGate(0)
   readonly property bool runs: wanted && symbols.length > 0 && !missing
+  readonly property bool running: proc.running
   onRunsChanged: sync()
   // A listing scrolled out of sight keeps its last trade, which is still
   // true, and stops being live a minute on (`Stream.liveSymbols`).
   onSymbolsChanged: sync()
+  onPaceChanged: sync()
 
   function wall() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
 

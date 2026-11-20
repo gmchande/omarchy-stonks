@@ -2303,12 +2303,15 @@ test("at night the price on top is Robinhood's last trade at its venue's second,
     .toEqual([null, null])
   expect(M.lastTrades(fixture(`moments/${set}/robinhood-quotes.json`), ["NVDA", "AAPL", "BRK-B", "BLDP", "ZZZZQ"]).ZZZZQ).toBe(null)
   // Yahoo's stream's trade is the night's price where it is newer than
-  // Robinhood's quote's, and not where it is older.
+  // Robinhood's quote's, and not where it is older, nor at 04:00:30, the
+  // pre-market's, which would leave the night with neither, nor from
+  // $131,072 up.
   const quoted = { NVDA: { status: "ok", trade: { t: t("22:16") + 24, p: 143.83, s: "overnight" }, at: night.now } }
-  const streamed = when => ({ NVDA: M.parseLine("NVDA " + when + " 143.9 4", night.now).tick })
+  const streamed = (when, price = 143.9) => ({ NVDA: M.parseLine("NVDA " + when + " " + price + " 4", night.now).tick })
   const newer = streamed(t("22:16") + 30)
-  expect([M.withNightTicks(quoted, newer).NVDA.trade, M.withNightTicks(quoted, streamed(t("22:16") + 20))])
-    .toEqual([newer.NVDA.night, quoted])
+  expect([M.withNightTicks(quoted, newer, cal).NVDA.trade, M.withNightTicks(quoted, streamed(t("22:16") + 20), cal),
+    M.withNightTicks(quoted, streamed(at("2026-11-20", "04:00") + 30), cal), M.withNightTicks(quoted, streamed(t("22:16") + 30, 131072.5), cal)])
+    .toEqual([newer.NVDA.night, quoted, quoted, quoted])
 })
 
 test("a streamed trade newer than Yahoo's answer is the price on top and the line's last point, and one older, from $131,072 up, or outside the day changes nothing", () => {
@@ -2337,6 +2340,30 @@ test("a streamed trade newer than Yahoo's answer is the price on top and the lin
   const brk = quote("brk-a")
   expect([M.tickedQuote(aapl, { ...ticks.AAPL, t: aapl.marketTime - 1 }), M.tickedQuote(aapl, { ...ticks.AAPL, t: t("20:30") }),
     M.tickedQuote(brk, { ...ticks.AAPL, p: 731000.5 })]).toEqual([aapl, aapl, brk])
+  // Only a listing whose trades show counts as streaming, so its chart is
+  // asked once a bar: AAPL, not BRK-A at $731,000.50 nor AAPL's trade at
+  // 20:30, in hours its quote doesn't hold.
+  expect(M.liveSymbols({ AAPL: ticks.AAPL, "BRK-A": { ...ticks.AAPL, p: 731000.5 } }, now, { AAPL: aapl, "BRK-A": brk })).toEqual({ AAPL: true })
+  expect(M.liveSymbols({ AAPL: { ...ticks.AAPL, t: t("20:30"), heard: t("20:30") } }, t("20:30"), { AAPL: aapl })).toEqual({})
+  // A coin's day is the 24 hours to its newest trade, as Stonks asks it,
+  // two days at a time: the stream's trade moves it on, its price and the
+  // close it counts from, 24 hours before.
+  const coinSet = "coin-stream-2026-11-20-1354"
+  const coinRead = Bun.spawnSync(["python3", "-I", join(import.meta.dir, "..", "stream.py"), "--frames"],
+    { stdin: Bun.file(join(fixtures, "moments", coinSet, "stream-frames.txt")), stdout: "pipe" }).stdout.toString()
+  const coinTick = M.parseLine(coinRead.trim(), answeredAt(coinSet) + 12).tick
+  const coin = M.parseChart(fixture(`moments/${coinSet}/2d/btc-usd.json`), cents, answeredAt(coinSet))
+  const rolled = M.tickedQuote(coin, coinTick)
+  const dayStart = rolled.points[0].t
+  expect([coin.rolling, rolled.price, rolled.marketTime, rolled.session.regular.end, rolled.points.at(-1), rolled.prevClose])
+    .toEqual([true, coinTick.p, coinTick.t, coinTick.t, { t: coinTick.t, p: coinTick.p }, rolled.points[0].p])
+  expect([dayStart <= coinTick.t - 86400, rolled.points[1].t > coinTick.t - 86400]).toEqual([true, true])
+  expect(M.liveSymbols({ "BTC-USD": coinTick }, coinTick.heard, { "BTC-USD": coin })).toEqual({ "BTC-USD": true })
+  // A pre-market trade on the coming day a two-day answer holds stays a
+  // pre-market trade: Monday 26 October at 07:00, NBIS.
+  const nbis = M.parseChart(fixture("moments/watch-2026-10-26-0700/2d/nbis.json"), cents, at("2026-10-26", "07:00") + 39)
+  const pre = M.tickedQuote(nbis, { t: nbis.points.at(-1).t + 20, p: 154, heard: nbis.points.at(-1).t + 22 })
+  expect([pre.points.at(-1).t, M.pointSession(pre, pre.points.at(-1)), M.extendedTrade(pre).phase]).toEqual([nbis.points.at(-1).t + 20, "pre", "pre"])
   // A line stream.py can't have printed is read as nothing.
   expect(["AAPL 1795197073 -1 1", "aapl 1795197073 345.6 1", "AAPL 17.5 345.6 1", "AAPL 1795197073 345.6"].map(line => M.parseLine(line, now)))
     .toEqual([null, null, null, null])

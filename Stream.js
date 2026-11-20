@@ -1,5 +1,6 @@
 .pragma library
 .import "Format.js" as Format
+.import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
 
 // Yahoo's price stream (stream.py, `StreamFeed`): what is streamed, how a
@@ -74,38 +75,73 @@ function parseLine(line, heard) {
   return { symbol: parts[0], tick: { t: t, p: p, heard: heard, night: { t: t, p: p, s: "overnight" } } }
 }
 
-// The listings streaming live at `now` (`LIVE_AGE`), of those whose trades
-// show (`streamable`).
+// The listings streaming live at `now` (`LIVE_AGE`): those whose trades
+// show, a trade in hours their quote holds (`showable`).
 function liveSymbols(ticks, now, quotes) {
   var out = {}
   for (var s in ticks) {
     var tick = ticks[s]
-    if (now - tick.heard <= 2 * LIVE_AGE && tick.heard - tick.t <= LIVE_AGE && streamable(quotes[s])) out[s] = true
+    if (now - tick.heard <= 2 * LIVE_AGE && tick.heard - tick.t <= LIVE_AGE && showable(quotes[s], tick)) out[s] = true
   }
   return out
 }
 
-// A quote with a streamed trade newer than all it holds, inside its day or
-// the coming day's pre-market it holds (`Quote.tailStart`): the trade is
-// its newest point, in place of the moment Yahoo's answer stamped at its own
-// second, and in the regular session its price too. Any other trade leaves
-// the quote as it is: one at or above `EXACT_BELOW`, whose cents can't be
-// known; one older; one in hours the quote doesn't hold, as a night's,
-// which `withNightTicks` takes; any before a listing's first trade; and a
-// currency's quote (`streamable`).
+// Whether a streamed trade can be a quote's price, newer or not: under
+// `EXACT_BELOW`, whose cents a 32-bit float can't hold past; a quote whose
+// trades show (`streamable`), traded at least once; and in hours the quote
+// holds: its day, the coming day's pre-market it holds (`Quote.tailStart`),
+// or for a coin's rolling day any time after it starts. A night's trade is
+// `withNightTicks`'.
+function showable(quote, tick) {
+  if (!streamable(quote) || !tick || !(tick.p < EXACT_BELOW) || quote.untraded) return false
+  if (quote.rolling) return tick.t >= quote.session.regular.start
+  return (tick.t >= Quote.dayStart(quote) && tick.t < Quote.dayEnd(quote)) || inTail(quote, tick.t)
+}
+
+function inTail(quote, t) {
+  var pre = quote.next ? quote.next.pre : null
+  return !!pre && t >= pre.start && t < pre.end
+}
+
+// A quote with a showable streamed trade newer than all it holds: the trade
+// is its newest point, in place of the moment Yahoo's answer stamped at its
+// own second, a pre-market's for the coming day it holds, and in the
+// regular session its price too. A coin's day moves on with it
+// (`rolledQuote`). Any other trade leaves the quote as it is.
 function tickedQuote(quote, tick) {
-  if (!streamable(quote) || !tick || !(tick.p < EXACT_BELOW) || quote.untraded) return quote
+  if (!showable(quote, tick)) return quote
   var pts = quote.points
   var last = pts.length ? pts[pts.length - 1] : null
   if ((last && tick.t <= last.t) || (Format.isFiniteNumber(quote.marketTime) && tick.t <= quote.marketTime)) return quote
-  var next = quote.next
-  var inDay = tick.t >= Quote.dayStart(quote) && tick.t < Quote.dayEnd(quote)
-  var inTail = !!next && !!next.pre && tick.t >= next.pre.start && tick.t < next.pre.end
-  if (!inDay && !inTail) return quote
   var kept = last && last.t % Quote.BAR !== 0 ? pts.slice(0, -1) : pts
+  if (quote.rolling) return rolledQuote(quote, kept, tick)
+  var tail = inTail(quote, tick.t)
   var reg = quote.session.regular
-  var regular = inDay && !!reg && tick.t >= reg.start && tick.t < reg.end
-  return Object.assign({}, quote, regular ? { price: tick.p, marketTime: tick.t } : {}, { points: kept.concat([{ t: tick.t, p: tick.p }]) })
+  var regular = !tail && !!reg && tick.t >= reg.start && tick.t < reg.end
+  return Object.assign({}, quote, regular ? { price: tick.p, marketTime: tick.t } : {},
+    { points: kept.concat([tail ? { t: tick.t, p: tick.p, s: "pre" } : { t: tick.t, p: tick.p }]) })
+}
+
+// A coin's day is the 24 hours to its newest trade (`Quote.coinDay`), so a
+// newer trade moves it on: from the last price 24 hours before it, which
+// the move counts from, to the trade, its price. Its high and low stay
+// while they still fall inside, the trade's price taking either it passes.
+function rolledQuote(quote, kept, tick) {
+  var pts = kept.concat([{ t: tick.t, p: tick.p }])
+  var first = 0
+  while (first + 1 < pts.length && pts[first + 1].t <= tick.t - 86400) first++
+  var day = pts.slice(first)
+  var start = day[0].t
+  var high = quote.dayHigh !== null && quote.dayHighAt >= start ? quote.dayHigh : null
+  var low = quote.dayLow !== null && quote.dayLowAt >= start ? quote.dayLow : null
+  var higher = high !== null && tick.p > high
+  var lower = low !== null && tick.p < low
+  return Object.assign({}, quote, {
+    points: day, price: tick.p, marketTime: tick.t, prevClose: day[0].p, dayOpen: day[0].p, figuresDay: start,
+    dayHigh: higher ? tick.p : high, dayHighAt: higher ? tick.t : high === null ? null : quote.dayHighAt,
+    dayLow: lower ? tick.p : low, dayLowAt: lower ? tick.t : low === null ? null : quote.dayLowAt,
+    session: { pre: null, regular: { start: start, end: tick.t }, post: null }
+  })
 }
 
 // Yahoo's answers (`quotes`) with each listing's newest streamed trade
@@ -135,15 +171,17 @@ function sameMap(a, b) {
 }
 
 // Robinhood's quotes (`entries`, `LastTradeFeed`'s) with each streamed trade
+// in an open night (`cal`'s, `Overnight.nightAt`), under `EXACT_BELOW`,
 // newer than a listing's, as the night's last trade: the newer of the two
-// is shown (`Overnight.joinedTrade`, which takes only a night's). Its
-// `at` is the second it was heard. The same object where none is newer.
-function withNightTicks(entries, ticks) {
+// is shown (`Overnight.joinedTrade`). Its `at` is the second it was heard.
+// The same object where none is newer.
+function withNightTicks(entries, ticks, cal) {
   var out = entries
   for (var s in ticks) {
     var entry = entries[s]
     var tick = ticks[s]
-    if (entry && entry.trade && entry.trade.t >= tick.t) continue
+    var night = cal ? Overnight.nightAt(cal, tick.t) : null
+    if (!night || !night.open || !(tick.p < EXACT_BELOW) || (entry && entry.trade && entry.trade.t >= tick.t)) continue
     if (out === entries) out = Object.assign({}, entries)
     out[s] = { status: entry ? entry.status : "ok", trade: tick.night, at: tick.heard }
   }

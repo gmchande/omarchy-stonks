@@ -522,6 +522,28 @@ Harness {
       harness.check("with only the pill on screen, the stream wants its stock alone every minute, and the pill shows the stream's newest trade",
         lastLine("STREAM.wanted") === "60 NEST" && shown,
         [lastLine("STREAM.wanted"), service.quotes.NEST ? service.quotes.NEST.price : "no quote", streamedPrice].join(" | "))
+      // Every screen off while the pill's stock streams, its chart asked only
+      // once a bar: the stream still stops within a minute or so, with no
+      // refresh to ask the screens.
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
+      screenStandIn.on = false
+      wait(1100)
+      var offFrom = service.now
+      tick(120, 5, function() {
+        if (steps++ % 3 !== 0) return
+        runCommand(["sh", "-c", "echo NEST " + (service.now - 2) + " " + (230 + steps / 100) + " 1 >> \"$STONKS_FAKE_STATE/STREAM.trades\""])
+      })
+      screensHeard()
+      var streamOff = within(3000, function() { return lastLine("STREAM.runs") === "end" })
+      harness.check("every screen off while the pill's stock streams, the stream stops within two minutes, with no refresh",
+        streamOff, lastLine("STREAM.runs") + " | " + (service.now - offFrom) + " s")
+      inputStandIn.isIdle = true
+      screenStandIn.on = true
+      inputStandIn.isIdle = false
+      screensHeard()
+      within(3000, function() { return lastLine("STREAM.runs") === "start" })
+      hyprlandStandIn.monitors = { values: [] }
+      settle()
       openWindow()
       settle()
       var sightNow = [].concat.apply([], service.sights.map(function(s) { return s.symbols }))

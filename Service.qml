@@ -705,8 +705,9 @@ Item {
   property var nights: ({})
   property var joins: ({})
   function joinNights() {
-    var joined = Overnight.joinedNights(overnightFeed.entries, Stream.withNightTicks(lastTradeFeed.entries, streamFeed.ticks),
-      Overnight.overnightMarket(root.calendars), { nights: root.nights, joins: root.joins })
+    var cal = Overnight.overnightMarket(root.calendars)
+    var joined = Overnight.joinedNights(overnightFeed.entries, Stream.withNightTicks(lastTradeFeed.entries, streamFeed.ticks, cal),
+      cal, { nights: root.nights, joins: root.joins })
     root.joins = joined.joins
     if (joined.nights !== root.nights) root.nights = joined.nights
   }
@@ -1240,6 +1241,9 @@ Item {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
       refreshRange()
+      // The stream asks nothing that would ask the screens, so it asks them
+      // once a minute, and stops within a minute of every screen going off.
+      if (streamFeed.running) root.screensClear()
     }
     if (root.refreshOwed && root.screensClear()) {
       root.refreshOwed = false
