@@ -527,7 +527,7 @@ Harness {
       // refresh to ask the screens.
       hyprlandStandIn.monitors = { values: [screenStandIn] }
       screenStandIn.on = false
-      wait(1100)
+      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
       var offFrom = service.now
       tick(120, 5, function() {
         if (steps++ % 3 !== 0) return
