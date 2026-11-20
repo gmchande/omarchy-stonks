@@ -298,9 +298,10 @@ again.
   we measured, London, São Paulo and the VIX came 15 minutes late, and
   Mexico 20, while Nasdaq, NYSE, Toronto and crypto came within a minute.
   [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html) lists the rest.
-  Overnight prices run 10 to 15 minutes behind, since Robinhood reports
-  those trades late. A thinly traded stock says "As of" when it last
-  traded more than two minutes ago.
+  An overnight price is Robinhood's last trade, which Stonks asks for
+  every minute. It dims once that trade is more than two minutes old, as a
+  thinly traded stock's often is at night. By day, a thinly traded stock
+  says "As of" when it last traded more than two minutes ago.
 - **A price looks wrong.** Check the currency, since Stonks never converts.
   PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
   £35.80. For a US stock, the large price may be a trade after the close.
@@ -410,12 +411,13 @@ empty.
 - `api.robinhood.com` for overnight prices, and for trades that fill a
   stretch Yahoo left empty. Once a day it asks which stocks trade
   overnight and the day each listed, again 5 minutes later if that fails,
-  and once for each stock the pill shows. Through the night it asks every
-  5 minutes for the pill's stock and, with the panel or the window open,
-  for the stock on show and the rows in sight, with one past each edge. It
-  asks once more on a morning Yahoo has no prices for half an hour or more
-  of the pre-market, and the same for a US stock or ETF you pause on in
-  search.
+  and once for each stock the pill shows. Through the night it asks about
+  the pill's stock and, with the panel or the window open, the stock on
+  show and the rows in sight, with one past each edge: for each one's last
+  trade every minute, as often as `"refreshIntervalSec"` sets for Yahoo,
+  and for the trades its chart draws every 5 minutes. It asks once more on
+  a morning Yahoo has no prices for half an hour or more of the
+  pre-market, and the same for a US stock or ETF you pause on in search.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

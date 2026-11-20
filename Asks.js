@@ -278,9 +278,9 @@ function quoteCadence(quote, now, interval, charted, calNow) {
 
 // Trades due within half an interval go with those due now, so the list
 // stays one request each night's 5 minutes. With a surface open, the stock
-// on show, a preview and the rows in sight (`inSight`) are asked; with
-// nothing open while a night trades, a pill's symbol is asked so its newest
-// price stays current. `allDay` and `nights` are Robinhood's entries;
+// on show, a preview and the rows in sight (`shownListings`) are asked; with
+// nothing open while a night trades, a pill's symbol is asked so its line
+// stays current. `allDay` and `nights` are Robinhood's entries;
 // `quoteEntries` Yahoo's.
 function overnightAsks(s) {
   if (!s.open && !s.pill) return null
@@ -292,11 +292,10 @@ function overnightAsks(s) {
   var featuredEntry = s.quoteEntries[featured]
   var live = !!featuredEntry && featuredEntry.status === "ok" && s.overnightSymbols.indexOf(featured) >= 0
   if (!kept && !live) return null
-  var previewing = s.open && s.previewShown && !!s.previewQuote && s.allSymbols.indexOf(s.preview) < 0
-    && Overnight.hasOvernight(s.previewQuote, s.calendars)
+  var shown = shownListings(s)
+  var previewing = shown.previewing
   var waited = previewing ? s.preview : featured
-  var shown = function(x) { return x === featured || (s.previewShown && x === s.preview) || s.inSight.indexOf(x) >= 0 }
-  var listings = s.open ? s.overnightSymbols.filter(shown).concat(previewing ? [s.preview] : []) : [featured]
+  var listings = s.open ? shown.listings : [featured]
   // By day with nothing open, once each stock the pill shows, and again
   // while no check has said whether it trades all day.
   var tradability = listings.filter(function(x) {
@@ -328,6 +327,59 @@ function overnightAsks(s) {
     trades = drawn.filter(function(x) { return tradesDue(x, s.now + Overnight.OVERNIGHT_INTERVAL / 2) })
   if (tradability.length === 0 && trades.length === 0) return null
   return { tradability: waitedAlone(tradability, waited, s.allDay), trades: waitedAlone(trades, waited, s.nights) }
+}
+
+// With a surface open, the US stock on show, a preview outside All and the
+// US rows in sight (`inSight`), the preview last; `previewing` says whether
+// it is among them.
+function shownListings(s) {
+  var previewing = s.open && s.previewShown && !!s.previewQuote && s.allSymbols.indexOf(s.preview) < 0
+    && Overnight.hasOvernight(s.previewQuote, s.calendars)
+  var shown = function(x) { return x === s.featured || (s.previewShown && x === s.preview) || s.inSight.indexOf(x) >= 0 }
+  return { listings: s.overnightSymbols.filter(shown).concat(previewing ? [s.preview] : []), previewing: previewing }
+}
+
+// The listings Robinhood's quote is asked about, for the night's last
+// trade, only while a night trades: with a surface open those
+// `shownListings` names, with nothing open the pill's stock, each once
+// Robinhood has said it trades all day.
+function lastTradeListings(s) {
+  var cal = Overnight.overnightMarket(s.calendars)
+  var tonight = cal ? Overnight.nightAt(cal, s.now) : null
+  if (!tonight || !tonight.open || (!s.open && !s.pill)) return []
+  var listings = s.open ? shownListings(s).listings : s.overnightSymbols.indexOf(s.featured) >= 0 ? [s.featured] : []
+  return listings.filter(function(x) { return !!s.allDay[x] && s.allDay[x].allDay })
+}
+
+// The quote goes once one asked before is `interval` seconds old, the
+// chart waited on, the preview's or else the stock on show, has none, or
+// one is behind its trades: those asked now (`alongside`), or answered
+// since. A quote asked before its trades can't say whether its trade is
+// newer than their last bar (`Overnight.joinedTrade`). Rows coming into
+// sight with no quote yet wait for it rather than each send a request.
+// With it go every listing not yet asked, those due within half an
+// interval, and those behind. `lastTrades` is the quote feed's entries,
+// `nights` the trades', `allDay` Robinhood's word on each.
+function lastTradeAsks(s, alongside) {
+  var traded = lastTradeListings(s)
+  var waited = shownListings(s).previewing ? s.preview : s.featured
+  var dueBy = function(at) {
+    return function(x) { return !!s.lastTrades[x] && at - s.lastTrades[x].at >= s.interval }
+  }
+  var behind = function(x) {
+    var entry = s.lastTrades[x]
+    return !!entry && (alongside.indexOf(x) >= 0 || (!!s.nights[x] && s.nights[x].at > entry.at))
+  }
+  if (!traded.some(dueBy(s.now)) && !traded.some(behind) && !(traded.indexOf(waited) >= 0 && !s.lastTrades[waited])) return []
+  return traded.filter(function(x) { return !s.lastTrades[x] || dueBy(s.now + s.interval / 2)(x) || behind(x) })
+}
+
+// When the next quote falls due, for the clock to wake then; 0 for none.
+function lastTradeNext(s) {
+  return lastTradeListings(s).reduce(function(next, x) {
+    var entry = s.lastTrades[x]
+    return entry && (!next || entry.at + s.interval < next) ? entry.at + s.interval : next
+  }, 0)
 }
 
 // The newest stretch Yahoo left empty in these quotes, once Robinhood's bars

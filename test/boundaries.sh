@@ -84,7 +84,7 @@ only '\.dispatch\s*\(' WindowHost.qml
 none '\.dispatch\s*\((?!"hl\.dsp\.focus\()' WindowHost.qml
 # A request leaves only from the feeds' runner, which only the feeds use,
 # and no QML names an address or asks any other way.
-only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
+only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml LastTradeFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
 # GitHub's address is the release rule's alone: no other file names it.
 others=()

@@ -42,7 +42,7 @@ Harness {
   }
 
   function yahoo(lines) {
-    return lines.filter(function(line) { return !/^(overnight|instruments) /.test(line) })
+    return lines.filter(function(line) { return !/^(overnight|instruments|lasttrade) /.test(line) })
   }
 
   // Quote requests per listing among `lines`: a chart's symbol, and each of
@@ -211,7 +211,7 @@ Harness {
     function idle() {
       return [service.feeds.quotes, service.feeds.preview].every(function(feed) {
         return feed.firstRun.length === 0 && feed.refreshRun.length === 0
-      }) && !service.feeds.overnight.busy && !service.opening
+      }) && !service.feeds.overnight.busy && !service.feeds.lastTrade.busy && !service.opening
     }
     function settle() {
       verify(within(10000, idle), "a quote run never landed")
@@ -520,8 +520,9 @@ Harness {
           answerScreens()
         }, answerScreens)
       var night = away.filter(function(l) { return /^overnight /.test(l) })
-      harness.check("through the night, Robinhood is asked every 5 minutes for the pill's newest trade", night.length === 6,
-        away.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
+      var lastTrades = away.filter(function(l) { return /^lasttrade NEST /.test(l) })
+      harness.check("through the night, Robinhood is asked every 5 minutes for the pill's trades, and every minute for its last trade",
+        night.length === 6 && lastTrades.length === 30, away.filter(function(l) { return /^(overnight|instruments|lasttrade) /.test(l) }).join(", "))
       var backFrom = harness.requests().length
       stonksToplevel.workspace = workspaceHere
       harness.check("back in sight, what fell due goes at once: the crypto",
@@ -545,6 +546,15 @@ Harness {
         }
       })
       remove("ROBINHOOD.offline")
+      // r asks again at once for the pill's last trade, failed while
+      // Robinhood was gone, with the clock still.
+      var quoteFailed = !!service.feeds.lastTrade.entries.NEST && service.feeds.lastTrade.entries.NEST.status === "failed"
+      var rFromNight = harness.requests().length
+      service.refresh()
+      var reasked = within(3000, function() { return harness.requests().slice(rFromNight).some(function(l) { return /^lasttrade NEST 200$/.test(l) }) })
+      settle()
+      harness.check("r at night asks again at once for the pill's last trade that failed while Robinhood was gone",
+        quoteFailed && reasked && service.feeds.lastTrade.entries.NEST.status === "ok", [quoteFailed, harness.requests().slice(rFromNight).join(", ")].join(" | "))
       var clearedAt = 0
       tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
       harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",
@@ -573,6 +583,18 @@ Harness {
       harness.check("a pointer resting on the pill at night sees tonight's newest price in its hover, a new price on the same bar included",
         joinedFirst && / 240\.00 /.test(entered) && tonight(241.5) && / 241\.50 /.test(after),
         [joinedFirst, entered, pill.newest ? pill.newest.p + " " + pill.newest.joined : "no newest", after].join(" | "))
+
+      // Robinhood's quote then brings a trade at 01:19:30, newer than that
+      // bar: within a minute the hover shows it, at its time.
+      runCommand(["sh", "-c", "echo 2026-10-08T05:19:30.250Z 242.25 > \"$STONKS_FAKE_STATE/NIGHT.trade\""])
+      tick(60, 5, function() {})
+      mouseMove(pill, pill.width / 2, pill.height / 2)
+      var quoted = harness.copiedHover
+      mouseMove(pillWindow.contentItem, 1, 100)
+      remove("NIGHT.trade")
+      harness.check("Robinhood's quote brings a newer trade than its bars, and within a minute the pill's hover shows it, at its time",
+        / 242\.25 /.test(quoted) && /01:19/.test(quoted) && !!pill.newest && pill.newest.t === at(harness.wed7 + 86400, 1, 19) + 30,
+        [quoted, pill.newest ? pill.newest.p + " " + pill.newest.t : "no newest"].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
@@ -636,7 +658,7 @@ Harness {
       var asksAgain = within(2000, function() { return harness.quoteCounts(harness.requests().slice(pillFrom)).NEST === 1 })
       settle()
       harness.check("with no pill, Robinhood is asked nothing either, and a pill put back asks for its stock at once",
-        unseen.filter(function(l) { return /^(overnight|instruments) /.test(l) }).length === 0 && asksAgain,
+        unseen.filter(function(l) { return /^(overnight|instruments|lasttrade) /.test(l) }).length === 0 && asksAgain,
         unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
 
       // The panel open on a screen that's off, the other screen on: its rows

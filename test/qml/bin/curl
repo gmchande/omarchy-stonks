@@ -3,7 +3,7 @@
 # saved answers (test/fixtures) by symbol, so the real feeds run without
 # the network, and it logs what it is asked, which the walks count:
 # <SYMBOL>.calls and <SYMBOL>.history.calls, SEARCH.asked.calls,
-# FUNDAMENTALS.calls, RATE.calls, OVERNIGHT.calls and INSTRUMENTS.calls in
+# FUNDAMENTALS.calls, RATE.calls, OVERNIGHT.calls, LASTTRADE.calls and INSTRUMENTS.calls in
 # STONKS_FAKE_STATE, each URL as "kind name status" in requests.log, and
 # each call's URLs in runs.log.
 #
@@ -43,7 +43,11 @@
 # answer ends with a night bar there at that price, in place of any bar
 # with that start, as Robinhood answers a bar still forming. Its
 # instruments answer from the moment's robinhood-instruments.json, or say
-# every symbol trades all day, 100 results a page.
+# every symbol trades all day, 100 results a page. Its quotes answer from
+# the moment's robinhood-quotes.json by symbol, a symbol it lacks or every
+# symbol with no moment set answering null, as Robinhood answers one it
+# doesn't know; while STONKS_FAKE_STATE/NIGHT.trade holds "TIME PRICE", each
+# listing's last trade outside the session is that one.
 #
 # GitHub's manifest fails, and any other GitHub address answers 404.
 #
@@ -88,6 +92,7 @@ kind_of() {
     *"raw.githubusercontent.com/"*) echo manifest ;;
     *"/v1/finance/search"*) echo search ;;
     *"api.robinhood.com/instruments/"*) echo instruments ;;
+    *"api.robinhood.com/marketdata/quotes/"*) echo lasttrade ;;
     *"api.robinhood.com/"*) echo overnight ;;
     *"/v8/finance/chart/"*"%3DX?"*) echo rate ;;
     *"/fundamentals-timeseries/"*|*"interval=1d&period1="*) echo fundamentals ;;
@@ -99,7 +104,7 @@ kind_of() {
 name_of() {
   case "$2" in
     search|instruments|manifest) echo "$2" ;;
-    spark|overnight) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
+    spark|overnight|lasttrade) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
     fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
     rate) local s="${1##*/chart/}"; echo "${s%%%3DX*}" ;;
     *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
@@ -144,6 +149,18 @@ serve() {
     else
       jq -nc --arg asked "$asked" '{ next: null, results: [($asked | split(","))[] | { symbol: ., all_day_tradability: "tradable" }] }'
     fi | jq -c 'if (.results | length) > 100 then .next = "https://api.robinhood.com/instruments/?cursor=page2" | .results |= .[:100] else . end'
+    exit
+  fi
+  if [[ "$url" == *"api.robinhood.com/marketdata/quotes/"* ]]; then
+    count "$state/LASTTRADE.calls" > /dev/null
+    asked="${url#*symbols=}"
+    asked="${asked%%&*}"
+    read -r trade_at trade_price 2> /dev/null < "$state/NIGHT.trade" || trade_at=""
+    saved_answer="$(in_moment robinhood-quotes.json)"
+    [ -f "$saved_answer" ] || saved_answer=/dev/null
+    jq -sc --arg asked "$asked" --arg at "$trade_at" --arg price "${trade_price:-}" '(.[0].results // []) as $saved
+      | { results: [($asked | split(","))[] as $s | if $at != "" then { symbol: $s, last_non_reg_trade_price: $price,
+          venue_last_non_reg_trade_time: $at, last_non_reg_trade_price_source: "boats" } else ([$saved[] | select(. != null and .symbol == $s)][0]) end] }' "$saved_answer"
     exit
   fi
   if [[ "$url" == *"api.robinhood.com/marketdata/historicals/"* ]]; then
