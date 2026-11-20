@@ -14,10 +14,11 @@ var STREAM_CAP = 32 * 1024 * 1024
 // Yahoo streams at most 100 symbols a connection.
 var MOST_SYMBOLS = 100
 
-// Seconds between reports: every second while a surface is open, as the
-// clock ticks; with only the pill on screen, every 15.
+// Seconds between reports: every second while a surface is open, as its
+// clock ticks; with only the pill on screen, every minute, as the pill's
+// clock ticks, so the pill costs no more than a minute's answer did.
 var OPEN_PACE = 1
-var PILL_PACE = 15
+var PILL_PACE = 60
 
 // Yahoo sends a price as a 32-bit float, whose cents are wrong from 2^17 on.
 var EXACT_BELOW = 131072
@@ -32,7 +33,8 @@ function localFolder(url, shellDir) {
 }
 
 // A listing streams live while it has a trade under a minute old on arrival,
-// heard in the last minute: its answers are then asked once a bar.
+// heard in the last two minutes, room for the pill's minute between
+// reports: its answers are then asked once a bar.
 var LIVE_AGE = 60
 
 // A currency's streamed price is a quote, not a trade, so a currency keeps
@@ -78,7 +80,7 @@ function liveSymbols(ticks, now, quotes) {
   var out = {}
   for (var s in ticks) {
     var tick = ticks[s]
-    if (now - tick.heard <= LIVE_AGE && tick.heard - tick.t <= LIVE_AGE && streamable(quotes[s])) out[s] = true
+    if (now - tick.heard <= 2 * LIVE_AGE && tick.heard - tick.t <= LIVE_AGE && streamable(quotes[s])) out[s] = true
   }
   return out
 }

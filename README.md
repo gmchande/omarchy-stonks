@@ -418,8 +418,8 @@ come from Robinhood and Yahoo's price stream.
 - `streamer.finance.yahoo.com` for the trades of the stocks on screen as
   they happen, a few seconds behind, over one connection: the pill's
   stock, and with the panel or the window open, the stock on show and the
-  rows in sight. It takes them every 15 seconds with only the pill on
-  screen, and every second with the panel or the window open. A
+  rows in sight. It takes them every minute with only the pill on screen,
+  and every second with the panel or the window open. A
   currency's streamed price is a quote, not a trade, so a currency keeps
   the price above. When the stream drops, Stonks asks for prices as above
   and tries the stream again, less often the longer it fails.

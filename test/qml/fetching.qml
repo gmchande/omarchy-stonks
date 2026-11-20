@@ -505,7 +505,7 @@ Harness {
       closeWindow()
 
       // The pill alone from 15:00, after the saved day's last trade, nothing
-      // open: the stream wants the pill's stock alone, reported every 15 s.
+      // open: the stream wants the pill's stock alone, reported every minute.
       // Its trades, each two seconds old, are the pill's price, and its
       // chart is asked once a bar, not every minute. With the window open it
       // wants the stock on show and the rows in sight, reported every second.
@@ -519,8 +519,8 @@ Harness {
           runCommand(["sh", "-c", "echo NEST " + (service.now - 2) + " " + streamedPrice + " 1 >> \"$STONKS_FAKE_STATE/STREAM.trades\""])
         })
       var shown = within(3000, function() { return !!service.quotes.NEST && service.quotes.NEST.price === streamedPrice })
-      harness.check("with only the pill on screen, the stream wants its stock alone every 15 s, and the pill shows the stream's newest trade",
-        lastLine("STREAM.wanted") === "15 NEST" && shown,
+      harness.check("with only the pill on screen, the stream wants its stock alone every minute, and the pill shows the stream's newest trade",
+        lastLine("STREAM.wanted") === "60 NEST" && shown,
         [lastLine("STREAM.wanted"), service.quotes.NEST ? service.quotes.NEST.price : "no quote", streamedPrice].join(" | "))
       openWindow()
       settle()
