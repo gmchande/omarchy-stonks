@@ -97,13 +97,17 @@ function parseHistory(json, range, centExchanges) {
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
   // Yahoo opens a new listing's history with its offer price: one price, no
-  // shares, at its first day's bell, hours before its first trade. That day
-  // it has no first trade on record, and repeats the price at its live
-  // moment too until shares trade (`Quote.offerTimes`).
+  // shares, in a bar or two of its first day, hours before its first trade.
+  // That day it has no first trade on record, and repeats the price at its
+  // live moment too until shares trade (`Quote.offerTimes`); from the next,
+  // its first trade on record is that day's bell.
   var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
   var offered = Quote.offerTimes(meta, bars)
+  var firstShares = bars.findIndex(Quote.traded)
+  var sharesAt = firstShares < 0 ? Infinity : bars[firstShares].t
   bars = bars.filter(function(b) {
-    return offered.indexOf(b.t) < 0 && !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c)
+    return offered.indexOf(b.t) < 0 && !(firstTrade !== null && b.t >= firstTrade && b.t < Math.min(sharesAt, firstTrade + 24 * 60 * 60)
+      && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c)
   })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)

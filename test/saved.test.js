@@ -229,6 +229,17 @@ test("a young listing shows only what traded: on its first day the IPO price, na
       .toMatchObject([range, "SINCE IPO", { label: "IPO", value: "83.00" }, false])
     expect([range, M.barDay(history, history.start).date, M.baselineLegend(history, quotes.ANT.priceDigits)]).toEqual([range, "IPO PRICE", "┄ IPO PRICE 83.00"])
   }
+  // From its second day Yahoo names its first trade at the bell, 09:30, yet
+  // its All still opens with the IPO price's bar at 09:35: no 83.00 low and
+  // no line from a price no share traded at, on any range.
+  for (const hhmm of ["1300", "1640"]) {
+    const day2 = M.parseChart(fixture(`moments/ipoday-2026-11-20-${hhmm}/ant.json`), cents)
+    for (const [file, range] of [["5d", "1W"], ["1mo", "1M"], ["ytd", "YTD"], ["1y", "1Y"], ["5y", "5Y"], ["10y", "10Y"], ["max", "All"]]) {
+      const history = M.parseHistory(fixture(`history/ant-2026-11-20-${hhmm}-${file}.json`), range, cents)
+      const line = M.rangeLine(history, M.rangeEnds(history, M.periodStats(history), day2), day2)
+      expect([hhmm, range, history.bars.some(b => b.l === 83), line.range.lowText === "83.00"]).toEqual([hhmm, range, false, false])
+    }
+  }
 
   // WREN, first traded Friday 16 October: Yahoo's 1W and 1M open with its
   // 18.00 offer at 09:30, no shares traded, its first trade 23.00 at 11:45.
