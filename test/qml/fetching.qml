@@ -206,12 +206,14 @@ Harness {
     function touch(name) { runCommand(["touch", harness.state + "/" + name]) }
     function remove(name) { runCommand(["rm", "-f", harness.state + "/" + name]) }
 
-    // No quote run is out, the preview's included: the clock moves on only
-    // once each run has landed, as it would in the seconds a run takes.
+    // No feed has a run out, a quote feed's runs included: the clock moves
+    // on only once each run has landed, as it would in the seconds a run
+    // takes.
     function idle() {
-      return [service.feeds.quotes, service.feeds.preview].every(function(feed) {
-        return feed.firstRun.length === 0 && feed.refreshRun.length === 0
-      }) && !service.feeds.overnight.busy && !service.feeds.lastTrade.busy && !service.opening
+      return Object.keys(service.feeds).every(function(name) {
+        var feed = service.feeds[name]
+        return feed.firstRun ? feed.firstRun.length === 0 && feed.refreshRun.length === 0 : !feed.busy
+      }) && !service.opening
     }
     function settle() {
       verify(within(10000, idle), "a quote run never landed")
@@ -808,9 +810,11 @@ Harness {
 
       // Sunday night, Robinhood gone as the day's check of which stocks
       // trade all day falls due, so both asks fail together: once it answers
-      // again, the "!" goes at the next try, not five minutes after it.
+      // again, the "!" goes at the next try, not five minutes after it. The
+      // check answers in 2 s, as on a loaded machine, and the clock waits.
       service.feature("NEST")
       touch("ROBINHOOD.offline")
+      runCommand(["sh", "-c", "echo 2 > \"$0/instruments.instruments.slow\"", harness.state])
       startAt(at(harness.wed7 + 4 * 86400, 21, 0))()
       var goneMarked = false
       tick(600, 5, function() { goneMarked = goneMarked || pill.warns })

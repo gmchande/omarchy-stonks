@@ -679,7 +679,7 @@ Item {
   }
   readonly property var nightFailed: Overnight.nightFailures(allDayFeed.entries, overnightFeed.entries, lastTradeFeed.entries, nightTrading)
   // The feeds themselves, for whoever waits until no run is out.
-  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed })
+  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed, allDay: allDayFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
   // it trades each all day.
   readonly property var overnightSymbols: allSymbols.filter(function(s) {
