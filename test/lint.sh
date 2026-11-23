@@ -24,6 +24,9 @@ declare -A listed=(
   # declares, which qmllint cannot see through Repeater.itemAt.
   ["Watchlist.qml missing-property pause"]=1
   ["Watchlist.qml missing-property settle"]=1
+  # Watchlist.qml: Omarchy's touchpad scroll factor, which shells before it
+  # lack, so the list falls back to 3.
+  ["Watchlist.qml missing-property touchpadScrollFactor"]=1
   # BarWidget.qml: injectPanel sets each property the loaded panel has,
   # checked with `in`; Qt 6.12 types Loader.item as a bare QObject.
   ["BarWidget.qml missing-property target"]=5

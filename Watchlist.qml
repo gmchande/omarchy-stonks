@@ -154,13 +154,18 @@ Flickable {
     }
   }
 
+  // A touchpad's pixels reach the shell at Hyprland's 0.4 of the fingers'
+  // travel, so Omarchy's menu scales them by its own factor, which Stonks
+  // follows, and by the 3 it chose until its shell has one.
+  readonly property real touchpadFactor: Style.touchpadScrollFactor || 3
+
   // The wheel and the touchpad move the list at once and leave it where they
   // stop, as Omarchy's own lists do. Says whether the list took the event.
   function wheelEvent(phase, pixels, angle) {
     // A wheel's notches come with no scroll phase: 120 units, and three rows,
     // a notch, or parts of one from a high-resolution wheel. On Wayland a
     // notch carries 15 pixels too, so only the touchpad moves by pixels.
-    var by = phase === Qt.NoScrollPhase ? -angle / 120 * 3 * rowPitch : -pixels
+    var by = phase === Qt.NoScrollPhase ? -angle / 120 * 3 * rowPitch : -pixels * touchpadFactor
     if (by === 0) return false
     endClick()
     var from = headedY

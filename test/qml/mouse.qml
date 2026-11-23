@@ -348,6 +348,13 @@ Harness {
         list.contentHeight > list.height && within(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
         [list.contentHeight, list.height, list.contentY, service.symbols.join(",")].join(" "))
 
+      // QtTest sends no touchpad, so its event goes to the list's handler as
+      // the WheelHandler hands it on: a swipe whose pixels Hyprland cut to 0.4.
+      var swipeFrom = list.contentY
+      list.wheelEvent(Qt.ScrollUpdate, -10, 0)
+      harness.check("a touchpad swipe moves the rows three times its pixels, as Omarchy's menu does",
+        Math.abs(list.contentY - swipeFrom - 30) < 0.5, swipeFrom + " " + list.contentY)
+
       app.close()
       harness.finish()
     }
