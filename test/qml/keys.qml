@@ -193,6 +193,7 @@ Harness {
     // A documented key without a case fails; changing some unrelated state
     // cannot satisfy the expected target or excuse another settings change.
     // `pressed` acts as the listed key `meaning`, itself when not given.
+    // Returns "" when it does, else the key and what went wrong.
     function acts(s, pressed, meaning) {
       var token = meaning || pressed
       base(s)
@@ -242,11 +243,14 @@ Harness {
         effect = function() { return harness.tabs === before.tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
       else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
-      if (!effect || !press(pressed)) return false
-      return within(1500, function() {
-        var after = state(b)
-        return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
-      })
+      if (!effect || !press(pressed)) return token + " (no case)"
+      // What the key asked lands before anything is judged, so a refresh
+      // slow to answer counts for its own key, not for the next.
+      quiet()
+      var after = null
+      var drifted = function() { return Object.keys(before).filter(function(k) { return changed.indexOf(k) < 0 && before[k] !== after[k] }) }
+      if (within(1500, function() { after = state(b); return effect() && drifted().length === 0 })) return ""
+      return token + " (" + (effect() ? "" : "no effect; ") + drifted().map(function(k) { return k + " " + before[k] + "→" + after[k] }).join(", ") + ")"
     }
 
     function escapeOrder(s) {
@@ -264,7 +268,7 @@ Harness {
 
     function walk(s) {
       var listed = harness.readmeKeys()
-      var dead = (listed || []).concat(harness.omarchyOwn(s.name)).filter(function(t) { return !acts(s, t) })
+      var dead = (listed || []).concat(harness.omarchyOwn(s.name)).map(function(t) { return acts(s, t) }).filter(function(d) { return d !== "" })
       harness.check("in the " + s.name + ", every README key and Omarchy's Esc and Ctrl+↑ ↓" + (s.name === "popup" ? ", Tab and Shift+Tab" : "")
         + " do their documented action (" + (listed || []).length + " README keys)",
         listed !== null && dead.length === 0, listed === null ? "no key table in the README" : "wrong: " + dead.join(" "))
@@ -587,11 +591,17 @@ Harness {
       var b = s.body
       var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
       var state = Quickshell.env("STONKS_FAKE_STATE")
-      var owner = function(kind, text) {
-        flag.command = ["sh", "-c", 'printf %s "$2" > "$1/wl-paste.owner" && printf %s "$3" > "$1/wl-paste.text"', "sh", state, kind, text || ""]
+      var run = function(script, args) {
+        flag.command = ["sh", "-c", script, "sh", state].concat(args || [])
         flag.running = true
         tryVerify(function() { return !flag.running }, 2000)
       }
+      // Each owner comes with a fresh fifo, through which a late one is told
+      // to answer (`answer`).
+      var owner = function(kind, text) {
+        run('printf %s "$2" > "$1/wl-paste.owner" && printf %s "$3" > "$1/wl-paste.text" && rm -f "$1/wl-paste.late" && mkfifo "$1/wl-paste.late"', [kind, text || ""])
+      }
+      var answer = function() { run('printf "\\n" 1<> "$1/wl-paste.late"') }
       var asked = function() { return harness.logged("wl-paste.calls").length }
       press("w")
       press("↓")
@@ -677,24 +687,30 @@ Harness {
         whole && refused, [whole, read, field.text.length].join(" | "))
 
       // Owners that never stop and never answer: the field types on, and
-      // neither lands. One that answers late lands, unless typed past.
+      // neither lands. One that answers late, only once the test tells it,
+      // lands, unless typed past. Each key comes once the owner is read.
       var holds = function(kind, ms) {
         fresh()
         owner(kind, "LATE")
+        var calls = asked()
         keyClick(Qt.Key_V, C)
+        var reading = within(3000, function() { return asked() === calls + 1 })
         keyClick("z")
-        var typed = within(300, function() { return field.text === "abc defz" })
-        var kept = typed && !within(ms, function() { return field.text !== "abc defz" })
-        return kept ? "" : kind + ": " + field.text.slice(0, 40)
+        if (kind === "late") answer()
+        var kept = field.text === "abc defz" && !within(ms, function() { return field.text !== "abc defz" })
+        return reading && kept ? "" : kind + ": " + (reading ? "" : "never read; ") + field.text.slice(0, 40)
       }
-      var held = [holds("endless", 1200), holds("silent", 2600), holds("late", 1600)].filter(function(s) { return s !== "" })
+      var held = [holds("endless", 1200), holds("silent", 2600), holds("late", 1000)].filter(function(s) { return s !== "" })
       fresh()
       owner("late", "LATE")
+      var calls = asked()
       keyClick(Qt.Key_V, C)
-      var late = within(2500, function() { return field.text === "abc defLATE" })
+      var waiting = within(3000, function() { return asked() === calls + 1 }) && field.text === "abc def"
+      answer()
+      var late = waiting && within(2000, function() { return field.text === "abc defLATE" })
       owner("none")
       harness.check("a paste whose owner never stops or never answers keeps nothing from the field's keys and lands nothing, and a late one lands unless typed past",
-        held.length === 0 && late, held.concat([late]).join(" | "))
+        held.length === 0 && late, held.concat(["late: " + (waiting ? "" : "never read; ") + field.text.slice(0, 40)]).join(" | "))
       press("Esc")
     }
 
@@ -705,7 +721,7 @@ Harness {
 
       // The panel first: the window, shown, would take the keys.
       walk(harness.popup)
-      var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(harness.popup, t, harness.omarchy[t]) })
+      var wrong = Object.keys(harness.omarchy).map(function(t) { return acts(harness.popup, t, harness.omarchy[t]) }).filter(function(d) { return d !== "" })
       harness.check("in the panel, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ← and l →, Space Enter, x and X Delete",
         wrong.length === 0, "wrong: " + wrong.join(" "))
       // Both surfaces draw one StonksBody's sheet: the panel's stands for both.

@@ -5,16 +5,20 @@
 # as STONKS_FAKE_STATE/wl-paste.owner says, the clipboard's owner:
 #   text      what STONKS_FAKE_STATE/wl-paste.text holds, or with --primary
 #             what wl-paste.primary holds
-#   late      what wl-paste.text holds, a second late
+#   late      what wl-paste.text holds, once a line comes through the fifo
+#             wl-paste.late: it holds the fifo before it appends its line,
+#             so a line sent once that line is seen is never lost
 #   endless   an owner that never stops sending
 #   silent    an owner that never answers, its PID in wl-paste.pid
 # and with no owner, nothing copied, as the real one says it.
+owner=$(cat "$STONKS_FAKE_STATE/wl-paste.owner" 2> /dev/null)
+[ "$owner" != late ] || exec 3<> "$STONKS_FAKE_STATE/wl-paste.late"
 echo "$*" >> "$STONKS_FAKE_STATE/wl-paste.calls"
-case $(cat "$STONKS_FAKE_STATE/wl-paste.owner" 2> /dev/null) in
+case $owner in
   text)
     if [[ " $* " == *" --primary "* ]]; then cat "$STONKS_FAKE_STATE/wl-paste.primary"
     else cat "$STONKS_FAKE_STATE/wl-paste.text"; fi ;;
-  late) sleep 1; cat "$STONKS_FAKE_STATE/wl-paste.text" ;;
+  late) read -r _ <&3; cat "$STONKS_FAKE_STATE/wl-paste.text" ;;
   endless) while :; do printf 'AAPL '; done ;;
   silent) echo $$ > "$STONKS_FAKE_STATE/wl-paste.pid"; exec sleep 3600 ;;
   *) echo "Nothing is copied" >&2; exit 1 ;;
