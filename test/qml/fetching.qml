@@ -235,12 +235,15 @@ Harness {
       settle()
     }
 
-    // The clock moves on by `seconds`, a step at a time, each run let land.
-    // `each` is called after every step.
+    // The clock moves on by `seconds`, a step at a time, each ask of the
+    // screens answered and each run let land, as both are between the
+    // service's seconds: the answer, not the next step, lets what waits on
+    // it go. `each` is called after every step.
     function tick(seconds, step, each) {
       step = step || 5
       for (var t = 0; t < seconds; t += step) {
         harness.clockTo(harness.time + step)
+        answerScreens()
         settle()
         if (each) each()
       }
@@ -518,7 +521,7 @@ Harness {
           app.open("{}")
           tryVerify(function() { return app.opened }, 3000)
           answerScreens()
-        }, answerScreens)
+        })
       var night = away.filter(function(l) { return /^overnight /.test(l) })
       var lastTrades = away.filter(function(l) { return /^lasttrade NEST /.test(l) })
       harness.check("through the night, Robinhood is asked every 5 minutes for the pill's trades, and every minute for its last trade",
@@ -676,7 +679,7 @@ Harness {
         300, counts([5, 0, 0, 0, 0, 0, 0, 0]), function() {
           startAt(service.now + 5)()
           answerScreens()
-        }, answerScreens)
+        })
       var wakeFrom = harness.requests().length
       inputStandIn.isIdle = true
       screenStandIn.on = true
