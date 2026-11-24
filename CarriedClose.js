@@ -109,10 +109,10 @@ function firstTrade(quote, head) {
 // Each is left out where unknown (`held`). Robinhood's trades of the new
 // session (`bars`, where it trades the stock all day) count toward its
 // first bars too, so a chart that has them doesn't hold the day again once
-// Yahoo's two-day answer comes.
-function heldDay(quote, bars) {
-  if (!quote.before || !firstBars(Quote.regularPoints(quote).concat((bars || []).filter(function(b) { return b.s === "reg" })),
-    quote.session.regular.start)) return null
+// Yahoo's two-day answer comes. A US stock's (`pre`) count from its
+// pre-market, so a day whose pre-market traded holds nothing at the open.
+function heldDay(quote, bars, pre) {
+  if (!quote.before || !firstMinutes(quote, bars, pre)) return null
   var close = quote.prevClose
   var known = Format.isFiniteNumber(close)
   return Object.assign({}, quote, {
@@ -139,8 +139,22 @@ function heldDay(quote, bars) {
 // shows (`CATCH_UP`). Yahoo's echo of its quote, off the grid, is no bar.
 var FIRST_BARS = 3
 
-function firstMinutes(quote) {
-  return firstBars(Quote.regularPoints(quote), quote.session.regular.start)
+// Whether the new day is still in its first minutes: its session's, or
+// for a US stock (`pre`) its day's from 04:00, Yahoo's trades with
+// Robinhood's of the session (`bars`). Robinhood's pre-market bars don't
+// count, since the chart draws them only where Yahoo has none for a while
+// (`Overnight.allTrades`), and abroad nor do Yahoo's, as London's echo of
+// its close at 07:20 is no trade.
+function firstMinutes(quote, bars, pre) {
+  var start = pre ? Quote.periodsStart(quote.session) : quote.session.regular.start
+  var end = Quote.dayEnd(quote)
+  return firstBars(sessionTrades(quote.points, bars, start, end), start)
+}
+
+// Yahoo's `points` from `start` and Robinhood's session `bars`, before `end`.
+function sessionTrades(points, bars, start, end) {
+  var regular = (bars || []).filter(function(b) { return b.s === "reg" })
+  return points.concat(regular).filter(function(p) { return p.t >= start && p.t < end })
 }
 
 // Whether `trades` of a session opening at `open` are still its first

@@ -249,10 +249,10 @@ function twoDays(quote, now, calendars) {
   var segs = cal ? Calendar.segmentsOn(cal, date) : []
   var pts = quote.points
   var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
-  var held = function(open) { return !tradedSince(open) || (CarriedClose.firstMinutes(quote) && now < open + CarriedClose.HOLD_LIMIT) }
+  var held = function(open, pre) { return !tradedSince(open) || (CarriedClose.firstMinutes(quote, null, pre) && now < open + CarriedClose.HOLD_LIMIT) }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && held(segs[0].start)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && held(segs[0].start, true)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   if (!open || now < open.start || now >= open.end) return false

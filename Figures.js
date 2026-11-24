@@ -260,7 +260,8 @@ function rowModel(quote, scrubT, mode, newest) {
 // close just gone, the panel's dashed line: the day drawn says so
 // (`Day.nightBell`), and a row's quote by its newest price
 // (`newest.stepped`). A day abroad just opened, joined to the day before
-// it, has its own open already (`CarriedClose.heldDay`).
+// it, has its own open already (`CarriedClose.heldDay`). A moment of a US
+// day's pre-market comes before its open, so it counts only from the close.
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
@@ -269,7 +270,7 @@ function scrubbedBase(quote, t, newest) {
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
   if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
-  return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
+  return { prevClose: Quote.dayBase(quote), dayOpen: reg && t < reg.start ? null : quote.dayOpen }
 }
 
 // The chart's dashed line in words: the close before the day on the chart,

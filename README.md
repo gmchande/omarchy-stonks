@@ -114,10 +114,11 @@ first trades, its IPO price is the large price, with IPO PRICE under it, no
 move, and an empty chart.
 
 The 1D chart runs by the clock from the open to the close, or for a US
-stock to the end of after hours, 20:00 on most days. The line stops at the
-newest price and the hours still to come stay empty, so the open sits in
-the same place every day. The regular session is bright and the hours
-around it dim.
+stock from 04:00, when its pre-market starts, to the end of after hours,
+20:00 on most days. The line stops at the newest price and the hours still
+to come stay empty, so the open sits in the same place every day, and a
+jump before it shows where it happened. The regular session is bright and
+the hours around it dim.
 
 After the close, the chart keeps the day that closed until the next open,
 and adds what trades in between at its end: tonight's trades, for a US
@@ -131,7 +132,9 @@ closed day draws fainter, since the move doesn't count it: a thinner line,
 or in retro every other cell lit, still green above the dashed line and red
 below. For about ten minutes after the open, until the new day has three
 five-minute bars, the chart still keeps the day just closed, with the new
-day's first trades at its end, so one or two trades don't fill the chart.
+day's first trades at its end, so one or two trades don't fill the chart. A
+US stock's bars count from 04:00, so one that traded before the open turns
+right at it.
 
 For a US stock that Robinhood trades at night, the chart brightens the
 session trading now, such as tonight or the pre-market. The rows, like the
