@@ -2991,14 +2991,16 @@ test("a weekend shows Friday from 04:00 to its last trade, then Sunday's night a
   // Yahoo still on Friday, with no price: Monday's pre-market counts from
   // Friday's last regular trade, never Thursday's close. At 09:35, Yahoo's
   // cached Friday answer still out while Robinhood's has Monday's
-  // pre-market and first trade of the session, more than three bars from
-  // 04:00, the chart is Monday's at once, dashed at that same trade.
+  // pre-market and first trade of the session, the chart holds Friday with
+  // them at its end, as it will once Yahoo's two-day answer comes, never
+  // Monday with one trade: Robinhood's pre-market bars count toward no
+  // hold, since Monday's chart would draw them only where Yahoo has none.
   const priceless = { ...sunday.quote, price: null }
   const pricelessDawn = M.dayChart(priceless, robinhood("watch-2026-10-26-0420"), calendars)
   expect(M.newestTrade(priceless, pricelessDawn.latest, calendars, pricelessDawn.day).base).toBe(M.regularClose(priceless))
   const outOfOrder = M.dayChart(priceless, robinhood("watch-2026-10-26-0935"), calendars, at("2026-10-26", "09:35")).day
-  expect([M.chartSpan(outOfOrder).start, outOfOrder.points.at(-1).t >= at("2026-10-26", "09:30"), M.nightBell(outOfOrder), M.dayBase(outOfOrder)])
-    .toEqual([at("2026-10-26", "04:00"), true, null, M.regularClose(priceless)])
+  expect([M.chartSpan(outOfOrder).start, outOfOrder.points.at(-1).t >= at("2026-10-26", "09:30"), M.nightBell(outOfOrder), M.regularClose(outOfOrder)])
+    .toEqual([at("2026-10-23", "04:00"), true, at("2026-10-23", "16:00"), M.regularClose(priceless)])
 })
 
 test("every price stands at its time from its day's first trade, a quiet night a line through its few trades, and Robinhood's trades fill an hour Yahoo lost", () => {

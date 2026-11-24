@@ -56,12 +56,11 @@ function drawnWindow(cal, edge) {
 
 // A day later than Yahoo's own still in its first minutes, as Robinhood's
 // trades give them before Yahoo's answer has turned, holds the day before,
-// as `CarriedClose.heldDay` will once that answer comes, so the chart never
-// turns to one trade and back. Its first bars count from 04:00, so a day
-// whose pre-market traded turns at the open.
-function heldWindow(cal, quote, trades, reach, win) {
+// as `CarriedClose.heldDay` will once that answer comes, counting the same
+// bars from 04:00, so the chart never turns to one trade and back.
+function heldWindow(cal, quote, bars, reach, win) {
   if (!win || win.open <= quote.session.regular.start || reach >= win.open + CarriedClose.HOLD_LIMIT) return win
-  var day = trades.filter(function(p) { return p.t < win.end })
+  var day = CarriedClose.sessionTrades(quote.points, bars, win.start, win.end)
   return CarriedClose.firstBars(day, win.start) ? drawnWindow(cal, win.start - 1) : win
 }
 
@@ -144,7 +143,7 @@ function dayChart(quote, answer, calendars, now) {
   var edge = dayEdge(cal, reach, now)
   var coming = quote.next && quote.next.regular ? quote.next.regular.start : Infinity
   var win = quote.held ? dayWindow(cal, Calendar.dateStringOf(Calendar.localDate(quote.session.regular.start, cal)))
-    : heldWindow(cal, quote, all, reach, drawnWindow(cal, Math.min(reach, coming - 1)))
+    : heldWindow(cal, quote, answer.bars, reach, drawnWindow(cal, Math.min(reach, coming - 1)))
   if (!win) return { day: quote, latest: latest }
   var joined = joinedHours(cal, win, edge)
   var session = windowSession(cal, quote, win)

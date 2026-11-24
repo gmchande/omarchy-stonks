@@ -66,7 +66,7 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
-  var held = CarriedClose.heldDay(quote, tradability && tradability.allDay && night ? night.bars : null)
+  var held = CarriedClose.heldDay(quote, tradability && tradability.allDay && night ? night.bars : null, Overnight.hasOvernight(quote, calendars))
   var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
   out.allDay = !!tradability && tradability.allDay
