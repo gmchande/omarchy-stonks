@@ -162,7 +162,7 @@ code=$?
   esac
 done <<< "$hits"
 # The bar entry holds only the pill's forms: barStyle, and, absent until a
-# middle-click there, barStyleRight for the right section and
+# right-click there, barStyleRight for the right section and
 # barStyleVertical for a side bar; the service's file holds the rest.
 jq -e '.barWidget.defaults | keys == ["barStyle"]' manifest.json > /dev/null \
   || fail "manifest.json: the bar entry's defaults hold more than barStyle"

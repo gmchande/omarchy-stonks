@@ -59,10 +59,10 @@ something to show. Add your own and remove the ones you don't follow.
 
 The pill shows today's move for the stock you last looked at, as a
 sparkline, an arrow, the price as text, or an icon: a bull on an up day, a
-bear on a down one. Middle-click it to switch. On a bar at the side of the
+bear on a down one. Right-click it to switch. On a bar at the side of the
 screen, it switches between the icon and the symbol over its change.
 
-Click the pill for the panel, or right-click it for the window. Scroll over
+Click the pill for the panel, or middle-click it for the window. Scroll over
 it to step through your list, and drag it to move it along the bar. Point
 at it for what it has no room for, such as the time of the newest price.
 
@@ -182,7 +182,7 @@ In your own order, drag a row to move it.
 <img src="media/window.png" width="720" alt="Stonks' window: the panel's chart and rows, at the window's width">
 
 Stonks also opens as a tiled window with the panel's chart and rows.
-Right-click the pill, or run `omarchy-shell grvc.stonks toggleWindow`. To
+Middle-click the pill, or run `omarchy-shell grvc.stonks toggleWindow`. To
 float it, add a window rule for class `org.quickshell` and title `Stonks`.
 
 To open the panel or the window with a key, add an `o.bind` line to
