@@ -5,7 +5,7 @@
 # and the range, switches the look and the sounds, takes a screenshot,
 # opens the key sheet, replays the chart, runs an update on offer, adds a
 # stock found and removes it, and scrubs the chart; and on the real pill
-# (BarWidget.qml), a middle-click changes its look. Each is judged by what
+# (BarWidget.qml), a right-click changes its look. Each is judged by what
 # the lists file, the surface and the stand-in commands then hold, never by
 # where a thing is drawn. The shell's layer-shell card window, which the
 # pill's panel uses, does not load offscreen, so the copy of Panel.qml puts

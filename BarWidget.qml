@@ -53,7 +53,7 @@ BarWidget {
     ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.dayClock) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars, Overnight.keepsDay(newest)) : null
   // The right section, among the bar's bare icons, and a side bar each keep
-  // a form of their own, the icon until a middle-click picks another, as the
+  // a form of their own, the icon until a right-click picks another, as the
   // clock keeps verticalFormat beside format: a move brings each one's back.
   readonly property bool onRight: {
     var layout = bar && bar.layoutConfig ? bar.layoutConfig : null
@@ -267,15 +267,17 @@ BarWidget {
     // the stacked form's move counts from the open, or on a listing's first
     // day from its IPO price, a newest price's session and time ("Overnight
     // 23:25"), at night with whose move the pill shows and tonight's price
-    // and move, what a "!" means, and that a right-click opens the window.
+    // and move, what a "!" means, and that a middle-click opens the window.
     // None while the panel is open: the bubble would land on its header.
     tooltipText: root.opened ? ""
       : [[root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.newestNote, root.warningText]
-        .filter(function(part) { return part !== "" }).join(" · "), "Right-click opens the window"].filter(function(part) { return part !== "" }).join("\n")
+        .filter(function(part) { return part !== "" }).join(" · "), "Middle-click opens the window"].filter(function(part) { return part !== "" }).join("\n")
 
     onPressed: function(b) {
-      if (b === Qt.RightButton) { if (root.plugin) root.plugin.windowHost.toggle() }
-      else if (b === Qt.MiddleButton) root.cycleBarStyle()
+      // As on Omarchy's clock: a right-click changes the look, a middle-click
+      // opens more.
+      if (b === Qt.RightButton) root.cycleBarStyle()
+      else if (b === Qt.MiddleButton) { if (root.plugin) root.plugin.windowHost.toggle() }
       else root.togglePanel()
     }
     onWheelMoved: function(delta) { root.walk(delta) }

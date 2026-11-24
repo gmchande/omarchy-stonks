@@ -296,8 +296,8 @@ Harness {
 
       var form = ({ sparkline: "arrow", arrow: "text", text: "icon", icon: "sparkline" })[pill.barStyle]
       var saves = harness.entrySaves
-      click(pill, Qt.MiddleButton)
-      harness.check("a middle-click on the pill changes its look and saves it",
+      click(pill, Qt.RightButton)
+      harness.check("a right-click on the pill changes its look and saves it, as on Omarchy's clock",
         within(1500, function() { return pill.barStyle === form && harness.entrySaves === saves + 1 }), pill.barStyle + " " + harness.entrySaves)
 
       // The words are typed; the rest is the pointer's.

@@ -1095,7 +1095,7 @@ Item {
   // The panel's first-run hint above the footer, cleared at the next open.
   property string hint: ""
   function showFirstRunHint() {
-    hint = "Drag the pill in your bar to move it\nMiddle-click changes its look · right-click opens the window"
+    hint = "Drag the pill in your bar to move it\nRight-click changes its look · middle-click opens the window"
   }
 
   readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
