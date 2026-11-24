@@ -1935,6 +1935,13 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   // Of two stretches, the last: NBIS with an earlier half hour, 06:00 to 06:35, taken out too.
   const twice = { ...quotes.NBIS, points: quotes.NBIS.points.filter(p => p.t < at("2026-11-02", "06:00") || p.t >= at("2026-11-02", "06:40")) }
   expect(M.yahooHole(twice)).toBe(at("2026-11-02", "09:25"))
+  // Before the open, Yahoo's two-day answer holds the coming pre-market
+  // after the day that closed: AAPL at 06:00 on Friday 23 October, with
+  // Yahoo's 05:00 to 05:30 taken out after twelve slots that traded, is
+  // such a stretch too.
+  const morning = savedDay("night-2026-10-23-0600", "aapl")
+  const holed = { ...morning, points: morning.points.filter(p => p.t < at("2026-10-23", "05:00") || p.t >= at("2026-10-23", "05:35")) }
+  expect(M.yahooHole(holed)).toBe(at("2026-10-23", "05:30"))
   // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
   // nothing open, every row in sight with a surface open, the pill on SHOP too.
   expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { featured: "SHOP" })]).toEqual([null,

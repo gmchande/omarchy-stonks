@@ -398,11 +398,20 @@ var STEADY_SLOTS = 12
 
 // A thin stock's sparse pre-market leaves gaps too, so only one that
 // traded in at least half its slots before the gap, STEADY_SLOTS at least,
-// counts.
+// counts. Before the open, the pre-market is the coming day's, Yahoo's
+// answer still the day that closed (`quote.next`).
 function yahooHole(quote) {
-  var pre = quote.session.pre
+  var last = null
+  var pres = [quote.session.pre, quote.next ? quote.next.pre : null]
+  for (var d = 0; d < pres.length; d++) {
+    var hole = pres[d] ? preHole(quote, pres[d]) : null
+    if (hole !== null) last = hole
+  }
+  return last
+}
+
+function preHole(quote, pre) {
   var pts = quote.points
-  if (!pre) return null
   var last = null
   var steady = 0
   for (var i = 0; i + 1 < pts.length && pts[i].t < pre.end; i++) {
