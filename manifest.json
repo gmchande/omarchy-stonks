@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "grvc.stonks",
   "name": "Stonks",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "author": "Gaurav Chande",
   "license": "MIT",
   "description": "Your stocks watchlist in the Omarchy bar, each price as it traded: in its own currency, on its exchange's clock, and with its time when it's late. Stonks follows stocks, ETFs, indexes and crypto from New York to London and Tokyo, with pre-market, after-hours and US overnight prices. They come from Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
