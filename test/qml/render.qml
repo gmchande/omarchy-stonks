@@ -644,11 +644,13 @@ Harness {
         quotes[s] = parsed(answer)
       })
       // Two moments saved in one day where Stonks asks for two, in the first
-      // minutes after the open while the chart holds the day before
-      // (`CarriedClose.heldDay`): their two-day answer is the day before's,
-      // saved at the moment named, joined to the moment's own, as one
-      // request brings both, read by a shell that held that day before.
-      var dayBefore = { "watch-2026-10-26-0935": "watch-2026-10-25-1000", "open-2026-11-02-0941": "gap-2026-11-01-2148" }[folder]
+      // minutes after the open, or a US stock's pre-market's, while the chart
+      // holds the day before (`CarriedClose.heldDay`): their two-day answer
+      // is the day before's, saved at the moment named, joined to the
+      // moment's own, as one request brings both, read by a shell that held
+      // that day before.
+      var dayBefore = { "watch-2026-10-26-0420": "watch-2026-10-25-1000", "watch-2026-10-26-0935": "watch-2026-10-25-1000",
+        "open-2026-11-02-0941": "gap-2026-11-01-2148" }[folder]
       var joinedTwo = function(s) {
         if (!dayBefore) return null
         var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', root)

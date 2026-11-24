@@ -95,24 +95,19 @@ function firstTrade(quote, head) {
 
 // One or two trades of a day just begun, scaled to the chart's height, draw
 // a line from top to bottom, or a crash from the close. So until the day has
-// `FIRST_BARS`, the 1D chart holds the day just closed, abroad or in New
-// York, asked for in two days meanwhile (`Asks.twoDays`), as it was drawn
-// before the open, with the new day's trades joined after it as a
-// pre-market joins a day (`Quote.tailDay`); a US stock's then draws from the
-// held day's open, with its night and pre-market (`Day.dayChart`,
-// `Day.sessionDay`). The close before it is the one Stonks drew before the
-// open (`heldBase`), and its open its own; the new day's trades count from
-// its close, the one the move counts from and the panel's dashed line, as
-// for tonight's trades (`Day.nightBell`), or since the new
-// day's open (`nextOpen`). Its figures are its own: its open, its low and
-// high from its bars, and no volume, which Yahoo gives only the new day's.
-// Each is left out where unknown (`held`). Robinhood's trades of the new
-// session (`bars`, where it trades the stock all day) count toward its
-// first bars too, so a chart that has them doesn't hold the day again once
-// Yahoo's two-day answer comes.
-function heldDay(quote, bars) {
-  if (!quote.before || !firstBars(Quote.regularPoints(quote).concat((bars || []).filter(function(b) { return b.s === "reg" })),
-    quote.session.regular.start)) return null
+// `FIRST_BARS`, the 1D chart of a listing abroad holds the day just closed,
+// asked for in two days meanwhile (`Asks.twoDays`), as it was drawn before
+// the open, with the new day's trades joined after it as a pre-market
+// joins a day (`Quote.tailDay`). A US stock's day turns at its pre-market
+// instead, and holds there (`Day.heldWindow`). The close before it is the
+// one Stonks drew before the open (`heldBase`), and its open its own; the
+// new day's trades count from its close, the one the move counts from and
+// the panel's dashed line, as for tonight's trades (`Day.nightBell`), or
+// since the new day's open (`nextOpen`). Its figures are its own: its open,
+// its low and high from its bars, and no volume, which Yahoo gives only the
+// new day's. Each is left out where unknown (`held`).
+function heldDay(quote) {
+  if (!quote.before || !firstMinutes(quote)) return null
   var close = quote.prevClose
   var known = Format.isFiniteNumber(close)
   return Object.assign({}, quote, {
@@ -143,11 +138,9 @@ function firstMinutes(quote) {
   return firstBars(Quote.regularPoints(quote), quote.session.regular.start)
 }
 
-// Whether `trades` of a session opening at `open` are still its first
-// minutes' (`FIRST_BARS`), Yahoo's and Robinhood's together, a bar each
-// slot: a 1D chart that has the new session's first trades from Robinhood
-// before Yahoo's two-day answer comes holds the day before as `heldDay`
-// will (`Day.dayChart`).
+// Whether `trades` of a day whose first bar is at `open` are still its
+// first minutes' (`FIRST_BARS`), Yahoo's and Robinhood's together, a bar
+// each slot.
 function firstBars(trades, open) {
   var slots = {}
   var count = 0

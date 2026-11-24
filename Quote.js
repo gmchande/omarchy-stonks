@@ -831,19 +831,28 @@ function tailStart(quote) {
   return quote.next ? periodsStart(quote.next) : null
 }
 
-function tailDay(quote) {
+// The coming day a two-day answer holds after the headline's, as a day of
+// its own: its trades so far, counted from the headline's close, with no
+// open yet. Null without one.
+function comingDay(quote) {
   var from = tailStart(quote)
-  var pts = quote.points
-  if (from === null || !pts.length || pts[pts.length - 1].t < from) return null
+  if (from === null) return null
   return Object.assign({}, quote, {
     session: quote.next,
     next: null,
-    points: pts.filter(function(p) { return p.t >= from }),
+    points: quote.points.filter(function(p) { return p.t >= from }),
     prevClose: regularClose(quote),
     dayOpen: null,
     openSession: null,
     wholeDay: false
   })
+}
+
+// The coming day once it has a trade.
+function tailDay(quote) {
+  var from = tailStart(quote)
+  var pts = quote.points
+  return from !== null && pts.length && pts[pts.length - 1].t >= from ? comingDay(quote) : null
 }
 
 function bucketTimes(times) {

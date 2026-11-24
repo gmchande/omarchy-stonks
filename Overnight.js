@@ -444,8 +444,8 @@ function restingNewest(newest) {
 
 // Whether the rows and the pill keep the day's close and move: once tonight
 // has traded, until the pre-market's first prices arrive, soon after 04:00,
-// though the 1D chart keeps the day until the open. Their line then draws
-// tonight faint (`Chart.chartGeometry`).
+// as the 1D chart keeps the day until the pre-market's first bars. Their
+// line then draws tonight faint (`Chart.chartGeometry`).
 function keepsDay(newest) {
   return !!newest && !!newest.joined
 }

@@ -51,28 +51,27 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 }
 
 // The day the chart, a row's line and the pill's draw, so all three show one.
-// For a US stock or ETF, the trading day whose open has come by `dayClock`,
-// the shell's clock five minutes at a time, from its open, with what has
-// traded since its end joined, running on to that clock, until the next
-// open: from Yahoo's day and Robinhood's trades where Robinhood trades it
-// all day (`Day.dayChart`); for one it doesn't, or while a failed check
-// leaves that unknown, Yahoo's own and its coming pre-market
-// (`Day.sessionDay`); `waiting` until Robinhood says which. Without
-// `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
-// listing's is its quote's day, or the coming day once it has a trade
-// (`Quote.tailDay`). Any listing's, London's, Tokyo's or a US stock's,
-// stays the last until its first bar, then holds it through the new day's
-// first minutes (`CarriedClose.heldDay`).
+// For a US stock or ETF, the trading day whose pre-market has come by
+// `dayClock`, the shell's clock five minutes at a time, from 04:00, with
+// what has traded since its end joined, running on to that clock, until
+// the next day takes the chart: from Yahoo's day and Robinhood's trades
+// where Robinhood trades it all day (`Day.dayChart`); for one it doesn't,
+// or while a failed check leaves that unknown, Yahoo's own and its coming
+// pre-market (`Day.sessionDay`); `waiting` until Robinhood says which.
+// Without `allDay`, as in a harness that stubs the service, Yahoo's own.
+// Any other listing's is its quote's day, or the coming day once it has a
+// trade (`Quote.tailDay`), and stays the last until its first bar, then
+// holds it through the new day's first minutes (`CarriedClose.heldDay`).
 function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
+  if (!Overnight.hasOvernight(quote, calendars))
+    return { day: Quote.tailDay(quote) || CarriedClose.heldDay(quote) || quote, latest: null, allDay: false, waiting: false }
+  var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
-  var held = CarriedClose.heldDay(quote, tradability && tradability.allDay && night ? night.bars : null)
-  var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
-  if (!Overnight.hasOvernight(quote, calendars)) return out
   out.allDay = !!tradability && tradability.allDay
-  if (tradability && !tradability.allDay) out.day = Day.sessionDay(held || quote, dayClock)
+  if (tradability && !tradability.allDay) out.day = Day.sessionDay(quote, dayClock)
   else if (tradability && night) {
-    var built = Day.dayChart(held || quote, night, calendars, dayClock)
+    var built = Day.dayChart(quote, night, calendars, dayClock)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true
@@ -105,7 +104,7 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 
 // x runs by the clock along the day's axis (`chartSpan`): from the first trade
 // or the open, whichever is earlier, so the line reaches the bell from where it
-// came, to hold every trade; or, for a US stock or ETF, from its open to its
+// came, to hold every trade; or, for a US stock or ETF, from 04:00 to its
 // 20:00 (`Day.js`), so a quiet hour shows as one, the hours to come stay
 // empty, and a finished day ends at its last trade. `ext` marks
 // trades outside the regular session, and `dim` those drawn dim: the extended

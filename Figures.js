@@ -118,11 +118,14 @@ function dayLine(quote, today, day) {
 // figures are of: its night, pre-market and after hours, but not tonight's,
 // joined after it, nor the coming day's; or where the figures are of the
 // day those joined trades belong to, as while the chart holds the day
-// before (`CarriedClose.heldDay`), those. None when the chart is another
-// day's. Inside the session Yahoo's figures are the trades', and a bar
-// there can be Yahoo echoing its quote, as Tokyo's at the bell.
+// before (`CarriedClose.heldDay`), those; or where the chart has turned to
+// a US stock's next day before Yahoo's figures have, the ones it brings of
+// theirs (`Day.figuresTrades`). None when the chart is another day's.
+// Inside the session Yahoo's figures are the trades', and a bar there can
+// be Yahoo echoing its quote, as Tokyo's at the bell.
 function figuresTrades(quote, day) {
   if (!day || !day.session || !day.session.regular) return []
+  if (day.figuresTrades) return day.figuresTrades.filter(function(p) { return Quote.pointSession(quote, p) !== "reg" })
   var drawn = exchangeDay(quote, day.session.regular.start)
   var figures = exchangeDay(quote, quote.figuresDay)
   var until = day.tonight || Quote.tailStart(day) || Infinity
@@ -260,7 +263,8 @@ function rowModel(quote, scrubT, mode, newest) {
 // close just gone, the panel's dashed line: the day drawn says so
 // (`Day.nightBell`), and a row's quote by its newest price
 // (`newest.stepped`). A day abroad just opened, joined to the day before
-// it, has its own open already (`CarriedClose.heldDay`).
+// it, has its own open already (`CarriedClose.heldDay`). A moment of a US
+// day's pre-market comes before its open, so it counts only from the close.
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
@@ -269,7 +273,7 @@ function scrubbedBase(quote, t, newest) {
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
   if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
-  return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
+  return { prevClose: Quote.dayBase(quote), dayOpen: reg && t < reg.start ? null : quote.dayOpen }
 }
 
 // The chart's dashed line in words: the close before the day on the chart,
