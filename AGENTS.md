@@ -42,8 +42,11 @@ truer, lighter, quicker, simpler or better made.
   own for that ground, and it never changes the theme's colors.
 - **Calm.** Nothing jumps: when the look, range, list or stock changes,
   everything keeps its place and size.
-- **1D at night.** A stock's day starts at its open, and until the next
-  open the chart keeps the day that closed, with tonight and the pre-market
+- **1D at night.** A stock's chart turns to the new day at its open, and
+  draws that day from its pre-market where Yahoo has one, a US stock's
+  from 04:00, so a move made before the open shows where it happened; the
+  night's trades before then leave the chart at the turn. Until the open
+  the chart keeps the day that closed, with tonight and the pre-market
   joined at its end. Tonight's trades belong to the day ahead: from the
   night's first trade the panel's % counts from the close just gone, its one
   dashed line is that close, and the closed day's session draws fainter, in
