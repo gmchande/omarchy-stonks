@@ -144,16 +144,16 @@ Harness {
       return counts
     }
 
-    // Robinhood's listing answer, as the surface has it, handed to the
-    // surface again with each symbol's read counted in `reads`: a US stock's
-    // row reads its symbol's once each time it works out its day.
-    function countedAllDay(reads) {
-      var answer = app.body.allDay
+    // Robinhood's prints, as the surface has them, handed to the surface
+    // again with each symbol's read counted in `reads`: a US stock's row
+    // reads its symbol's once each time it works out its day.
+    function countedNights(reads) {
+      var answer = app.body.nights
       var out = {}
       service.allSymbols.forEach(function(s) {
         Object.defineProperty(out, s, { enumerable: true, get: function() { reads[s] = (reads[s] || 0) + 1; return answer[s] } })
       })
-      app.body.allDay = out
+      app.body.nights = out
     }
     // The rows in sight, by symbol, the featured one aside: the chart reads
     // its answer too.
@@ -279,7 +279,7 @@ Harness {
       list.contentY = 0
       rested()
       var answered = {}
-      countedAllDay(answered)
+      countedNights(answered)
       var seen = rowsInSight()
       var unseen = Object.keys(answered).filter(function(s) { return seen.indexOf(s) < 0 && s !== service.view.featured })
       harness.check("with every row seen once, a Robinhood answer is worked out once by each row in sight and by none out of sight",

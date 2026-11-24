@@ -41,15 +41,15 @@ Item {
   function twoDays(symbol) { return Asks.twoDays(quotes[symbol] || null, stamp(), calendars) }
 
   property var quotes: ({})
-  // Robinhood's all-day check, whose listing dates each quote carries
-  // however it landed (`Overnight.withListDates`).
-  property var allDay: ({})
+  // Robinhood's listing dates, which each quote carries however it landed
+  // (`Overnight.withListDates`).
+  property var listDates: ({})
   function tagListDates() {
-    var tagged = Overnight.withListDates(quotes, allDay, stamp())
+    var tagged = Overnight.withListDates(quotes, listDates, stamp())
     if (tagged !== quotes) root.quotes = tagged
   }
   onQuotesChanged: tagListDates()
-  onAllDayChanged: tagListDates()
+  onListDatesChanged: tagListDates()
   // Each symbol's last answer, by the service's clock. "saved": a quote kept
   // from an earlier session, until its first answer. receivedAt is the last
   // usable answer, so a failed row keeps its price; answeredAt, any answer.

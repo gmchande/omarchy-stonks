@@ -50,7 +50,7 @@ BarWidget {
   // Built only for the form that draws it, and handed only to the look on
   // show.
   readonly property var lineDay: featuredQuote && barStyle === "sparkline"
-    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.dayClock) : null
+    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.calendars, service.dayClock) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars, Overnight.keepsDay(newest)) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a right-click picks another, as the

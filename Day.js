@@ -7,9 +7,10 @@
 // The day a US stock's or ETF's 1D chart draws: from its pre-market, 04:00,
 // on an axis that runs by the clock to its 20:00, and until the next open
 // the day that closed with what has traded since joined at its end. For one
-// Robinhood trades all day, built from Yahoo's day and Robinhood's trades
-// (`Overnight.allTrades`, `dayChart`); for one it doesn't, from Yahoo's
-// alone (`sessionDay`). Knows nothing of how the chart draws it.
+// that trades at night (`Overnight.tradesAtNight`), built from Yahoo's day
+// and Robinhood's trades (`Overnight.allTrades`, `dayChart`); for one with
+// no night trades, from Yahoo's alone (`sessionDay`). Knows nothing of how
+// the chart draws it.
 
 // Where the trades joined to the day that closed, tonight's or the coming
 // day's pre-market, start counting from its close: its bell, so its after
@@ -187,15 +188,14 @@ function dayChart(quote, answer, calendars, now) {
   }
 }
 
-// A stock Robinhood doesn't trade all day: Yahoo's day from its pre-market,
+// A stock with no night trades: Yahoo's day from its pre-market,
 // once Yahoo's answer holds the coming day's pre-market (`Quote.tailDay`),
 // that joined at its end, the night between taking no room, as is the
 // coming day's first minutes on a day held through them
 // (`CarriedClose.heldDay`). The axis runs on to `now`, the shell's clock
 // five minutes at a time, through the coming day's end, or without one, or
-// with an answer staler than that, to the newest trade. A thin listing
-// Robinhood doesn't trade all day has a few night trades, and none is a
-// night's price.
+// with an answer staler than that, to the newest trade. A stray trade Yahoo
+// sends after 20:00 is no night's price.
 function sessionDay(quote, now) {
   var reg = quote.session.regular
   if (!reg) return quote

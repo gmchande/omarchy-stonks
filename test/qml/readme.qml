@@ -121,13 +121,12 @@ Harness {
       verify(colors.green !== "", "the theme's green is read")
     }
 
-    // Robinhood's word on the US listings, asked for once a surface opens:
-    // whether each trades all day, and the prints of those that do.
+    // Robinhood's prints of the US listings, asked for once a surface
+    // opens, which say whether each trades at night.
     function robinhoodIn() {
       return harness.us.every(function(s) {
-        var allDay = service.allDay[s]
         var night = service.nights[s]
-        return !!allDay && allDay.status === "ok" && (!allDay.allDay || (!!night && night.status === "ok"))
+        return !!night && night.status === "ok"
       })
     }
 

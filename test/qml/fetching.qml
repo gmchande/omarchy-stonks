@@ -808,10 +808,11 @@ Harness {
       harness.check("the bell keeps quiet once every screen goes off before Do Not Disturb and the microphone answer, and rings with a screen on",
         dark && atClose === 0 && rang, "screens off " + dark + ", bells at the close " + atClose + ", at the open " + (bells() - openFrom))
 
-      // Sunday night, Robinhood gone as the day's check of which stocks
-      // trade all day falls due, so both asks fail together: once it answers
-      // again, the "!" goes at the next try, not five minutes after it. The
-      // check answers in 2 s, as on a loaded machine, and the clock waits.
+      // Sunday night, Robinhood gone as the day's check of the day each
+      // stock listed falls due, so it and the night's asks fail together:
+      // once it answers again, the "!" goes at the next try, not five
+      // minutes after it. The check answers in 2 s, as on a loaded machine,
+      // and the clock waits.
       service.feature("NEST")
       touch("ROBINHOOD.offline")
       runCommand(["sh", "-c", "echo 2 > \"$0/instruments.instruments.slow\"", harness.state])

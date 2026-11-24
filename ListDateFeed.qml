@@ -1,8 +1,8 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
-// Whether Robinhood trades each US stock or ETF all day, and the day each
-// listed, in one run of requests. A fetch while a run is out is dropped: the
+// The day Robinhood says each US stock or ETF listed, in one run of
+// requests. A fetch while a run is out is dropped: the
 // service asks again for what it still wants once that run lands.
 Item {
   id: root
@@ -18,7 +18,7 @@ Item {
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
     var batches = []
-    for (var i = 0; i < symbols.length; i += Overnight.ALL_DAY_BATCH) batches.push(symbols.slice(i, i + Overnight.ALL_DAY_BATCH))
+    for (var i = 0; i < symbols.length; i += Overnight.LIST_DATE_BATCH) batches.push(symbols.slice(i, i + Overnight.LIST_DATE_BATCH))
     var granted = gate ? gate.take(batches.length) : batches.length
     root.batches = granted > 0 ? batches.slice(0, granted) : batches
     root.askedAt = at
@@ -26,21 +26,19 @@ Item {
       heldTimer.restart()
       return
     }
-    fetchRun.send(root.batches.map(Overnight.allDayUrl), Fetch.instrumentsCap(root.batches[0].length))
+    fetchRun.send(root.batches.map(Overnight.listDateUrl), Fetch.instrumentsCap(root.batches[0].length))
   }
 
   function receive(got) {
     var next = Object.assign({}, entries)
     batches.forEach(function(batch, b) {
       var answer = got.filter(function(a) { return a.index === b })[0]
-      var parsed = null
       var dates = null
       try {
         var json = answer && answer.kind === "ok" ? JSON.parse(answer.body) : null
-        parsed = json ? Overnight.parseAllDay(json, batch) : null
-        dates = parsed ? Overnight.listDates(json, batch) : null
-      } catch (e) { parsed = null }
-      batch.forEach(function(symbol) { next[symbol] = Overnight.allDayEntry(parsed, symbol, entries[symbol], askedAt, dates) })
+        dates = json ? Overnight.listDates(json, batch) : null
+      } catch (e) { dates = null }
+      batch.forEach(function(symbol) { next[symbol] = Overnight.listDateEntry(dates, symbol, entries[symbol], askedAt) })
     })
     root.batches = []
     root.entries = next

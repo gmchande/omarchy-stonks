@@ -122,7 +122,7 @@ the hours around it dim.
 
 After the close, the chart keeps the day that closed until the next open,
 and adds what trades in between at its end: tonight's trades, for a US
-stock Robinhood trades at night, then any US stock's pre-market. The closed
+stock that trades at night, then any US stock's pre-market. The closed
 day narrows to make room, and hours the market is shut take none, so a
 weekend or a holiday adds nothing.
 
@@ -136,13 +136,15 @@ day's first trades at its end, so one or two trades don't fill the chart. A
 US stock's bars count from 04:00, so one that traded before the open turns
 right at it.
 
-For a US stock that Robinhood trades at night, the chart brightens the
-session trading now, such as tonight or the pre-market. The rows, like the
-pill, keep the day's close and move until the pre-market's first prices
-arrive, soon after 04:00. Their line draws tonight thinner and fainter in
-the same green and red, or in retro as grey columns. Where Yahoo has no
-prices for half an hour or more of the pre-market or after hours, the chart
-draws Robinhood's trades there, never in place of Yahoo's.
+Stonks shows a US stock's night once Robinhood's prices hold a trade of it
+from 20:00 to 04:00, tonight or the night before. For such a stock, the
+chart brightens the session trading now, such as tonight or the
+pre-market. The rows, like the pill, keep the day's close and move until
+the pre-market's first prices arrive, soon after 04:00. Their line draws
+tonight thinner and fainter in the same green and red, or in retro as grey
+columns. Where Yahoo has no prices for half an hour or more of the
+pre-market or after hours, the chart draws Robinhood's trades there, never
+in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
 while its market trades, or saved from before and not yet refreshed.
@@ -355,9 +357,9 @@ and what your broker or the exchange showed then.
 
 Stonks isn't investment advice, and isn't affiliated with Yahoo or
 Robinhood. Yahoo's endpoints are unofficial and Robinhood's data is for
-personal use, so either may change or stop without notice. Robinhood fills
-the night, from 20:00 to 04:00 New York time, when Yahoo's charts are
-empty.
+personal use, so either may change or stop without notice. Robinhood's
+prices fill the night, from 20:00 to 04:00 New York time, where Yahoo's
+charts stop.
 
 <details>
 <summary>The commands it runs, the sites it asks, and the files it writes</summary>
@@ -412,15 +414,16 @@ empty.
 - `query2.finance.yahoo.com` for search as you type, asking for each word
   once while search is open.
 - `api.robinhood.com` for overnight prices, and for trades that fill a
-  stretch Yahoo left empty. Once a day it asks which stocks trade
-  overnight and the day each listed, again 5 minutes later if that fails,
-  and once for each stock the pill shows. Through the night it asks about
-  the pill's stock and, with the panel or the window open, the stock on
-  show and the rows in sight, with one past each edge: for each one's last
-  trade every minute, as often as `"refreshIntervalSec"` sets for Yahoo,
-  and for the trades its chart draws every 5 minutes. It asks once more on
-  a morning Yahoo has no prices for half an hour or more of the
-  pre-market, and the same for a US stock or ETF you pause on in search.
+  stretch Yahoo left empty. Once a day it asks the day each US stock
+  listed, again 5 minutes later if that fails, and once for each stock the
+  pill shows. Through the night it asks about the pill's stock and, with
+  the panel or the window open, the stock on show and the rows in sight,
+  with one past each edge: for the trades each one's chart draws every 5
+  minutes, which say whether it trades at night, and for the last trade of
+  each that does every minute, as often as `"refreshIntervalSec"` sets for
+  Yahoo. It asks once more on a morning Yahoo has no prices for half an
+  hour or more of the pre-market, and the same for a US stock or ETF you
+  pause on in search.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

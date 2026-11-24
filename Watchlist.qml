@@ -24,7 +24,6 @@ Flickable {
   // Robinhood's answers, by symbol, and the clock a row's 1D runs on to
   // before the open, five minutes at a time (`Service.viewDayClock`).
   property var nights: ({})
-  property var allDay: ({})
   property int dayClock: 0
   property var entries: ({})
   property string featuredSymbol: ""
@@ -692,7 +691,7 @@ Flickable {
         property var sightDay: null
         Binding on sightDay {
           value: !rowDelegate.inSight ? rowDelegate.day
-            : root.quotes[rowDelegate.symbol] ? Chart.lineDay(rowDelegate.symbol, root.quotes[rowDelegate.symbol], root.nights, root.allDay, root.calendars, root.dayClock)
+            : root.quotes[rowDelegate.symbol] ? Chart.lineDay(rowDelegate.symbol, root.quotes[rowDelegate.symbol], root.nights, root.calendars, root.dayClock)
             : null
           when: rowDelegate.inSight
           restoreMode: Binding.RestoreNone
