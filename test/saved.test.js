@@ -3720,6 +3720,19 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   expect([sessionDate(quietMonday), M.chartSpan(quietMonday).start, quietMonday.points.length, M.dayBase(quietMonday)])
     .toEqual(["2026-10-26", at("2026-10-26", "04:00"), 0, M.regularClose(opened)])
   expect([sessionDate(cvrDay(opened, at("2026-10-26", "04:55"))), sessionDate(cvrDay(opened, at("2026-10-26", "05:00")))]).toEqual(["2026-10-23", "2026-10-26"])
+  // PSIX at 07:00 that Monday, its newest trade Friday's after hours and
+  // none since: its chart turned to Monday at 05:00, and the price on top
+  // and its row both read Friday's move, from Thursday's close, as before
+  // 05:00, never the after hours alone against Friday's close.
+  const seven = at("2026-10-26", "07:00")
+  const monday = M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/psix.json"), fixture("moments/watch-2026-10-26-0700/psix.json")), cents, seven)
+  const psixTrades = { PSIX: { status: "ok", allDay: false, at: 0 } }
+  const psixView = M.viewChart("PSIX", "1D", { PSIX: monday }, {}, {}, {}, psixTrades, calendars, seven)
+  const psixTop = M.newestTrade(monday, psixView.latest, calendars, psixView.day)
+  const psixRow = M.newestTradeOf("PSIX", monday, {}, psixTrades, calendars, M.turnClock(calendars, seven))
+  const psixLines = M.heroLines(monday, M.rowModel(monday, 0, "pct", psixTop), psixView.latest, seven, psixView.day, calendars, "pct", false)
+  expect([sessionDate(psixView.day), psixTop.phase, M.rowModel(monday, 0, "pct", psixTop).changeText, M.listRow(monday, "pct", psixRow).changeText, psixLines.caption.label])
+    .toEqual(["2026-10-26", "post", "\u22123.14%", "\u22123.14%", "FRI"])
   const traded = M.parseChart(fixture("moments/watch-2026-10-26-1500/cvr.json"), cents, at("2026-10-26", "15:00"))
   expect([M.twoDays(cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00")), at("2026-10-26", "15:00"), calendars), sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t])
     .toEqual([false, "2026-10-26", at("2026-10-26", "13:10")])

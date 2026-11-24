@@ -1311,6 +1311,21 @@ test("each trade says its own time across a change of clocks, the 1D's day keeps
   expect([opened.points.map(p => p.s), M.dayBase(opened)]).toEqual([["pre", "pre", "pre"], 100])
   const quietDawn = clock => M.dayChart(quote, { bars: [sundayTrade, late, premarket], through: premarket.t }, calendars, at("2026-11-02", clock)).day
   expect([M.chartSpan(quietDawn("04:55")).start, M.chartSpan(quietDawn("05:00")).start]).toEqual([at("2026-10-30", "04:00"), at("2026-11-02", "04:00")])
+  // A night traded to 01:30 with no pre-market trade, Robinhood's newest
+  // slot 04:05, as a running shell holds it all day: until 05:00 the rows
+  // keep Friday's close and move beside the night joined to Friday, and
+  // from 05:00 they turn with the chart, reading what the price on top
+  // does, from Friday's close.
+  const nights = { X: { status: "ok", bars: [sundayTrade, late], through: at("2026-11-02", "04:05") } }
+  const allDay = { X: { status: "ok", allDay: true, at: 0 } }
+  const read = clock => {
+    const t = at("2026-11-02", clock)
+    const view = M.viewChart("X", "1D", { X: quote }, {}, {}, nights, allDay, calendars, t)
+    const top = M.newestTrade(quote, view.latest, calendars, view.day)
+    const row = M.newestTradeOf("X", quote, nights, allDay, calendars, M.turnClock(calendars, t))
+    return [clock, M.keepsDay(top), M.keepsDay(row), top.base, row.base]
+  }
+  expect(["04:55", "05:00", "07:00"].map(read)).toEqual([["04:55", true, true, 100, 100], ["05:00", false, false, 100, 100], ["07:00", false, false, 100, 100]])
   // The day after Thanksgiving closes at 13:00, and its tick says so, by
   // the clock between the 12:55 trade and the 15:00 one. Its after hours
   // end at 17:00, as Robinhood's hours for it say, and so does its chart,

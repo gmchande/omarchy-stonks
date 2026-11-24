@@ -67,6 +67,19 @@ function heldWindow(cal, trades, edge, win) {
   return CarriedClose.firstBars(day, win.start) ? drawnWindow(cal, win.start - 1) : win
 }
 
+// The clock as far as which day a US chart draws (`now`, the shell's clock
+// five minutes at a time): it moves only at a day's 04:00, when the day can
+// turn, and an hour on, when it turns however little it has traded
+// (`heldWindow`). The rows' newest prices read the day by it, so they turn
+// with the chart without working every stock out again each five minutes.
+// 0 without a clock.
+function turnClock(calendars, now) {
+  var cal = now ? Overnight.overnightMarket(calendars) : null
+  var win = cal ? drawnWindow(cal, now) : null
+  if (!win) return 0
+  return now >= win.start + CarriedClose.HOLD_LIMIT ? win.start + CarriedClose.HOLD_LIMIT : win.start
+}
+
 // Once the market trades again after the day's end, tonight and then the
 // coming day's pre-market join it until that day takes the chart
 // (`heldWindow`), from where it trades again (`from`): the shut hours

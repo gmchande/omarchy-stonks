@@ -87,15 +87,16 @@ function lineDay(symbol, quote, nights, allDay, calendars, dayClock) {
 
 // A listing's newest trade, measured from the dashed line of the day its
 // chart draws. While that day waits on Robinhood, Yahoo's own trades make
-// it. Until the next open that is the day that closed, as the chart will
-// draw it, with its after hours counted as its own, until Robinhood's
-// answer brings tonight's trade. It reads the listing's quote, its night's
-// trades and reach, and Robinhood's word on whether it trades all day, and
+// it. Until 04:00 that is the day that closed, as the chart will draw it,
+// with its after hours counted as its own, until Robinhood's answer brings
+// tonight's trade. It reads the listing's quote, its night's trades and
+// reach, Robinhood's word on whether it trades all day, and `turnClock`,
+// the clock as far as which day the chart draws (`Day.turnClock`), and
 // nothing else.
-function newestTradeOf(symbol, quote, nights, allDay, calendars) {
+function newestTradeOf(symbol, quote, nights, allDay, calendars, turnClock) {
   if (!quote || !Overnight.hasOvernight(quote, calendars)) return null
-  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
-  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars)
+  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars, turnClock)
+  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars, turnClock)
   return Overnight.newestTrade(quote, drawn.latest, calendars, drawn.day)
 }
 
