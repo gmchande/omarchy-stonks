@@ -236,11 +236,9 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
 // Yahoo's day answer for a stock turns to the coming day with its
 // pre-market, and London's and Tokyo's with their open, whose first bar
 // comes about 15 minutes late. Two days keep the last session in the answer
-// until the new one has a trade, and abroad through its first minutes,
-// while the chart holds the last (`CarriedClose.heldDay`). A US stock's
-// keep it from 04:00, through the pre-market's first bars, while the chart
-// holds the last (`Day.heldWindow`), and on to the open, for the last
-// session's figures. An index's answer stays the last session's until its
+// until the new one has a trade, and through its first minutes, while the
+// chart holds the last (`CarriedClose.heldDay`), a US stock's from its
+// pre-market on. An index's answer stays the last session's until its
 // open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
@@ -251,11 +249,11 @@ function twoDays(quote, now, calendars) {
   var segs = cal ? Calendar.segmentsOn(cal, date) : []
   var pts = quote.points
   var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  var held = function(open) { return !tradedSince(open) || (CarriedClose.firstMinutes(quote) && now < open + CarriedClose.HOLD_LIMIT) }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(segs[0].start)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && held(segs[0].start)))
   }
-  var held = function(open) { return !tradedSince(open) || (CarriedClose.firstMinutes(quote) && now < open + CarriedClose.HOLD_LIMIT) }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   if (!open || now < open.start || now >= open.end) return false
   return held(open.start)

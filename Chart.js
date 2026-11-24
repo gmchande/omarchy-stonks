@@ -51,27 +51,28 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 }
 
 // The day the chart, a row's line and the pill's draw, so all three show one.
-// For a US stock or ETF, the trading day whose pre-market has come by
-// `dayClock`, the shell's clock five minutes at a time, from 04:00, with
-// what has traded since its end joined, running on to that clock, until
-// the next day takes the chart: from Yahoo's day and Robinhood's trades
-// where Robinhood trades it all day (`Day.dayChart`); for one it doesn't,
-// or while a failed check leaves that unknown, Yahoo's own and its coming
-// pre-market (`Day.sessionDay`); `waiting` until Robinhood says which.
-// Without `allDay`, as in a harness that stubs the service, Yahoo's own.
-// Any other listing's is its quote's day, or the coming day once it has a
-// trade (`Quote.tailDay`), and stays the last until its first bar, then
-// holds it through the new day's first minutes (`CarriedClose.heldDay`).
+// For a US stock or ETF, the trading day whose open has come by `dayClock`,
+// the shell's clock five minutes at a time, from 04:00, with what has
+// traded since its end joined, running on to that clock, until the next
+// open: from Yahoo's day and Robinhood's trades where Robinhood trades it
+// all day (`Day.dayChart`); for one it doesn't, or while a failed check
+// leaves that unknown, Yahoo's own and its coming pre-market
+// (`Day.sessionDay`); `waiting` until Robinhood says which. Without
+// `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
+// listing's is its quote's day, or the coming day once it has a trade
+// (`Quote.tailDay`). Any listing's, London's, Tokyo's or a US stock's,
+// stays the last until its first bar, then holds it through the new day's
+// first minutes (`CarriedClose.heldDay`).
 function dayDrawn(symbol, quote, nights, allDay, calendars, dayClock) {
-  if (!Overnight.hasOvernight(quote, calendars))
-    return { day: Quote.tailDay(quote) || CarriedClose.heldDay(quote) || quote, latest: null, allDay: false, waiting: false }
-  var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
+  var held = CarriedClose.heldDay(quote, tradability && tradability.allDay && night ? night.bars : null)
+  var out = { day: Quote.tailDay(quote) || held || quote, latest: null, allDay: false, waiting: false }
+  if (!Overnight.hasOvernight(quote, calendars)) return out
   out.allDay = !!tradability && tradability.allDay
-  if (tradability && !tradability.allDay) out.day = Day.sessionDay(quote, dayClock)
+  if (tradability && !tradability.allDay) out.day = Day.sessionDay(held || quote, dayClock)
   else if (tradability && night) {
-    var built = Day.dayChart(quote, night, calendars, dayClock)
+    var built = Day.dayChart(held || quote, night, calendars, dayClock)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true
@@ -87,16 +88,15 @@ function lineDay(symbol, quote, nights, allDay, calendars, dayClock) {
 
 // A listing's newest trade, measured from the dashed line of the day its
 // chart draws. While that day waits on Robinhood, Yahoo's own trades make
-// it. Until 04:00 that is the day that closed, as the chart will draw it,
-// with its after hours counted as its own, until Robinhood's answer brings
-// tonight's trade. It reads the listing's quote, its night's trades and
-// reach, Robinhood's word on whether it trades all day, and `turnClock`,
-// the clock as far as which day the chart draws (`Day.turnClock`), and
+// it. Until the next open that is the day that closed, as the chart will
+// draw it, with its after hours counted as its own, until Robinhood's
+// answer brings tonight's trade. It reads the listing's quote, its night's
+// trades and reach, and Robinhood's word on whether it trades all day, and
 // nothing else.
-function newestTradeOf(symbol, quote, nights, allDay, calendars, turnClock) {
+function newestTradeOf(symbol, quote, nights, allDay, calendars) {
   if (!quote || !Overnight.hasOvernight(quote, calendars)) return null
-  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars, turnClock)
-  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars, turnClock)
+  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
+  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars)
   return Overnight.newestTrade(quote, drawn.latest, calendars, drawn.day)
 }
 

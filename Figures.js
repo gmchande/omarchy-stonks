@@ -118,14 +118,11 @@ function dayLine(quote, today, day) {
 // figures are of: its night, pre-market and after hours, but not tonight's,
 // joined after it, nor the coming day's; or where the figures are of the
 // day those joined trades belong to, as while the chart holds the day
-// before (`CarriedClose.heldDay`), those; or where the chart has turned to
-// a US stock's next day before Yahoo's figures have, the ones it brings of
-// theirs (`Day.figuresTrades`). None when the chart is another day's.
-// Inside the session Yahoo's figures are the trades', and a bar there can
-// be Yahoo echoing its quote, as Tokyo's at the bell.
+// before (`CarriedClose.heldDay`), those. None when the chart is another
+// day's. Inside the session Yahoo's figures are the trades', and a bar
+// there can be Yahoo echoing its quote, as Tokyo's at the bell.
 function figuresTrades(quote, day) {
   if (!day || !day.session || !day.session.regular) return []
-  if (day.figuresTrades) return day.figuresTrades.filter(function(p) { return Quote.pointSession(quote, p) !== "reg" })
   var drawn = exchangeDay(quote, day.session.regular.start)
   var figures = exchangeDay(quote, quote.figuresDay)
   var until = day.tonight || Quote.tailStart(day) || Infinity

@@ -3,7 +3,6 @@ import Quickshell.Io
 import "Asks.js" as Asks
 import "Calendar.js" as Calendar
 import "Chart.js" as Chart
-import "Day.js" as Day
 import "Freshness.js" as Freshness
 import "History.js" as History
 import "Overnight.js" as Overnight
@@ -175,17 +174,14 @@ Item {
   // The price on top on the pill, the rows, and the hero. A stock's is worked
   // out again only when what it is read from changes (`Chart.newestTradeOf`):
   // each builds the stock's whole day, and a price that lands changes one
-  // stock's, not every stock's, while the day the chart draws turns for all
-  // at once (`turnClock`). The same object while no stock's changes, so no
-  // row works out its figures again.
+  // stock's, not every stock's. The same object while no stock's changes, so
+  // no row works out its figures again.
   property var newestTrades: ({})
   // Each stock's newest price, with what it was worked out from.
   property var newestFrom: ({})
-  readonly property int turnClock: Day.turnClock(root.calendars, root.dayClock)
   function workOutNewest() {
     var nights = root.nights
     var allDay = allDayFeed.entries
-    var turnClock = root.turnClock
     var from = {}
     var out = {}
     var count = 0
@@ -198,9 +194,8 @@ Item {
       var through = night ? night.through : null
       var trades = allDay[symbol] ? allDay[symbol].allDay : null
       var had = root.newestFrom[symbol]
-      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades && had.turnClock === turnClock ? had
-        : { quote: quote, bars: bars, through: through, trades: trades, turnClock: turnClock,
-          newest: Chart.newestTradeOf(symbol, quote, nights, allDay, root.calendars, turnClock) }
+      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
+        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, root.calendars) }
       if (!from[symbol].newest) return
       out[symbol] = from[symbol].newest
       count++
@@ -211,7 +206,6 @@ Item {
   }
   onNightsChanged: workOutNewest()
   onAllDayChanged: workOutNewest()
-  onTurnClockChanged: workOutNewest()
 
   // Held until every price the open asked for is in, or a site's pause
   // holds the rest once every run out is read, so the rows move once. A
@@ -1216,7 +1210,7 @@ Item {
     flushQuotes()
   }
   property int prunedMinute: -1
-  // The clock five minutes at a time, which turns 1D's day at 04:00 and
+  // The clock five minutes at a time, which turns 1D's day at the open and
   // carries the hours after its close on to now (`Day.dayChart`,
   // `Day.sessionDay`): the pill's line follows it while a screen is on, and
   // the panel's and window's chart and rows (`viewDayClock`) only while one

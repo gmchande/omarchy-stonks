@@ -424,13 +424,10 @@ function beside(quote, t) {
 // scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's,
 // which the rows keep the day's close beside (`keepsDay`). `own`: the day
 // drawn is Yahoo's quote's, whose open the move may count from. `dayStart`
-// names the day the move is of: the day drawn, or the pre-market's own. A
-// trade of Yahoo's own day, such as its after hours, is that day's still
-// once the chart has turned to the next before it trades (`Day.heldWindow`).
+// names the day the move is of: the day drawn, or the pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
   var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
   if (!trade) return null
-  if (trade.t < Quote.dayStart(day) && trade.t < Quote.dayEnd(quote)) day = quote
   var own = day.session.regular.start === quote.session.regular.start
   var stepped = !!day.tonight && trade.t >= day.tonight
   var joined = stepped && trade.phase === "overnight"
@@ -447,8 +444,8 @@ function restingNewest(newest) {
 
 // Whether the rows and the pill keep the day's close and move: once tonight
 // has traded, until the pre-market's first prices arrive, soon after 04:00,
-// as the 1D chart keeps the day until the pre-market's first bars. Their
-// line then draws tonight faint (`Chart.chartGeometry`).
+// though the 1D chart keeps the day until the open. Their line then draws
+// tonight faint (`Chart.chartGeometry`).
 function keepsDay(newest) {
   return !!newest && !!newest.joined
 }
