@@ -28,7 +28,7 @@ var EXCHANGE_NAMES = {
   ASE: "NYSE AMERICAN", BTS: "CBOE", TOR: "TSX", VAN: "TSXV", NEO: "NEO", CNQ: "CSE", LSE: "LSE",
   IOB: "LSE", TYO: "TSE", JPX: "TSE", FRA: "FRA", GER: "XETRA", PAR: "PARIS", AMS: "AMSTERDAM",
   HKG: "HKEX", ASX: "ASX", NZE: "NZX", SES: "SGX", BSE: "BSE", NSI: "NSE", CCC: "CRYPTO", CCY: "FX",
-  SNP: "S&P", DJI: "DOW", NIM: "NASDAQ", PNK: "OTC", OQB: "OTC", OQX: "OTC", OEM: "OTC", JNB: "JSE"
+  SNP: "S&P", DJI: "DOW", NIM: "NASDAQ", PNK: "OTC", OQB: "OTC", OQX: "OTC", OEM: "OTC", OID: "OTC", JNB: "JSE"
 }
 
 // The length of the bars Stonks asks for, in seconds.

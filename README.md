@@ -20,7 +20,8 @@ Made for Omarchy 4.5, and runs back to 4.0.6.
 - A price more than two minutes old while its market trades says "As of"
   and its time. A "!" on the pill means a refresh failed or is late.
 - Each market's hours on its own clock, with the holidays and early closes
-  of New York, Toronto, London and Tokyo.
+  of New York, US over-the-counter stocks, Toronto, London, Frankfurt,
+  Tokyo, Hong Kong and Sydney.
 - Stocks, ETFs, indexes and crypto, in lists of your own.
 - Eleven ranges from one day to all time. Point anywhere on the chart for
   the price at that moment.
@@ -321,12 +322,13 @@ again.
   Stonks leaves out prices of zero or less, and stray points in Yahoo's
   charts.
 - **A dash for the move, with FIRST TRADES · MOVE SOON.** For a few
-  minutes after a stock in London, Tokyo or Toronto first trades, Yahoo
-  can still count its day from the close before last, so Stonks counts
-  from the last close it saw itself. If it hasn't seen one, the move shows
-  a dash until the stock has traded for ten minutes. Since the open, the
-  move and the open stay blank until Yahoo sends the day's first
-  five-minute bar, a few minutes into any market's day.
+  minutes after a stock in London, Frankfurt, Tokyo, Hong Kong, Sydney or
+  Toronto first trades, Yahoo can still count its day from the close
+  before last, so Stonks counts from the last close it saw itself. If it
+  hasn't seen one, the move shows a dash until the stock has traded for
+  ten minutes. Since the open, the move and the open stay blank until
+  Yahoo sends the day's first five-minute bar, a few minutes into any
+  market's day.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **"Not traded yet".** A new listing hasn't had its first trade. Its IPO

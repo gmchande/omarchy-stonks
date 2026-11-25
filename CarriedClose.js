@@ -56,10 +56,14 @@ function carryClose(previous, quote, calendars, now) {
   return carried
 }
 
+// An answer that came after Yahoo's day ended holds the session's close, its
+// last trade, even one before the end: Sydney's last trade comes at 16:10,
+// two minutes before Yahoo's day ends. An earlier answer holds it only at
+// the end, since a trade before it may not be the last.
 function sessionClose(quote) {
   var reg = quote.session && quote.session.regular
   var head = Quote.headlineQuote(quote)
-  return reg && head && head.source === "quote" && head.t !== null && head.t >= reg.end && Format.isFiniteNumber(quote.prevClose)
+  return reg && head && head.source === "quote" && head.t !== null && head.t >= (quote.wholeDay ? reg.start : reg.end) && Format.isFiniteNumber(quote.prevClose)
     ? { day: reg.start, close: head.price, before: quote.prevClose } : null
 }
 

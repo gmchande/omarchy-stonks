@@ -2495,8 +2495,8 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // 12:00 for Nebius and for the S&P 500, which has no session but the
   // regular one, and all evening for the S&P 500, whose close stays on top;
   // since the open, that move's name and amount. Toyota at 01:00 Tuesday in Tokyo names
-  // the day that ended, MON, as does BHP, whose exchange has no calendar to
-  // name the close before by, so that close is PREV CLOSE.
+  // the day that ended, MON, as does BHP, whose close before is Friday's by
+  // Sydney's calendar.
   const under = (at, s, mode = "pct") => M.heroLines(at.quotes[s], M.rowModel(at.quotes[s], 0, mode, at.newest[s] || null), null, at.now, null, calendars, mode, false)
   const said = lines => [lines.close ? [lines.close.label, lines.close.price, lines.close.changeText].filter(Boolean).join(" ") : "",
     [lines.caption.label, lines.caption.changeText].filter(Boolean).join(" ")]
@@ -2510,7 +2510,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     // An index moves in points, so its move names no unit.
     expect(said(under(noon, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.42"])
     expect(said(under(noon, "7203.T"))).toEqual(["FRI CLOSE 3,105.00", "MON +12.00 JPY"])
-    expect(said(under(noon, "BHP.AX"))).toEqual(["PREV CLOSE 55.05", "MON +0.57 AUD"])
+    expect(said(under(noon, "BHP.AX"))).toEqual(["FRI CLOSE 55.05", "MON +0.57 AUD"])
     const evening = topsAt("watch-2026-10-26-1605")
     expect(said(under(evening, "^GSPC"))).toEqual(["FRI CLOSE 7,623.68", "TODAY +53.09"])
     // Power Solutions' only after-hours trade repeats its close, so the
@@ -3501,7 +3501,7 @@ test("at the open the chart holds the last session, with the new one's first tra
   // from Monday's 3,921. Yahoo had caught up by the first bars Stonks saw.
   // A shell started at 08:20 leaves the move out, and one started at 08:30,
   // its trades 14 minutes past the first, shows it.
-  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
+  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents, nyOn3(time))
   const nyOn3 = time => at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2))
   const opening = (place, symbol, times, mode = "pct", cals = calendars) => {
     let held = null
@@ -3527,11 +3527,13 @@ test("at the open the chart holds the last session, with the new one's first tra
     .toEqual([["0320", "FIRST TRADES · MOVE SOON", "plain"], ["0330", "TODAY", "bear"]])
   // BHP at Sydney's open on Wednesday 4 November, 09:55 to 10:30 there
   // (Tuesday 17:55 to 18:30 New York): Tuesday's move from Monday's 56.74,
-  // then Wednesday's from Tuesday's 56.42, Yahoo's own from its first bars.
-  // Sydney has no calendar, so a shell started at 10:20 reads Yahoo's.
+  // then Wednesday's from Tuesday's 56.42, the close of 16:10, two minutes
+  // before Yahoo's day ended, held from the answers before the open. A
+  // shell started at 10:20 holds no close, and leaves the move out, as at
+  // London's open.
   expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
     "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.20%"])
-  expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
+  expect([startedAt("sydney", "bhp.ax", "1820"), startedAt("sydney", "bhp.ax", "1830")]).toEqual(["\u2014", "\u22121.20%"])
   // At 10:20 there the two-day answer's only bar of Wednesday is Yahoo's
   // echo of its quote at 10:00:03, 55.78, inside the day's range. The day
   // opened at 55.905, Yahoo's 10:00 bar says at 10:30: since the open is
@@ -3583,7 +3585,9 @@ test("at the open the chart holds the last session, with the new one's first tra
     .toEqual(["0310 Mon 4,036.50 \u2014 3,921.00", "0320 Mon 4,036.50 3,921.00 3,906.50", "0330 Tue 3,921.00 \u2014 3,913.00"])
   expect(charted("sydney", "bhp.ax", ["1810", "1820", "1830"]))
     .toEqual(["1810 Tue 56.74 \u2014 56.42", "1820 Tue 56.74 56.42 55.78", "1830 Tue 56.74 56.42 55.74"])
-  expect(charted("sydney", "bhp.ax", ["1820", "1830"], true)).toEqual(["1820 Tue \u2014 56.42 55.78", "1830 Tue \u2014 56.42 55.74"])
+  // Started at 10:20, before Yahoo has caught up, as at Tokyo's open: the
+  // last session's close is left out until it has.
+  expect(charted("sydney", "bhp.ax", ["1820", "1830"], true)).toEqual(["1820 Tue \u2014 \u2014 55.78", "1830 Tue \u2014 56.42 55.74"])
   expect(charted("tokyo", "7203.t", ["1915"], true)).toEqual(["1915 Mon \u2014 \u2014 3,051.00"])
   // With no calendar for Tokyo, the close held, Monday's, is from before a
   // weekday with no session seen, and at 09:15 Yahoo still counts from the

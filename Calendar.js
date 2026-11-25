@@ -102,14 +102,17 @@ function dayKind(cal, dateString) {
   return { kind: "open" }
 }
 
+// A half day ends at its early close: the session it falls in, or the last
+// before it, ends there, and no later session opens, as Hong Kong's
+// afternoon on Christmas Eve.
 function segmentsOn(cal, dateString) {
   if (dayKind(cal, dateString).kind !== "open") return []
   var sessions = cal.sessions || []
   var early = cal.earlyCloses ? cal.earlyCloses[dateString] : null
   var out = []
-  for (var i = 0; i < sessions.length; i++) {
-    var close = early && i === sessions.length - 1 ? early : sessions[i].close
-    out.push({ start: epochAt(cal, dateString, sessions[i].open), end: epochAt(cal, dateString, close) })
+  for (var i = 0; i < sessions.length && !(early && sessions[i].open >= early); i++) {
+    var last = !!early && (i === sessions.length - 1 || sessions[i + 1].open >= early)
+    out.push({ start: epochAt(cal, dateString, sessions[i].open), end: epochAt(cal, dateString, last ? early : sessions[i].close) })
   }
   return out
 }

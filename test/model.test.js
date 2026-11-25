@@ -275,6 +275,109 @@ test("a listing's overnight session is named so, a holiday's evening too, and th
   expect(marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
 })
 
+// The clock of the exchange at `t`, as "HH:MM".
+const clockAt = (cal, t) => load("Calendar.js").clockOf(M.localDate(t, cal))
+// A listing held from the day before, so only its calendar knows today.
+const heldListing = (symbol, exchange, cal, day, open, close) => ({
+  symbol, exchange, crypto: false, gmtoffset: M.offsetForDate(cal, day),
+  session: { pre: null, post: null, regular: { start: M.epochAt(cal, day, open), end: M.epochAt(cal, day, close) } },
+  points: []
+})
+
+test("the four first calendars keep their early closes, one session each, and Tokyo its lunch", () => {
+  const day = (id, date) => {
+    const cal = calendars.calendars[id]
+    return M.segmentsOn(cal, date).map(seg => clockAt(cal, seg.start) + "-" + clockAt(cal, seg.end))
+  }
+  expect([day("US", "2026-11-27"), day("US", "2028-07-03"), day("TSX", "2026-12-24"), day("LSE", "2027-12-31"), day("JPX", "2026-12-30")])
+    .toEqual([["09:30-13:00"], ["09:30-13:00"], ["09:30-13:00"], ["08:00-12:30"], ["09:00-11:30", "12:30-15:30"]])
+})
+
+test("Hong Kong breaks for lunch, trades its eves' mornings alone, closes on HKEX's holidays, and reads HKT all year", () => {
+  const HKEX = calendars.calendars.HKEX
+  const hk = (day, clock) => M.epochAt(HKEX, day, clock)
+  const tencent = { ...heldListing("0700.HK", "HKEX", HKEX, "2026-11-26", "09:30", "16:10"), timezoneName: "Asia/Hong_Kong" }
+  // The morning counts to the break; at lunch Stonks waits on the slow clock
+  // for 13:00, and the bell rings only at the open and the close.
+  expect(marketStatus(tencent, hk("2026-11-26", "11:00"), 0, calendars)).toBe("Lunch break in 1h")
+  expect(marketStatus(tencent, hk("2026-11-26", "12:30"), 0, calendars)).toBe("Lunch break · reopens 13:00 HKT · in 30m")
+  expect([quoteCadence(tencent, hk("2026-11-26", "11:00"), 60, true), quoteCadence(tencent, hk("2026-11-26", "12:30"), 60, true)]).toEqual([60, 900])
+  expect(["09:30", "12:00", "13:00", "16:10"].map(clock => M.bellBetween(tencent, hk("2026-11-26", clock) - 60, hk("2026-11-26", clock) + 1, calendars)))
+    .toEqual(["open", "", "", "close"])
+  // The 1D chart breaks its line over lunch alone.
+  const traded = { ...tencent, prevClose: 100, points: ["09:30", "11:55", "13:00", "16:05"].map((clock, i) => ({ t: hk("2026-11-26", clock), p: 100 + i })) }
+  expect(M.chartGeometry(traded, calendars).points.map(p => p.brk)).toEqual([false, false, true, false])
+  // Christmas Eve trades the morning and its closing auction, to 12:10, and
+  // no afternoon; Christmas Day is closed, and Boxing Day a Saturday.
+  const eve = heldListing("0700.HK", "HKEX", HKEX, "2026-12-23", "09:30", "16:10")
+  expect(M.segmentsOn(HKEX, "2026-12-24").map(seg => clockAt(HKEX, seg.start) + "-" + clockAt(HKEX, seg.end))).toEqual(["09:30-12:10"])
+  expect(marketStatus(eve, hk("2026-12-24", "11:00"), 0, calendars)).toBe("Market closes in 1h 10m")
+  expect([quoteCadence(eve, hk("2026-12-24", "12:05"), 60, false), quoteCadence(eve, hk("2026-12-24", "13:30"), 60, false)]).toEqual([60, 900])
+  expect(marketStatus(eve, hk("2026-12-25", "11:00"), 0, calendars)).toBe("Christmas Day · opens Mon 09:30 HKT")
+  // No change of clocks: the close is 16:10 HKT in July as in December.
+  expect([M.tradeTime(tencent, hk("2026-07-14", "16:10"), calendars), M.tradeTime(tencent, hk("2026-12-14", "16:10"), calendars)]).toEqual(["16:10 HKT", "16:10 HKT"])
+  // 2028's derived Lunar New Year: its eve a half day, then three days closed.
+  expect(["2028-01-25", "2028-01-26", "2028-01-27", "2028-01-28", "2028-01-31"].map(day => M.segmentsOn(HKEX, day).length)).toEqual([1, 0, 0, 0, 2])
+})
+
+test("Sydney closes on ASX's holidays and early on its eves, and reads AEDT or AEST as Sydney's clock changes", () => {
+  const ASX = calendars.calendars.ASX
+  const sydney = (day, clock) => M.epochAt(ASX, day, clock)
+  // Easter, as the clocks go back on Sunday 5 April 2026: Thursday's close
+  // is AEDT, and Good Friday says Tuesday's open, AEST, after Easter Monday.
+  const bhp = heldListing("BHP.AX", "ASX", ASX, "2026-04-02", "10:00", "16:12")
+  expect(M.tradeTime(bhp, sydney("2026-04-02", "16:12"), calendars)).toBe("16:12 AEDT")
+  expect(marketStatus(bhp, sydney("2026-04-03", "12:00"), 0, calendars)).toBe("Good Friday · opens Tue 10:00 AEST")
+  expect(sydney("2026-04-07", "10:00") - sydney("2026-04-02", "10:00")).toBe(5 * 86400 + 3600)
+  // Australia Day on a Tuesday, and Christmas Eve's close at 14:12, a minute
+  // after its closing auction.
+  expect(marketStatus(heldListing("BHP.AX", "ASX", ASX, "2027-01-25", "10:00", "16:12"), sydney("2027-01-26", "12:00"), 0, calendars))
+    .toBe("Australia Day · opens Wed 10:00 AEDT")
+  const eve = heldListing("BHP.AX", "ASX", ASX, "2026-12-23", "10:00", "16:12")
+  expect([quoteCadence(eve, sydney("2026-12-24", "14:00"), 60, false), quoteCadence(eve, sydney("2026-12-24", "14:30"), 60, false)]).toEqual([60, 900])
+})
+
+test("Frankfurt's two markets close on Deutsche Börse's holidays, each at its own hour, and read CET or CEST", () => {
+  const XETRA = calendars.calendars.XETRA
+  const FRA = calendars.calendars.FRA
+  const sapDe = heldListing("SAP.DE", "XETRA", XETRA, "2026-12-29", "09:00", "17:30")
+  const sapF = heldListing("SAP.F", "FRA", FRA, "2026-12-29", "08:00", "22:00")
+  const berlin = (day, clock) => M.epochAt(XETRA, day, clock)
+  // The year's last trading day ends at 14:00 on both.
+  expect([quoteCadence(sapDe, berlin("2026-12-30", "13:55"), 60, false), quoteCadence(sapDe, berlin("2026-12-30", "14:05"), 60, false),
+    quoteCadence(sapF, berlin("2026-12-30", "13:55"), 60, false), quoteCadence(sapF, berlin("2026-12-30", "14:05"), 60, false)]).toEqual([60, 900, 60, 900])
+  // Christmas Eve is closed, and the next open is after Christmas Day.
+  expect(marketStatus(sapDe, berlin("2026-12-24", "12:00"), 0, calendars)).toBe("Christmas Eve · opens Mon 09:00 CET")
+  expect(marketStatus(sapF, berlin("2026-12-24", "12:00"), 0, calendars)).toBe("Christmas Eve · opens Mon 08:00 CET")
+  // Ascension Day trades, Börse Frankfurt only until 20:00.
+  const day = (cal, date) => M.segmentsOn(cal, date).map(seg => clockAt(cal, seg.start) + "-" + clockAt(cal, seg.end))
+  expect([day(XETRA, "2026-05-14"), day(FRA, "2026-05-14"), day(FRA, "2026-05-13")]).toEqual([["09:00-17:30"], ["08:00-20:00"], ["08:00-22:00"]])
+  // The clocks go forward on Sunday 29 March 2026: Good Friday's eve closes
+  // in summer time, and the Friday before in winter time.
+  expect([M.tradeTime(sapDe, berlin("2026-03-27", "17:30"), calendars), M.tradeTime(sapDe, berlin("2026-04-02", "17:30"), calendars)])
+    .toEqual(["17:30 CET", "17:30 CEST"])
+  expect(marketStatus(sapDe, berlin("2026-04-03", "12:00"), 0, calendars)).toBe("Good Friday · opens Tue 09:00 CEST")
+})
+
+test("a US over-the-counter stock closes on OTC Markets' holidays and early on its half days, reads New York's clock, and trades no night", () => {
+  const OTC = calendars.calendars.OTC
+  const tcehy = { ...heldListing("TCEHY", "OTC", OTC, "2026-11-25", "09:30", "16:00"), timezoneName: "America/New_York" }
+  // Yahoo names an OTCID stock's market "OID": it reads OTC, and keeps OTC
+  // Markets' calendar.
+  expect(M.exchangeOf({ exchangeName: "OID", fullExchangeName: "OTC Markets OTCID" })).toBe("OTC")
+  expect(marketStatus(tcehy, at("2026-11-26", "12:00"), 0, calendars)).toBe("Thanksgiving Day · opens Fri 09:30")
+  expect([quoteCadence(tcehy, at("2026-11-27", "12:55"), 60, false), quoteCadence(tcehy, at("2026-11-27", "13:05"), 60, false)]).toEqual([60, 900])
+  // A change of clocks: 16:00 EDT on Friday 30 October, 16:00 EST on Monday
+  // 2 November, each the reader's own.
+  const ny = (day, clock) => M.epochAt(OTC, day, clock)
+  expect(ny("2026-11-02", "16:00") - ny("2026-10-30", "16:00")).toBe(3 * 86400 + 3600)
+  expect([M.tradeTime(tcehy, ny("2026-10-30", "16:00"), calendars), M.tradeTime(tcehy, ny("2026-11-02", "16:00"), calendars)]).toEqual(["16:00", "16:00"])
+  // Robinhood isn't asked its nights, and a night's trades wouldn't wake it.
+  const night = { through: at("2026-11-25", "21:00"), bars: [{ t: at("2026-11-25", "20:30"), p: 1, s: "overnight" }] }
+  expect([M.hasOvernight(tcehy, calendars), M.tradesAtNight(night, OTC), M.nightTrades(tcehy, true, at("2026-11-25", "21:00"), calendars)])
+    .toEqual([false, false, false])
+})
+
 test("formatting", () => {
   expect(M.duration(4200)).toBe("1h 10m")
   expect(M.duration(300)).toBe("5m")
@@ -2609,7 +2712,7 @@ test("a fetched name or code past its length reads as not sent", () => {
 // up to 14 minutes after the bell, and no two closes in a row are the same.
 test("at every open the calendars hold, a row's move counts from the close before its day, or is left out", () => {
   const STALE = 6 * 60
-  const codes = { US: "NMS", TSX: "TOR", LSE: "LSE", JPX: "JPX" }
+  const codes = { US: "NMS", TSX: "TOR", LSE: "LSE", JPX: "JPX", HKEX: "HKG", ASX: "ASX", XETRA: "GER", FRA: "FRA", OTC: "PNK" }
   const failures = []
   for (const [name, cal] of Object.entries(calendars.calendars)) {
     const days = []
