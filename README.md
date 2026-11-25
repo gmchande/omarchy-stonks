@@ -64,7 +64,9 @@ screen, it switches between the icon and the symbol over its change.
 
 Click the pill for the panel, or middle-click it for the window. Scroll over
 it to step through your list, and drag it to move it along the bar. Point
-at it for what it has no room for, such as the time of the newest price.
+at it for what it has no room for: the icon's symbol and move, "After
+hours" or "Pre-market" for a price from outside the session, and the time
+of a late price.
 
 At night, from the stock's first trade until the new day's first prices
 arrive soon after 04:00, the pill keeps the day's close and move. Its line

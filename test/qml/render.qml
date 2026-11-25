@@ -161,7 +161,9 @@ Harness {
   // bull, and its flat day.
   readonly property var pillUpQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price * 0.97 }) : null
   readonly property var pillFlatQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price }) : null
-  function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
+  // The same price ten minutes older: late, as its row would say "As of".
+  readonly property var pillLateQuote: pillQuote ? Object.assign({}, pillQuote, { marketTime: pillQuote.marketTime - 600 }) : null
+  function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : day === "late" ? pillLateQuote : null }
   // The pill at night (pill-sheet-night), { quote, newest }.
   property var nightPill: null
   // The pill on a listing's first day (pill-sheet-ipo-<hhmm>), { quote, night }.
@@ -467,6 +469,11 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
+      // pill-sheet-day: an hour before the close, its price a minute old.
+      if (root.stateName === "pill-sheet-day") {
+        root.now = nestDay.session.regular.end - 3600
+        root.pillQuote = Object.assign({}, nestDay, { marketTime: root.now - 60 })
+      }
       // pill-sheet-night: JNJ on Sunday 25 October at 23:35, as the service
       // reads it: Friday's close and move on the pill, down, over Friday's
       // line and tonight's, and tonight's price, up, in its hover.
@@ -1497,6 +1504,15 @@ Harness {
               return [false, true].reduce(function(all, retro) {
                 return all.concat(["text", "icon"].map(function(style) { return { style: style, retro: retro, day: "down", open: true } }))
               }, [])
+            // pill-sheet-day: in the session, the text and icon forms in
+            // each look, with a fresh price and a late one, each with its
+            // hover's words, or none.
+            if (root.stateName === "pill-sheet-day")
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["down", "late"].reduce(function(forms, day) {
+                  return forms.concat(["text", "icon"].map(function(style) { return { style: style, retro: retro, day: day, hover: true } }))
+                }, []))
+              }, [])
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1638,7 +1654,7 @@ Harness {
             // none without words, as the bar shows none.
             Rectangle {
               readonly property bool night: pillRow.modelData.day === "night" || pillRow.modelData.day === "ipo"
-              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open || night) && hoverWords.text !== ""
+              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open || !!pillRow.modelData.hover || night) && hoverWords.text !== ""
               anchors.verticalCenter: parent.verticalCenter
               width: hoverWords.implicitWidth + 20
               height: hoverWords.implicitHeight + 14
