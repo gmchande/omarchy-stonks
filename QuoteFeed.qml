@@ -2,6 +2,7 @@ import QtQuick
 import "Asks.js" as Asks
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
+import "Freshness.js" as Freshness
 import "Quote.js" as Quote
 // Every symbol due goes in one curl run over one connection, and the
 // symbols waiting for their first answer go in a run of their own.
@@ -68,7 +69,34 @@ Item {
     if (owing !== owed) root.owed = owing
     var waiting = queued(userAsked)
     if (waiting !== userAsked) root.userAsked = waiting
+    trackAsks()
   }
+  // `asking`: those asked under `Freshness.ASKED_GRACE` ago, timed to the
+  // millisecond: in the clock's whole seconds the grace would end anywhere
+  // from 1 to 2 s on.
+  property var asking: ({})
+  property var askedMs: ({})
+  function trackAsks() {
+    var nowMs = Date.now()
+    var since = {}
+    var inGrace = {}
+    var ends = 0
+    for (var s in asked) {
+      since[s] = s in askedMs ? askedMs[s] : nowMs
+      var end = since[s] + Freshness.ASKED_GRACE * 1000
+      if (end > nowMs) {
+        inGrace[s] = true
+        if (!ends || end < ends) ends = end
+      }
+    }
+    root.askedMs = since
+    if (Object.keys(inGrace).join(",") !== Object.keys(asking).join(",")) root.asking = inGrace
+    if (ends) {
+      graceTimer.interval = Math.max(1, ends - nowMs)
+      graceTimer.restart()
+    } else graceTimer.stop()
+  }
+  Timer { id: graceTimer; onTriggered: root.trackAsks() }
   function queued(map) {
     var next = null
     for (var symbol in map) {

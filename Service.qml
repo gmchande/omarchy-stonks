@@ -6,7 +6,6 @@ import "Chart.js" as Chart
 import "Freshness.js" as Freshness
 import "History.js" as History
 import "Overnight.js" as Overnight
-import "Quote.js" as Quote
 import "Settings.js" as Settings
 import "Rows.js" as Rows
 // What every surface reads and acts through: what you follow and look at,
@@ -240,7 +239,6 @@ Item {
     // which rows are in sight (`rowsSeen`), so it asks for those first.
     if (open) {
       root.opening = true
-      root.saveWaitsFor = null
       Qt.callLater(function() {
         root.opening = false
         feed.sendWaiting()
@@ -458,7 +456,7 @@ Item {
     id: listsFile
     pluginId: root.pluginId
     files: ownerOnly
-    onStarted: root.seedSaved()
+    onStarted: quotesCache.seed()
     onSaveChecked: function(saved) { root.saveChecked(saved) }
   }
   // Bindings, not aliases: an alias reads nothing until the file's own
@@ -543,35 +541,8 @@ Item {
   readonly property var asked: feed.asked
   // Those waiting on Yahoo, from when: freshness's overdue counts from it.
   readonly property var owed: feed.owed
-  // Asked under `Freshness.ASKED_GRACE` ago, timed to the millisecond: in the
-  // clock's whole seconds the grace would end anywhere from 1 to 2 s on.
-  property var asking: ({})
-  property var askedMs: ({})
-  function trackAsks() {
-    var nowMs = Date.now()
-    var since = {}
-    var inGrace = {}
-    var ends = 0
-    for (var s in feed.asked) {
-      since[s] = s in root.askedMs ? root.askedMs[s] : nowMs
-      var end = since[s] + Freshness.ASKED_GRACE * 1000
-      if (end > nowMs) {
-        inGrace[s] = true
-        if (!ends || end < ends) ends = end
-      }
-    }
-    root.askedMs = since
-    if (Object.keys(inGrace).join(",") !== Object.keys(root.asking).join(",")) root.asking = inGrace
-    if (ends) {
-      graceTimer.interval = Math.max(1, ends - nowMs)
-      graceTimer.restart()
-    } else graceTimer.stop()
-  }
-  Connections {
-    target: feed
-    function onAskedChanged() { root.trackAsks() }
-  }
-  Timer { id: graceTimer; onTriggered: root.trackAsks() }
+  // Those asked under `Freshness.ASKED_GRACE` ago (`QuoteFeed.asking`).
+  readonly property var asking: feed.asking
 
   HistoryFeed {
     id: historyFeed
@@ -842,15 +813,13 @@ Item {
   onQuotesChanged: {
     workOutNewest()
     settleArrivals()
-    root.quotesUnsaved = true
-    Qt.callLater(flushQuotes)
+    Qt.callLater(quotesCache.flush)
   }
   // Every run's answers land here, a quote changed or not. Once the run has
   // left the feed's asks, the clock catches up and the next ask falls due.
   onEntriesChanged: {
-    if (!root.answeredOnce) root.answeredOnce = Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })
     settleArrivals()
-    Qt.callLater(flushQuotes)
+    Qt.callLater(quotesCache.flush)
     Qt.callLater(answersLanded)
   }
   function answersLanded() {
@@ -1021,103 +990,26 @@ Item {
 
   // ---- The saved prices
 
-  readonly property string quotesPath: ownerOnly.folder ? ownerOnly.folder + "/quotes.json" : ""
   // The one keeper of the cache; the sounds write through it too.
   OwnerOnly { id: ownerOnly; pluginId: root.pluginId }
   readonly property alias files: ownerOnly
 
-  // Read as the service starts, beside the lists file, and handed to the
-  // feed once both are in (`FileRead`). 16 MiB: a stock's saved price is 8
-  // KB, 12 KB at the most seen, so 150 stocks' are about 1.2 MB.
-  readonly property int quotesCap: 16777216
-  property var savedAnswer: null
-  property bool seeded: false
-  FileRead {
-    id: quotesReader
-    onDone: function(answer) {
-      root.savedAnswer = answer
-      root.seedSaved()
-    }
+  // Their reading, their handing to the feed and their writing are
+  // `QuotesCache`'s. The service says when a save may be due: once a turn
+  // the quotes changed in is over, and on each step of the clock, after
+  // what it asks.
+  QuotesCache {
+    id: quotesCache
+    files: ownerOnly
+    quoteFeed: feed
+    clock: root
+    listsReady: root.ready
+    opening: root.opening
+    answering: !yahooGate.paused && !root.screensOff
   }
-  onQuotesPathChanged: if (root.quotesPath !== "" && !root.seeded) quotesReader.read(root.quotesPath, root.quotesCap)
-  function seedSaved() {
-    if (!root.ready || root.savedAnswer === null || root.seeded) return
-    root.seeded = true
-    feed.seed(root.parseSavedQuotes(root.savedAnswer.text || ""))
-    root.savedAnswer = null
-    // What the seed put in is what the file holds.
-    root.quotesUnsaved = false
-    root.askDue()
-  }
-
-  // { symbol: { quote, receivedAt } }
-  function parseSavedQuotes(text) {
-    try {
-      var parsed = JSON.parse(text)
-      return parsed && parsed.version === 1 && parsed.quotes ? Quote.keptQuotes(parsed.quotes) : {}
-    } catch (e) {
-      return {}
-    }
-  }
-
-  // At most every 10 minutes, and only once an answer has come, so quotes
-  // from an earlier session are never written back as they are. It waits
-  // while a surface opens or a chart draws in, and for the runs out and asks
-  // due when it fell due (`saveWaitsFor`): a long list's file is a megabyte,
-  // written on the shell's thread, which would stall an open's prices.
-  property bool quotesUnsaved: false
-  property int quotesSavedAt: 0
-  property var saveWaitsFor: null
-  // What came is saved, though every price may have failed since.
-  property bool answeredOnce: false
-
-  // Each of All's quotes as the cache's text, made by a save for a quote
-  // changed since the last, a few milliseconds a turn: the whole cache in
-  // one JSON.stringify took 40 ms of the shell's thread for 150 stocks.
-  // `quoteTexts` doesn't notify.
-  readonly property var quoteTexts: ({ by: {} })
-  Timer {
-    id: quoteTextStep
-    interval: 0
-    onTriggered: root.writeQuotes()
-  }
-
-  function flushQuotes() {
-    if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
-    if (!root.answeredOnce || root.opening || root.drawing.length > 0) return
-    if (!root.saveWaitsFor) root.saveWaitsFor = { runs: feed.landing.slice(), asked: Object.assign({}, feed.asked) }
-    var waits = root.saveWaitsFor
-    var answering = !yahooGate.paused && !root.screensOff
-    if (waits.runs.some(function(run) { return feed.landing.indexOf(run) >= 0 })
-      || (answering && Object.keys(waits.asked).some(function(s) { return feed.asked[s] === waits.asked[s] }))) return
-    root.saveWaitsFor = null
-    root.quotesUnsaved = false
-    root.quotesSavedAt = root.now
-    root.writeQuotes()
-  }
-
-  // Written in a turn of its own once every text is made: the text
-  // JSON.stringify makes of { version: 1, quotes: { symbol: { quote,
-  // receivedAt } } }, in All's order, as the quotes stand then.
-  function writeQuotes() {
-    var until = Date.now() + 4
-    var by = root.quoteTexts.by
-    var held = root.allSymbols.filter(function(s) { return !!feed.quotes[s] })
-    var stale = held.filter(function(s) { return !by[s] || by[s].quote !== feed.quotes[s] })
-    if (stale.length > 0) {
-      for (var i = 0; i < stale.length && Date.now() < until; i++)
-        by[stale[i]] = { quote: feed.quotes[stale[i]], text: JSON.stringify(feed.quotes[stale[i]]) }
-      quoteTextStep.start()
-      return
-    }
-    var kept = {}
-    var saved = held.map(function(s) {
-      kept[s] = by[s]
-      return JSON.stringify(s) + ':{"quote":' + by[s].text + ',"receivedAt":' + JSON.stringify((feed.entries[s] || {}).receivedAt || 0) + "}"
-    })
-    root.quoteTexts.by = kept
-    ownerOnly.write(root.quotesPath, '{"version":1,"quotes":{' + saved.join(",") + "}}\n")
-  }
+  // The feed holds the saved prices, so what of them is due is asked.
+  readonly property bool seeded: quotesCache.seeded
+  onSeededChanged: if (seeded) askDue()
 
   // ---- The screens
 
@@ -1201,7 +1093,7 @@ Item {
       root.refreshOwed = false
       root.refreshRest()
     }
-    flushQuotes()
+    quotesCache.flush()
   }
   property int prunedMinute: -1
   // The clock five minutes at a time, which turns 1D's day at the open and
@@ -1219,8 +1111,5 @@ Item {
   }
   onScreensOffChanged: stepDayClock()
   onOpenSurfacesChanged: stepDayClock()
-  Component.onCompleted: {
-    stepDayClock()
-    if (root.quotesPath !== "") quotesReader.read(root.quotesPath, root.quotesCap)
-  }
+  Component.onCompleted: stepDayClock()
 }
