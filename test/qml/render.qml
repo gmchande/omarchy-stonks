@@ -1472,7 +1472,7 @@ Harness {
               }, [])
             // At night, and on a listing's first day, every form in each
             // look, each with its hover's words.
-            if (root.nightPill || root.ipoPill)
+            if (root.stateName.indexOf("pill-sheet-night") === 0 || root.ipoPill)
               return [false, true].reduce(function(all, retro) {
                 return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: root.ipoPill ? "ipo" : "night" } }))
               }, [])
