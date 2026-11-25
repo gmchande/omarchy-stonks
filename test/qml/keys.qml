@@ -351,7 +351,6 @@ Harness {
         service.save(Object.assign({}, service.fileSettings, { symbols: service.fileSettings.symbols.concat(extra) }))
         within(3000, function() { return list.displayedSymbols.length === wanted })
         quiet()
-        wait(100)
       }
       base(s)
       var rows = list.displayedSymbols.slice()
@@ -378,8 +377,6 @@ Harness {
       var still = ["Single", "Empty"].filter(function(name) {
         service.switchList(name)
         quiet()
-        s.focusKeys()
-        wait(0)
         var before = JSON.stringify(state(b))
         keys.forEach(function(key) { press(key) })
         quiet()
