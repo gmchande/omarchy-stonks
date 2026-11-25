@@ -41,12 +41,14 @@ Flickable {
     return groups.length
   }
   readonly property int columnWidth: (width - inset - columns.spacing) / 2
-  // Reads keyMetrics.font so a new font or text size measures again.
-  readonly property int keyWidth: {
+  // The widest key among `side`'s groups, so each half's words start as
+  // close to its keys as they can. Reads keyMetrics.font so a new font or
+  // text size measures again.
+  function keyWidthOf(side) {
     var font = keyMetrics.font
     var widest = 0
-    for (var g = 0; g < groups.length; g++)
-      for (var r = 0; r < groups[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(groups[g].rows[r].key)))
+    for (var g = 0; g < side.length; g++)
+      for (var r = 0; r < side[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(side[g].rows[r].key)))
     return widest
   }
   FontMetrics { id: keyMetrics; font.family: root.look.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
@@ -62,6 +64,7 @@ Flickable {
   component Group: Column {
     id: group
     required property var modelData
+    property int keyWidth: 0
     spacing: Style.space(4)
 
     PanelSectionHeader {
@@ -80,7 +83,7 @@ Flickable {
         spacing: Style.space(10)
 
         Text {
-          width: root.keyWidth
+          width: group.keyWidth
           textFormat: Text.PlainText
           text: helpRow.modelData.key
           color: root.look.foreground
@@ -89,7 +92,7 @@ Flickable {
           font.bold: true
         }
         Text {
-          width: parent.width - root.keyWidth - parent.spacing
+          width: parent.width - group.keyWidth - parent.spacing
           textFormat: Text.PlainText
           text: helpRow.modelData.does
           color: root.look.dim
@@ -124,7 +127,7 @@ Flickable {
 
           Repeater {
             model: sheetSide.modelData
-            delegate: Group { width: root.columnWidth }
+            delegate: Group { width: root.columnWidth; keyWidth: root.keyWidthOf(sheetSide.modelData) }
           }
 
           Text {

@@ -195,6 +195,60 @@ Harness {
         wasLifted && closedEnds && body.watchlist.displayedSymbols.join(",") === rows.join(",") && order() === rows.join(","),
         [wasLifted, closedEnds, body.watchlist.displayedSymbols.join(","), order()].join(" "))
 
+      // Held at the bottom edge of the rows, a row scrolls the list to its
+      // end and drops last; held at the top edge, it scrolls back, rests
+      // while the pointer leaves the edge, and drops first. Each drop shows
+      // and saves the order drawn as it was let go.
+      var list = body.watchlist
+      var saved = function() {
+        try { return JSON.parse(harness.readFile(Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json")) } catch (e) { return null }
+      }
+      var savedSymbols = function() { var file = saved(); return file ? file.symbols.join(",") : "" }
+      var moved = function(from, to) { var next = rows.slice(); next.splice(to, 0, next.splice(from, 1)[0]); return next.join(",") }
+      var edgeAt = function(y) { return list.mapToItem(body, list.width / 2, y) }
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      var lift = row(rows[1]).mapToItem(body, list.width / 2, row(rows[1]).height / 2)
+      var bottom = edgeAt(list.sightHeight - 2)
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y + down / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, bottom.y, -1, Qt.LeftButton)
+      var reachedEnd = within(6000, function() { return list.atYEnd && list.reorder.slot === rows.length - 1 })
+      var drawnAt = list.reorder.slot
+      mouseRelease(body, lift.x, bottom.y)
+      var wanted = moved(1, drawnAt)
+      var droppedLast = within(2000, function() { return list.displayedSymbols.join(",") === wanted && savedSymbols() === wanted })
+      harness.check("a row held at the bottom edge of the rows scrolls them to the end, drops last, and the order shown is the order saved",
+        reachedEnd && droppedLast, [reachedEnd, drawnAt, list.displayedSymbols.join(","), savedSymbols()].join(" | "))
+      rows = service.symbols.slice()
+      rest()
+
+      var middle = rows[Math.floor((list.contentY + list.sightHeight / 2) / list.rowPitch)]
+      lift = row(middle).mapToItem(body, list.width / 2, row(middle).height / 2)
+      var top = edgeAt(2)
+      var centre = edgeAt(list.sightHeight / 2)
+      var startY = list.contentY
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y - down / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, top.y, -1, Qt.LeftButton)
+      var climbing = within(3000, function() { return list.contentY < startY - 2 * list.rowPitch })
+      mouseMove(body, lift.x, centre.y, -1, Qt.LeftButton)
+      var restingY = list.contentY
+      var rested = climbing && !within(400, function() { return list.contentY !== restingY })
+      mouseMove(body, lift.x, top.y, -1, Qt.LeftButton)
+      var reachedTop = within(6000, function() { return list.atYBeginning && list.reorder.slot === 0 })
+      drawnAt = list.reorder.slot
+      mouseRelease(body, lift.x, top.y)
+      wanted = moved(rows.indexOf(middle), drawnAt)
+      var droppedFirst = within(2000, function() { return list.displayedSymbols.join(",") === wanted && savedSymbols() === wanted })
+      harness.check("a row held at the top edge scrolls the rows back, rests while the pointer leaves the edge, drops first, and the order shown is the order saved",
+        climbing && rested && reachedTop && droppedFirst,
+        [climbing, rested, reachedTop, drawnAt, list.displayedSymbols.join(","), savedSymbols()].join(" | "))
+      service.setManualOrder(rows)
+      within(1500, function() { return order() === rows.join(",") })
+      rest()
+
       click(row(rows[0]), Qt.RightButton)
       var menu = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
       var lines = harness.findAll(body, "rowMenuLine")
@@ -386,6 +440,36 @@ Harness {
       harness.check("in Manage lists a list lifted as the wheel scrolls stays under the pointer and drops where it is then",
         opened && scrolls && carriedOn && landedOn && listNames() === wheeledOrder.join(","),
         [opened, scrolls, carriedOn, landedOn, listNames()].join(" "))
+
+      // Held at the bottom edge of Manage lists, a list scrolls them to the
+      // end and drops last; held at the top edge, it scrolls back and drops
+      // first, under All. Each drop saves the order drawn.
+      var savedLists = function() { var file = saved(); return file ? file.lists.map(function(l) { return l.name }).join(",") : "" }
+      var manageAt = function(y) { return manage.mapToItem(body, manage.width / 4, y) }
+      opened = openManage()
+      var held = manageRows().filter(function(r) { return r.name === "One" })[0]
+      lift = held.mapToItem(body, held.width / 4, held.height / 2)
+      var listsBottom = manageAt(manage.height - 2)
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y + up / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, listsBottom.y, -1, Qt.LeftButton)
+      var listsEnd = within(6000, function() { return manage.reorder.contentY >= manage.reorder.reach && manage.reorder.slot === manage.choices.length - 1 })
+      mouseRelease(body, lift.x, listsBottom.y)
+      var lastOrder = listNames().split(",").filter(function(n) { return n !== "One" }).concat(["One"]).join(",")
+      var listsLast = within(2000, function() { return listNames() === lastOrder && savedLists() === lastOrder })
+      held = manageRows().filter(function(r) { return r.name === "One" })[0]
+      lift = held.mapToItem(body, held.width / 4, held.height / 2)
+      var listsTop = manageAt(manage.itemHeight + 2)
+      mousePress(body, lift.x, lift.y)
+      mouseMove(body, lift.x, lift.y - up / 2, -1, Qt.LeftButton)
+      mouseMove(body, lift.x, listsTop.y, -1, Qt.LeftButton)
+      var listsStart = within(6000, function() { return manage.reorder.contentY === 0 && manage.reorder.slot === 1 })
+      mouseRelease(body, lift.x, listsTop.y)
+      var firstOrder = ["One"].concat(lastOrder.split(",").filter(function(n) { return n !== "One" })).join(",")
+      var listsFirst = within(2000, function() { return listNames() === firstOrder && savedLists() === firstOrder })
+      harness.check("in Manage lists a list held at the bottom edge scrolls them to the end and drops last, and at the top edge scrolls back and drops under All, each order saved",
+        opened && scrolls && listsEnd && listsLast && listsStart && listsFirst,
+        [opened, listsEnd, listsLast, listsStart, listsFirst, listNames(), savedLists()].join(" | "))
       body.closeViews()
       more.forEach(function(name) { service.deleteList(name) })
       service.switchList(wasList)

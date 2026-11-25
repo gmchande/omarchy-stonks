@@ -36,9 +36,10 @@ Harness {
   readonly property string readmePath: String(Qt.resolvedUrl("README.md")).replace(/^file:\/\//, "")
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
 
-  // The keys a label names: "Delete or Backspace" as the two.
+  // The keys a label names: "Delete or Backspace" as the two, and "Page Up"
+  // as one.
   function tokens(label) {
-    return label.replace(/`/g, "").split(/\s+/).filter(function(t) { return t !== "" && t !== "or" })
+    return label.replace(/`/g, "").replace(/Page (Up|Down)/g, "Page$1").split(/\s+/).filter(function(t) { return t !== "" && t !== "or" })
   }
 
   // The keys the README's table lists. Null with no table.
@@ -132,7 +133,7 @@ Harness {
     }
 
     // Every key starts from here: the surface open on All, manual order, the
-    // day, nothing open over the rows, the last of the ten rows featured
+    // day, nothing open over the rows, the last of the rows featured
     // with its chart on screen, and the cursor on the second.
     function base(s) {
       if (!s.body || !s.body.surfaceOpen) s.open()
@@ -177,7 +178,7 @@ Harness {
     function press(token) {
       var named = { "↑": Qt.Key_Up, "↓": Qt.Key_Down, "←": Qt.Key_Left, "→": Qt.Key_Right, "⏎": Qt.Key_Return,
         "Space": Qt.Key_Space, "Delete": Qt.Key_Delete, "Backspace": Qt.Key_Backspace, "Tab": Qt.Key_Tab,
-        "Esc": Qt.Key_Escape }
+        "Esc": Qt.Key_Escape, "PageUp": Qt.Key_PageUp, "PageDown": Qt.Key_PageDown, "Home": Qt.Key_Home, "End": Qt.Key_End }
       var held = /^(Shift|Ctrl)\+(.+)$/.exec(token)
       var modifier = held ? (held[1] === "Shift" ? Qt.ShiftModifier : Qt.ControlModifier) : Qt.NoModifier
       var key = held ? held[2] : token
@@ -210,6 +211,10 @@ Harness {
         changed = ["cursor"]
         var cursor = rows[rows.indexOf(selected) + (token === "↑" ? -1 : 1)]
         effect = function() { return b.watchlist.cursorRow === cursor }
+      } else if (token === "PageUp" || token === "PageDown" || token === "Home" || token === "End") {
+        changed = ["cursor"]
+        var pagedTo = rows[paged(b.watchlist, rows.length, rows.indexOf(selected), token)]
+        effect = function() { return b.watchlist.cursorRow === pagedTo }
       } else if (token === "←" || token === "→") {
         changed = ["scrub"]
         var nextTime = (b.scrubT || b.motion.scrubEnd) + (token === "→" ? 300 : -300)
@@ -313,6 +318,119 @@ Harness {
       harness.check("in the " + s.name + ", with the ? sheet open, " + removers.join(", ") + " close it and remove no row",
         removing.length === 0, "wrong: " + removing.join(" "))
       escapeOrder(s)
+    }
+
+    // Where a page key takes the cursor from `from`, among `count` rows: a
+    // screenful, the rows the view holds whole less one, so the row it
+    // leaves stays in sight; or the first or last row.
+    function paged(list, count, from, token) {
+      var screenful = Math.max(1, Math.floor((list.sightHeight + list.rowGap) / list.rowPitch) - 1)
+      var to = token === "Home" ? 0 : token === "End" ? count - 1 : from + (token === "PageUp" ? -screenful : screenful)
+      return Math.max(0, Math.min(count - 1, to))
+    }
+
+    // PgUp, PgDn, Home and End at the top, in the middle and at the end of
+    // rows longer than two screens: the cursor lands where `paged` says,
+    // whole in sight, with the row it left still in sight. In a list of one
+    // row and an empty one, they change nothing. The rows it adds, and the
+    // lists, go again after.
+    function paging(s) {
+      var keys = ["PageUp", "PageDown", "Home", "End"]
+      base(s)
+      var kept = service.fileSettings
+      var b = s.body, list = b.watchlist
+      // A screen's worth at a time, as a list opened with them would hold
+      // them: one at a time, each add asks Robinhood on its own. A window
+      // grows with its rows, so it tops up until they pass two of its
+      // screens.
+      var n = 100
+      for (var round = 0; round < 4 && list.displayedSymbols.length * list.rowPitch <= 2 * list.sightHeight + list.rowPitch; round++) {
+        var extra = []
+        while ((list.displayedSymbols.length + extra.length) * list.rowPitch <= 2 * list.sightHeight + list.rowPitch) extra.push("LONG" + n++)
+        var wanted = list.displayedSymbols.length + extra.length
+        service.save(Object.assign({}, service.fileSettings, { symbols: service.fileSettings.symbols.concat(extra) }))
+        within(3000, function() { return list.displayedSymbols.length === wanted })
+        quiet()
+      }
+      base(s)
+      var rows = list.displayedSymbols.slice()
+      var seen = function(i) { return i * list.rowPitch < list.contentY + list.sightHeight && i * list.rowPitch + list.rowHeight > list.contentY }
+      var wrong = []
+      ;[0, Math.floor(rows.length / 2), rows.length - 1].forEach(function(from) {
+        keys.forEach(function(key) {
+          list.select(rows[from])
+          within(1500, function() { return !list.settling })
+          var to = paged(list, rows.length, from, key)
+          press(key)
+          var landed = within(1500, function() {
+            return list.cursorRow === rows[to] && !list.settling && list.wholeInSight(to, list.contentY) && (key.indexOf("Page") < 0 || seen(from))
+          })
+          if (!landed) wrong.push(key + " from " + from + " gave " + list.displayedSymbols.indexOf(list.cursorRow) + ", wanted " + to)
+        })
+      })
+      harness.check("in the " + s.name + ", PgUp, PgDn, Home and End at the top, middle and end of rows longer than two screens move the cursor a screenful or to the end, in sight",
+        rows.length * list.rowPitch > 2 * list.sightHeight && wrong.length === 0, rows.length + " rows | " + wrong.join(" | "))
+
+      // A list of one row, then an empty one.
+      service.createList("Single", rows[0])
+      service.createList("Empty")
+      var still = ["Single", "Empty"].filter(function(name) {
+        service.switchList(name)
+        quiet()
+        var before = JSON.stringify(state(b))
+        keys.forEach(function(key) { press(key) })
+        quiet()
+        return within(1000, function() { return JSON.stringify(state(b)) !== before }) || list.displayedSymbols.length !== (name === "Single" ? 1 : 0)
+      })
+      service.save(kept)
+      quiet()
+      harness.check("in the " + s.name + ", PgUp, PgDn, Home and End in a list of one row and an empty one change nothing",
+        still.length === 0, "changed: " + still.join(" "))
+    }
+
+    // In Manage lists, longer than its view, the same four keys move the
+    // selected list as in the rows; with only All, they change nothing.
+    function managePaging(s) {
+      base(s)
+      var b = s.body
+      var names = []
+      for (var n = 1; n <= 48; n++) names.push("Page" + n)
+      names.forEach(function(name) { service.createList(name) })
+      service.switchList("")
+      quiet()
+      s.focusKeys()
+      b.openManageLists()
+      var manage = harness.find(b, "manageLists")
+      var count = names.length + 1, pitch = manage.itemHeight
+      var opened = within(1500, function() { return b.managingLists && manage.choices.length === count })
+      var screenful = Math.max(1, Math.floor(manage.reorder.sight / pitch) - 1)
+      var whole = function(i) { return i * pitch >= manage.reorder.contentY - 0.5 && (i + 1) * pitch <= manage.reorder.contentY + manage.reorder.sight + 0.5 }
+      var wrong = []
+      ;[0, Math.floor(count / 2), count - 1].forEach(function(from) {
+        ["PageUp", "PageDown", "Home", "End"].forEach(function(key) {
+          manage.cursor = from
+          manage.showCursor()
+          var to = key === "Home" ? 0 : key === "End" ? count - 1 : Math.max(0, Math.min(count - 1, from + (key === "PageUp" ? -screenful : screenful)))
+          press(key)
+          if (!within(1000, function() { return manage.cursor === to && whole(to) && (key.indexOf("Page") < 0 || whole(from) || to === from) }))
+            wrong.push(key + " from " + from + " gave " + manage.cursor + ", wanted " + to)
+        })
+      })
+      press("Esc")
+      within(1500, function() { return !b.managingLists })
+      names.forEach(function(name) { service.deleteList(name) })
+      service.switchList("")
+      quiet()
+      // Only All: one row.
+      s.focusKeys()
+      b.openManageLists()
+      var alone = within(1500, function() { return b.managingLists && manage.choices.length === 1 })
+      ;["PageUp", "PageDown", "Home", "End"].forEach(function(key) { press(key) })
+      var kept = alone && !within(500, function() { return manage.cursor !== 0 || !b.managingLists })
+      press("Esc")
+      harness.check("in Manage lists, longer than its view, PgUp, PgDn, Home and End move the selected list a screenful or to the end, in sight; with only All, nothing",
+        opened && manage.reorder.sight < count * pitch / 2 && wrong.length === 0 && kept,
+        [opened, manage.reorder.sight, count * pitch, kept].concat(wrong).join(" | "))
     }
 
     // What a person does with stocks and lists, by keys alone: no step moves
@@ -733,6 +851,7 @@ Harness {
 
       // The panel first: the window, shown, would take the keys.
       walk(harness.popup)
+      paging(harness.popup)
       var wrong = Object.keys(harness.omarchy).map(function(t) { return acts(harness.popup, t, harness.omarchy[t]) }).filter(function(d) { return d !== "" })
       harness.check("in the panel, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ← and l →, Space Enter, x and X Delete",
         wrong.length === 0, "wrong: " + wrong.join(" "))
@@ -749,6 +868,8 @@ Harness {
       tryVerify(function() { return !harness.popup.body.surfaceOpen }, 1000)
 
       walk(harness.window)
+      paging(harness.window)
+      managePaging(harness.window)
       // The window has no bar to step through; a Tab there must leave the
       // keys with the window.
       base(harness.window)
