@@ -4,7 +4,7 @@ Stonks puts your stocks in the Omarchy bar, day and night. A small pill
 shows how one stock is doing right now. Click it for the chart and your
 lists.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's line chart. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
+<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 23.43%. Below it, the panel shows Nebius Group at 100.36 after hours, over the day's line chart, which jumps before the open. Beside it: 'Your stocks in the Omarchy bar, day and night. Free · No account · No API key'">
 
 ```sh
 omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
@@ -119,6 +119,8 @@ stock from 04:00, when its pre-market starts, to the end of after hours,
 to come stay empty, so the open sits in the same place every day, and a
 jump before it shows where it happened. The regular session is bright and
 the hours around it dim.
+
+<img src="media/night.png" width="480" alt="SPY's panel on a Tuesday night: 713.57 overnight, down 0.72% from the day's close of 718.78. The day that closed draws faint, green above the dashed line at that close and red below, and tonight's trades draw bright red at its end">
 
 After the close, the chart keeps the day that closed until the next open,
 and adds what trades in between at its end: tonight's trades, for a US
