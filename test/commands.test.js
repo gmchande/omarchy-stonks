@@ -96,7 +96,7 @@ test("a file made for Stonks is its owner's alone from the start, holds the text
 }))
 
 test("a saved file is read only when it is a regular file of at most its cap, at once, and a missing one is told apart from one that can't be read", () => scratch(dir => {
-  // Decoded as Qt decodes it: a byte that isn't UTF-8 as U+FFFD, and a
+  // Decoded as Qt does it here: a byte that isn't UTF-8 as U+FFFD, and a
   // byte-order mark at the start dropped.
   const read = (path, cap = 16) => {
     const began = Date.now()

@@ -63,7 +63,7 @@ Item {
         var symbol = batch[job.read]
         var answer = null
         var unreadable = false
-        try { answer = Overnight.overnightAnswer(job.results, job.read, symbol) } catch (e) { unreadable = true }
+        try { answer = Overnight.overnightAnswer(job.results, batch, job.read) } catch (e) { unreadable = true }
         var had = entries[symbol]
         var kept = Overnight.keptTrades(had, answer, batches[job.batch].span)
         if (kept) job.listings[symbol] = { bars: had && Overnight.sameBars(had.bars, kept.bars) ? had.bars : kept.bars, through: kept.through }

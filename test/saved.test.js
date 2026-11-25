@@ -1873,7 +1873,7 @@ test("a spark day with a jump shows at once and is checked on a chart, whose ans
 // its place in the request.
 const overnight = (answer, symbols) => {
   const results = M.overnightResults(answer)
-  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results, i, symbol)]))
+  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results, symbols, i)]))
 }
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that
 // traded, and how far it reached.
@@ -1898,9 +1898,12 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   expect([bars.NEST.through, bars.SILK.through]).toEqual([bars.REED.through, bars.REED.through])
   // Asked in another order than it answers in, each listing still reads its
   // own result. One the answer leaves out is no answer, so it is asked
-  // again soon, and never taken for one Robinhood doesn't carry.
+  // again soon, and never taken for one Robinhood doesn't carry, even where
+  // the placeholder of one it doesn't carry has moved into its place.
   const day = fixture("moments/day/robinhood-day.json")
   expect(overnight(day, ["SILK", "NEST"])).toEqual({ SILK: bars.SILK, NEST: bars.NEST })
+  expect(overnight({ results: day.results.filter((_, i) => i !== 2) }, ["NEST", "SILK", "REED", "GRIT.TO"]))
+    .toEqual({ NEST: bars.NEST, SILK: bars.SILK, REED: null, "GRIT.TO": null })
   expect(overnight({ results: day.results.slice(1) }, ["NEST", "SILK"])).toEqual({ NEST: null, SILK: bars.SILK })
   expect(overnight({ chart: {} }, ["NEST"])).toBeNull()
 })

@@ -243,8 +243,9 @@ Item {
         if (root.folder !== "" && !survey.running) survey.running = true
         return
       }
-      // The files ahead wait for the folder to be private (`OwnerOnly.made`).
-      if (!root.files.made) return
+      // The files ahead wait for the folder to be private (`OwnerOnly.made`),
+      // which starts them again.
+      if (!root.files.made) return stop()
       var look = root.voice
       var due = root.aheadOf(look).filter(function(f) { return !root.madeThisRun[root.fileOf(look, f[0], f[1])] })
       // A write that didn't land ends the run: it's tried again when its sound is wanted.
@@ -258,6 +259,10 @@ Item {
       if (root.rewrote[look] === "landed" && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
       delete root.rewrote[look]
     }
+  }
+  Connections {
+    target: root.files
+    function onMadeChanged() { ahead.restart() }
   }
 
   // Once a run (`Commands.soundSurvey`). Read as `running` falls, since a

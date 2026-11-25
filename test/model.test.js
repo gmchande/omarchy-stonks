@@ -2292,7 +2292,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   const quote = { symbol: "SHOP", quoteType: "EQUITY", exchange: "NMS", longname: "Shopify Inc." }
   const result = historicals => ({ symbol: "NEST", historicals })
   const trade = { begins_at: "2026-10-07T00:00:00Z", close_price: "10.00", session: "overnight", interpolated: false }
-  const nest = "M.overnightAnswer(json.results, 0, 'NEST').bars.length"
+  const nest = "M.overnightAnswer(json.results, ['NEST'], 0).bars.length"
   const cases = [
     { name: "a search, as sent", call: "M.parseSearch(json).results.length", answer: { quotes: [quote] }, want: 1 },
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
@@ -2404,7 +2404,7 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
 // their times ahead of the clock, ask for an hour again for ever.
 test("a hostile Robinhood's hours keep at most a day's request's trades, and times ahead of the clock ask for a day", () => {
   const hour = k => M.overnightAnswer([{ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
-    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }], 0, "X")
+    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }], ["X"], 0)
   let kept = hour(0)
   for (let k = 1; k <= 100; k++) kept = M.joinTrades(kept, hour(k))
   expect(kept.bars.length).toBe(M.MOST_TRADES)
