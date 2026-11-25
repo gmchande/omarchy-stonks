@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons as Commons
 import "Chart.js" as Chart
+import "SmoothPaint.js" as SmoothPaint
 import "Tones.js" as Tones
 // A row's day line. With a known direction it takes the hero's rule, the up
 // colour above the dashed baseline and the down colour below; without one,
@@ -73,24 +74,8 @@ Item {
 
       // With no line under it, the line takes its own ink (`by` null).
       var by = root.hasBaseline ? pad + root.geometry.baselineY * h : null
-      var aside = root.geometry.aside
-      var gx0 = !aside || aside.from <= 0 ? 0 : pad + aside.from * w
-      var gx1 = !aside ? 0 : aside.to >= 1 ? width : pad + aside.to * w
-      var parts = !aside ? [{ from: 0, to: width, aside: false }]
-        : [{ from: 0, to: gx0, aside: false }, { from: gx0, to: gx1, aside: true }, { from: gx1, to: width, aside: false }]
-      if (root.hasBaseline) {
-        ctx.strokeStyle = root.baselineColor
-        ctx.lineWidth = 1
-        // Round ends on every paint: the context keeps the last paint's cap,
-        // so otherwise a first paint draws square dashes and repaints round.
-        ctx.lineCap = "round"
-        ctx.setLineDash([2, 3])
-        ctx.beginPath()
-        ctx.moveTo(pad, by)
-        ctx.lineTo(pad + w, by)
-        ctx.stroke()
-        ctx.setLineDash([])
-      }
+      var parts = SmoothPaint.asideParts(root.geometry.aside, pad, w, width)
+      if (root.hasBaseline) SmoothPaint.strokeBaseline(ctx, pad, pad + w, by, root.baselineColor, 1, [2, 3])
 
       ctx.lineWidth = root.lineWidth
       ctx.lineJoin = "round"
@@ -106,47 +91,15 @@ Item {
       for (var s = 0; s < parts.length; s++) {
         if (parts[s].to <= parts[s].from) continue
         ctx.save()
-        if (aside) {
-          ctx.beginPath()
-          ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
-          ctx.clip()
-        }
+        if (parts.length > 1) SmoothPaint.clipTo(ctx, parts[s], height)
         var tinted = root.split && by !== null
+        var alpha = parts[s].aside ? root.asideAlpha : 1
         if (parts[s].aside && !tinted) ctx.strokeStyle = root.greyColor
-        else if (tinted) {
-          // Two stops at one offset merge, so the second sits a hair below.
-          var alpha = parts[s].aside ? root.asideAlpha : 1
-          var stop = Math.max(0, Math.min(1, by / height))
-          var g = ctx.createLinearGradient(0, 0, 0, height)
-          g.addColorStop(stop, Qt.rgba(root.upColor.r, root.upColor.g, root.upColor.b, alpha))
-          g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(root.downColor.r, root.downColor.g, root.downColor.b, alpha))
-          ctx.strokeStyle = g
-        } else ctx.strokeStyle = root.lineColor
+        else if (tinted) ctx.strokeStyle = SmoothPaint.splitInk(ctx, height, by,
+          Qt.rgba(root.upColor.r, root.upColor.g, root.upColor.b, alpha), Qt.rgba(root.downColor.r, root.downColor.g, root.downColor.b, alpha))
+        else ctx.strokeStyle = root.lineColor
         if (parts[s].aside && tinted) ctx.lineWidth = root.asideWidth
-        // A break (`brk`) lifts the pen, as the hero's line does, and a
-        // stretch with no trade (`untraded`) holds the trade before it, dotted.
-        var held = []
-        ctx.beginPath()
-        for (var i = 0; i < pts.length; i++) {
-          var x = pad + pts[i].x * w
-          var y = pad + pts[i].y * h
-          if (i === 0 || pts[i].brk) ctx.moveTo(x, y)
-          else if (pts[i].untraded) {
-            var heldY = pad + pts[i - 1].y * h
-            held.push({ from: pad + pts[i - 1].x * w, to: x, y: heldY })
-            ctx.moveTo(x, heldY)
-            ctx.lineTo(x, y)
-          } else ctx.lineTo(x, y)
-        }
-        ctx.stroke()
-        ctx.setLineDash([0.01, 2])
-        ctx.beginPath()
-        for (var d = 0; d < held.length; d++) {
-          ctx.moveTo(held[d].from, held[d].y)
-          ctx.lineTo(held[d].to, held[d].y)
-        }
-        ctx.stroke()
-        ctx.setLineDash([])
+        SmoothPaint.strokeLine(ctx, pts, pad, w, h, 1)
         ctx.restore()
       }
       // A lone trade is a dot three line widths across.

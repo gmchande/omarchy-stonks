@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Chart.js" as Chart
+import "SmoothPaint.js" as SmoothPaint
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The smooth chart, one rule for the day and every range: a dashed baseline at
@@ -150,15 +151,8 @@ Item {
       ctx.clearRect(0, 0, width, height)
       if (!root.hasBaseline) return
       var h = height - root.pad * 2
-      ctx.strokeStyle = root.baselineColor
-      ctx.lineWidth = root.weight
-      ctx.lineCap = "round"
-      ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
-      ctx.beginPath()
-      ctx.moveTo(root.pad, root.pad + root.geometry.baselineY * h)
-      ctx.lineTo(width - root.pad, root.pad + root.geometry.baselineY * h)
-      ctx.stroke()
-      ctx.setLineDash([])
+      SmoothPaint.strokeBaseline(ctx, root.pad, width - root.pad, root.pad + root.geometry.baselineY * h, root.baselineColor,
+        root.weight, [3 * root.dashUnit, 4 * root.dashUnit])
       root.strokeTicks(ctx, true)
     }
   }
@@ -196,21 +190,14 @@ Item {
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(even ? pts : pts.slice(0, lastRegular + 1), function() { return true })
-        var gx0 = !aside || aside.from <= 0 ? 0 : pad + aside.from * w
-        var gx1 = !aside ? 0 : aside.to >= 1 ? width : pad + aside.to * w
-        var parts = !aside ? [{ from: 0, to: width, aside: false }]
-          : [{ from: 0, to: gx0, aside: false }, { from: gx0, to: gx1, aside: true }, { from: gx1, to: width, aside: false }]
+        var parts = SmoothPaint.asideParts(aside, pad, w, width)
         var clipped = parts.length > 1
         var by = root.hasBaseline ? pad + geometry.baselineY * h : null
 
         for (var s = 0; by !== null && s < parts.length; s++) {
           if (parts[s].aside || parts[s].to <= parts[s].from) continue
           ctx.save()
-          if (clipped) {
-            ctx.beginPath()
-            ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
-            ctx.clip()
-          }
+          if (clipped) SmoothPaint.clipTo(ctx, parts[s], height)
           ctx.fillStyle = even ? fade(ctx, pts, by, pad, h) : sides(ctx, by, root.aboveWash, root.belowWash)
           for (var r = 0; r < filled.length; r++) {
             var run = filled[r]
@@ -241,11 +228,7 @@ Item {
         for (var p = 0; p < parts.length; p++) {
           if (parts[p].to <= parts[p].from) continue
           ctx.save()
-          if (clipped) {
-            ctx.beginPath()
-            ctx.rect(parts[p].from, 0, parts[p].to - parts[p].from, height)
-            ctx.clip()
-          }
+          if (clipped) SmoothPaint.clipTo(ctx, parts[p], height)
           if (parts[p].aside) {
             ctx.lineWidth = root.weight
             ctx.strokeStyle = sides(ctx, by, root.asideAlpha, root.asideAlpha)
@@ -277,23 +260,20 @@ Item {
         return out
       }
 
-      // One gradient for both sides: stroking each line twice, clipped to each
-      // side, doubles the paint. Two stops at one offset merge, so the second
-      // sits a hair below. The dim ink is one share of its own colour: it reads
-      // against the full line beside it, not against the other side. With no
-      // line to stand against (`by` null), the baseline's ink.
+      // One ink for both sides: stroking each line twice, clipped to each
+      // side, doubles the paint. The dim ink is one share of its own colour:
+      // it reads against the full line beside it, not against the other
+      // side. With no line to stand against (`by` null), the baseline's ink.
       function sides(ctx, by, aboveAlpha, belowAlpha) {
         if (by === null) return Qt.rgba(root.baselineColor.r, root.baselineColor.g, root.baselineColor.b, aboveAlpha)
-        var stop = Math.max(0, Math.min(1, by / height))
-        var g = ctx.createLinearGradient(0, 0, 0, height)
-        g.addColorStop(stop, Qt.rgba(root.aboveColor.r, root.aboveColor.g, root.aboveColor.b, aboveAlpha))
-        g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(root.belowColor.r, root.belowColor.g, root.belowColor.b, belowAlpha))
-        return g
+        var a = root.aboveColor
+        var b = root.belowColor
+        return SmoothPaint.splitInk(ctx, height, by, Qt.rgba(a.r, a.g, a.b, aboveAlpha), Qt.rgba(b.r, b.g, b.b, belowAlpha))
       }
 
       // The day's wash: strongest at its far reach on each side, clear at
       // the dashed line, so it shows where the move went. Two stops at one
-      // offset merge, as in `sides`.
+      // offset merge, so the second sits a hair below.
       function fade(ctx, pts, by, pad, h) {
         var top = by - 1
         var bottom = by + 1
@@ -314,44 +294,18 @@ Item {
 
       // A lone trade, a day's only one or one beside a break, is a dot three
       // times the line's width, so it reads at a glance. It never breathes:
-      // that is the live dot's alone. Across a stretch with no trade
-      // (`untraded`) the line holds the trade before it, dotted, and steps to
-      // the next.
+      // that is the live dot's alone.
       function strokeRuns(ctx, lines, pad, w, h) {
         for (var r = 0; r < lines.length; r++) {
           var line = lines[r]
-          if (line.length === 1) {
-            ctx.fillStyle = ctx.strokeStyle
-            ctx.beginPath()
-            ctx.arc(pad + line[0].x * w, pad + line[0].y * h, ctx.lineWidth * 1.5, 0, Math.PI * 2)
-            ctx.fill()
+          if (line.length > 1) {
+            SmoothPaint.strokeLine(ctx, line, pad, w, h, root.dashUnit)
             continue
           }
-          var held = []
+          ctx.fillStyle = ctx.strokeStyle
           ctx.beginPath()
-          for (var j = 0; j < line.length; j++) {
-            var x = pad + line[j].x * w
-            var y = pad + line[j].y * h
-            if (j === 0) ctx.moveTo(x, y)
-            else if (line[j].untraded) {
-              var heldY = pad + line[j - 1].y * h
-              held.push({ from: pad + line[j - 1].x * w, to: x, y: heldY })
-              ctx.moveTo(x, heldY)
-              ctx.lineTo(x, y)
-            } else ctx.lineTo(x, y)
-          }
-          ctx.stroke()
-          if (!held.length) continue
-          // Dots the line's width across, a width apart: the dashes count in
-          // its widths, and stretch in the screenshot as the baseline's do.
-          ctx.setLineDash([0.01, 2 * root.dashUnit])
-          ctx.beginPath()
-          for (var d = 0; d < held.length; d++) {
-            ctx.moveTo(held[d].from, held[d].y)
-            ctx.lineTo(held[d].to, held[d].y)
-          }
-          ctx.stroke()
-          ctx.setLineDash([])
+          ctx.arc(pad + line[0].x * w, pad + line[0].y * h, ctx.lineWidth * 1.5, 0, Math.PI * 2)
+          ctx.fill()
         }
       }
     }
