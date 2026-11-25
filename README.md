@@ -34,7 +34,8 @@ Made for Omarchy 4.5, and runs back to 4.0.6.
 
 Stonks doesn't track your holdings, send price alerts or show news.
 
-Website: [getstonks.app](https://getstonks.app)
+Website: [getstonks.app](https://getstonks.app) · On the marketplace:
+[plugins.omarchy.org](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
 
 ## Install
 
@@ -491,5 +492,6 @@ and send a change.
 License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/`, and the ones
 Stonks makes as it runs, were made from code for Stonks. They're MIT too.
 
-If Stonks earns a place in your bar, a heart on its page helps the next
-person find it.
+If Stonks earns a place in your bar, a heart on
+[its marketplace page](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
+helps the next person find it.

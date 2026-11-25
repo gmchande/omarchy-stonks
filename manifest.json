@@ -5,7 +5,7 @@
   "version": "1.3.2",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "Your stocks in the bar, day and night. Stonks is a watchlist and ticker for stocks, ETFs, indexes and crypto on any exchange Yahoo Finance lists. US stocks keep their price before the open, after the close and through the night. Each price shows as it traded, in its own currency, with its time when it's late. Free, with no account or API key.",
+  "description": "Your stocks in the bar, day and night. Stonks is a watchlist and ticker with charts and quotes for stocks, ETFs, indexes and crypto on the world's markets. US stocks and ETFs show their pre-market, after-hours and overnight prices. Each price shows as it traded, in its own currency, with its time when it's late. From Yahoo Finance and Robinhood, free, with no account or API key.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
