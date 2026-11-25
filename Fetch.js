@@ -55,16 +55,21 @@ function answerKind(status, exit) {
   return status === 200 ? "ok" : "bad"
 }
 
-function answers(text, from) {
+// `now`, in seconds, turns a Retry-After given as a date into seconds. The
+// exit code is curl's, at most three digits: unbounded, a line that starts
+// like a mark and runs on in digits has the pattern try every split of
+// them, which holds the shell's thread for as long as the square of their
+// count.
+function answers(text, from, now) {
   var out = []
-  var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d+) ?([^\\n]*)\\n", "g")
+  var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d{1,3}) ?([^\\n]*)\\n", "g")
   from = from || 0
   pattern.lastIndex = from
   var match
   while ((match = pattern.exec(text)) !== null) {
     var status = Number(match[2])
     var exit = Number(match[3])
-    var retryAfter = /^\s*\d+\s*$/.test(match[4]) ? Number(match[4]) : 0
+    var retryAfter = retrySeconds(match[4], now)
     out.push({
       index: Number(match[1]),
       status: status,
@@ -76,4 +81,13 @@ function answers(text, from) {
     from = pattern.lastIndex
   }
   return out
+}
+
+// A Retry-After's seconds: a count, or a date in the one form HTTP lets a
+// host send (RFC 9110), never less than none. Anything else is none.
+function retrySeconds(header, now) {
+  if (/^\s*\d+\s*$/.test(header)) return Number(header)
+  if (!/^\s*[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT\s*$/.test(header)) return 0
+  var at = Date.parse(header.trim()) / 1000
+  return at === at ? Math.max(0, at - now) : 0
 }

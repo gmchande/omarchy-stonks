@@ -401,6 +401,16 @@ test("a run's output splits into its answers, each said by what came back", () =
   const early = M.answers(text.slice(0, half + 3))
   const rest = M.answers(text, early[early.length - 1].end)
   expect(early.concat(rest).map(a => [a.index, a.kind, a.body, a.retryAfter])).toEqual(got)
+  // A Retry-After may be a date, as HTTP allows: the seconds until then,
+  // none once it's past, and none for words that are neither.
+  const date = Date.parse("Wed, 21 Oct 2026 07:28:00 GMT") / 1000
+  const dated = retry => M.answers(trailer(0, 429, 0, retry), 0, date - 90)[0].retryAfter
+  expect([dated("Wed, 21 Oct 2026 07:28:00 GMT"), dated("Wed, 21 Oct 2026 07:20:00 GMT"), dated("soon")]).toEqual([90, 0, 0])
+  // A line that starts like a mark and runs on in digits, as a broken host
+  // could send, holds no answer until it ends, and reads at once.
+  const began = performance.now()
+  expect(M.answers("\n@@stonks 0 200 " + "1".repeat(100000))).toEqual([])
+  expect(performance.now() - began).toBeLessThan(500)
 })
 
 test("a spark day keeps the last chart's verdict, and a jump past it waits for a chart", () => {
