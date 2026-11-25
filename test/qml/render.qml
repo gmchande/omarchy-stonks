@@ -440,7 +440,7 @@ Harness {
     var results = Overnight.overnightResults(answer)
     if (!results) return null
     var out = {}
-    symbols.forEach(function(symbol, i) { out[symbol] = Overnight.overnightAnswer(results[i], symbol) })
+    symbols.forEach(function(symbol, i) { out[symbol] = Overnight.overnightAnswer(results, i, symbol) })
     return out
   }
 

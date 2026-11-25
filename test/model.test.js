@@ -2386,8 +2386,8 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
 // shell keep 150 more trades at every one, 15,000 after a hundred, and with
 // their times ahead of the clock, ask for an hour again for ever.
 test("a hostile Robinhood's hours keep at most a day's request's trades, and times ahead of the clock ask for a day", () => {
-  const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
-    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
+  const hour = k => M.overnightAnswer([{ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
+    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }], 0, "X")
   let kept = hour(0)
   for (let k = 1; k <= 100; k++) kept = M.joinTrades(kept, hour(k))
   expect(kept.bars.length).toBe(M.MOST_TRADES)

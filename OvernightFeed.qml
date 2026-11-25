@@ -62,13 +62,15 @@ Item {
       } else {
         var symbol = batch[job.read]
         var answer = null
-        try { answer = Overnight.overnightAnswer(job.results[job.read], symbol) } catch (e) { answer = null }
+        var unreadable = false
+        try { answer = Overnight.overnightAnswer(job.results, job.read, symbol) } catch (e) { unreadable = true }
         var had = entries[symbol]
         var kept = Overnight.keptTrades(had, answer, batches[job.batch].span)
         if (kept) job.listings[symbol] = { bars: had && Overnight.sameBars(had.bars, kept.bars) ? had.bars : kept.bars, through: kept.through }
-        // One listing that can't be read makes the whole answer bad.
-        else if (!answer) batch.forEach(function(s) { delete job.listings[s] })
-        if (!answer || ++job.read >= batch.length) {
+        // One listing that can't be read makes the whole answer bad. One
+        // the answer left out fails alone (`land`).
+        else if (unreadable) batch.forEach(function(s) { delete job.listings[s] })
+        if (unreadable || ++job.read >= batch.length) {
           job.results = null
           job.batch++
         }

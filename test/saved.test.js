@@ -1866,11 +1866,11 @@ test("a spark day with a jump shows at once and is checked on a chart, whose ans
 
 // ---------------------------------------------------------------- overnight
 
-// Robinhood's answer by symbol, read as the feed reads it: each result is
-// for the symbol asked in its place.
+// Robinhood's answer by symbol, read as the feed reads it, each symbol by
+// its place in the request.
 const overnight = (answer, symbols) => {
   const results = M.overnightResults(answer)
-  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results[i], symbol)]))
+  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results, i, symbol)]))
 }
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that
 // traded, and how far it reached.
@@ -1893,10 +1893,12 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   // them, and still reaches as far as SILK and NEST.
   expect(bars.REED.through).toBe(Date.parse(raw[2].historicals.at(-1).begins_at) / 1000)
   expect([bars.NEST.through, bars.SILK.through]).toEqual([bars.REED.through, bars.REED.through])
-  // Asked out of the order it answers in, an answer names another symbol
-  // and is no answer for the one asked.
-  expect(overnight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
-    .toEqual({ SILK: { bars: [], from: null, through: null }, NEST: { bars: [], from: null, through: null } })
+  // Asked in another order than it answers in, each listing still reads its
+  // own result. One the answer leaves out is no answer, so it is asked
+  // again soon, and never taken for one Robinhood doesn't carry.
+  const day = fixture("moments/day/robinhood-day.json")
+  expect(overnight(day, ["SILK", "NEST"])).toEqual({ SILK: bars.SILK, NEST: bars.NEST })
+  expect(overnight({ results: day.results.slice(1) }, ["NEST", "SILK"])).toEqual({ NEST: null, SILK: bars.SILK })
   expect(overnight({ chart: {} }, ["NEST"])).toBeNull()
 })
 
