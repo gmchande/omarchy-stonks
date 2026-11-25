@@ -50,7 +50,7 @@ OverRows {
     opening.restart()
   }
   onClosed: {
-    nameField.focus = false
+    newRow.release()
     scroll.cancelFlick()
   }
 
@@ -88,7 +88,7 @@ OverRows {
     showCursor()
     naming = true
     problem = ""
-    Qt.callLater(function() { if (root.active && root.naming) nameField.forceActiveFocus() })
+    newRow.edit(false)
   }
 
   // Back to the line, the field emptied. After a make, the cursor stays on
@@ -96,10 +96,8 @@ OverRows {
   function stopNaming() {
     naming = false
     problem = ""
-    nameField.text = ""
-    // The field drops its focus first, or the scope hands it straight back.
-    nameField.focus = false
-    if (root.active) root.forceActiveFocus()
+    newRow.text = ""
+    newRow.release()
   }
 
   function moveCursor(delta) {
@@ -327,92 +325,27 @@ OverRows {
         }
       }
 
-      Item {
+      InlineNameRow {
         id: newRow
         width: column.width
-        height: root.itemHeight
-
-        // The line gives way whole to the field while a name is typed.
-        MenuLine {
-          objectName: "symbolNewList"
-          anchors.fill: parent
-          visible: !root.naming
-          look: root.look
-          isCursor: root.cursor === root.newIndex
-          onTaken: root.startNaming()
-
-          Text {
-            x: root.inset + Style.space(22)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: "New list…"
-            color: root.look.dim
-            font.family: root.look.fontFamily
-            font.pixelSize: Style.font.bodySmall
-          }
-        }
-
-        Field {
-          id: nameField
-          objectName: "symbolListNameField"
-          anchors.left: parent.left
-          anchors.right: namingChoices.left
-          anchors.rightMargin: Style.space(10)
-          anchors.top: parent.top
-          anchors.bottom: parent.bottom
-          visible: root.naming
-          verticalPadding: 0
-          // The typed name starts where the lists' names do.
-          leftPadding: root.inset + Style.space(22)
-          retro: root.look.retro
-          foreground: root.look.foreground
-          dim: root.look.dim
-          font.family: root.look.fontFamily
-          font.pixelSize: Style.font.bodySmall
-          placeholderText: "List name"
-          onTextChanged: root.problem = ""
-          onAccepted: root.createRequested(text)
-          Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) { root.stopNaming(); event.accepted = true }
-          }
-        }
-
-        // As New list's MAKE and CANCEL in the list menu.
-        Row {
-          id: namingChoices
-          visible: root.naming
-          anchors.right: parent.right
-          anchors.rightMargin: root.inset
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: Style.space(14)
-
-          ListAction {
-            objectName: "symbolListMake"
-            look: root.look
-            text: "MAKE"
-            enterTakes: true
-            onActivated: root.createRequested(nameField.text)
-          }
-          ListAction {
-            look: root.look
-            text: "CANCEL"
-            onActivated: root.stopNaming()
-          }
-        }
-      }
-
-      Text {
-        visible: root.problem !== ""
-        width: column.width
-        height: root.itemHeight
-        leftPadding: root.inset + Style.space(22)
-        verticalAlignment: Text.AlignVCenter
-        textFormat: Text.PlainText
-        text: root.problem
-        color: root.look.foreground
-        font.family: root.look.fontFamily
-        font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
+        host: root
+        look: root.look
+        editing: root.naming
+        problem: root.problem
+        prompt: "New list…"
+        isCursor: root.cursor === root.newIndex
+        placeholder: "List name"
+        lineHeight: root.itemHeight
+        // The typed name starts where the lists' names do.
+        textX: root.inset + Style.space(22)
+        actionsRight: root.inset
+        lineName: "symbolNewList"
+        fieldName: "symbolListNameField"
+        actionName: "symbolListMake"
+        onTextChanged: root.problem = ""
+        onTaken: root.startNaming()
+        onSubmitted: function(name) { root.createRequested(name) }
+        onCancelled: root.stopNaming()
       }
     }
   }

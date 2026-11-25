@@ -23,7 +23,7 @@ OverRows {
 
   property int cursor: 0
   property bool naming: false
-  readonly property string typedName: naming ? nameField.text : ""
+  readonly property string typedName: naming ? newRow.text : ""
 
   readonly property int itemHeight: Style.space(26)
   function rowSize() { return { pitch: itemHeight, height: itemHeight } }
@@ -53,7 +53,7 @@ OverRows {
   }
   // Closed, it gives up its name field's keys too.
   onClosed: {
-    nameField.focus = false
+    newRow.release()
     scroll.cancelFlick()
     settle.stop()
   }
@@ -61,8 +61,7 @@ OverRows {
   function reset() {
     naming = false
     problem = ""
-    nameField.text = ""
-    nameField.focus = false
+    newRow.text = ""
     cursor = 0
     for (var i = 0; i < choices.length; i++) if (choices[i].name === current) cursor = i
     scroll.contentY = 0
@@ -123,13 +122,13 @@ OverRows {
     cursor = newIndex
     naming = true
     problem = ""
-    Qt.callLater(function() { if (root.active && root.naming) nameField.forceActiveFocus() })
+    newRow.edit(false)
   }
 
   // Back after a close that couldn't make the new list.
   function resumeNaming(text, reason) {
     startNaming()
-    nameField.text = text
+    newRow.text = text
     problem = reason
   }
 
@@ -150,10 +149,8 @@ OverRows {
   function stopNaming() {
     naming = false
     problem = ""
-    nameField.text = ""
-    // The field drops its focus first, or the scope hands it straight back.
-    nameField.focus = false
-    if (root.active) root.forceActiveFocus()
+    newRow.text = ""
+    newRow.release()
   }
 
   Keys.onPressed: function(event) {
@@ -304,92 +301,27 @@ OverRows {
       }
     }
 
-    Item {
+    InlineNameRow {
       id: newRow
       width: pinned.width
-      height: root.itemHeight
-
-      // The line gives way whole to the field while a name is typed.
-      MenuLine {
-        objectName: "newListLine"
-        anchors.fill: parent
-        visible: !root.naming
-        look: root.look
-        isCursor: root.cursor === root.newIndex
-        onTaken: root.startNaming()
-
-        Text {
-          x: Style.space(24)
-          anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: "New list…"
-          color: root.look.dim
-          font.family: root.look.fontFamily
-          font.pixelSize: Style.font.bodySmall
-        }
-      }
-
-      Field {
-        id: nameField
-        objectName: "listNameField"
-        anchors.left: parent.left
-        anchors.right: namingChoices.left
-        anchors.rightMargin: Style.space(10)
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        visible: root.naming
-        verticalPadding: 0
-        // The typed name starts where "New list…" and the lists' names do.
-        leftPadding: Style.space(24)
-        retro: root.look.retro
-        foreground: root.look.foreground
-        dim: root.look.dim
-        font.family: root.look.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        placeholderText: "List name"
-        onTextChanged: root.problem = ""
-        onAccepted: root.createRequested(text)
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Escape) { root.stopNaming(); event.accepted = true }
-        }
-      }
-
-      // As a rename's SAVE and CANCEL in Manage lists.
-      Row {
-        id: namingChoices
-        visible: root.naming
-        anchors.right: parent.right
-        anchors.rightMargin: Style.space(8)
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: Style.space(14)
-
-        ListAction {
-          look: root.look
-          text: "MAKE"
-          enterTakes: true
-          onActivated: root.createRequested(nameField.text)
-        }
-        ListAction {
-          objectName: "namingCancel"
-          look: root.look
-          text: "CANCEL"
-          onActivated: root.stopNaming()
-        }
-      }
-    }
-
-    Text {
-      visible: root.problem !== ""
-      width: pinned.width
-      height: root.itemHeight
-      leftPadding: Style.space(24)
-      verticalAlignment: Text.AlignVCenter
-      textFormat: Text.PlainText
-      text: root.problem
-      color: root.look.foreground
-      font.family: root.look.fontFamily
-      font.pixelSize: Style.font.caption
-      elide: Text.ElideRight
+      host: root
+      look: root.look
+      editing: root.naming
+      problem: root.problem
+      prompt: "New list…"
+      isCursor: root.cursor === root.newIndex
+      placeholder: "List name"
+      lineHeight: root.itemHeight
+      // The typed name starts where "New list…" and the lists' names do.
+      textX: Style.space(24)
+      actionsRight: Style.space(8)
+      lineName: "newListLine"
+      fieldName: "listNameField"
+      cancelName: "namingCancel"
+      onTextChanged: root.problem = ""
+      onTaken: root.startNaming()
+      onSubmitted: function(name) { root.createRequested(name) }
+      onCancelled: root.stopNaming()
     }
 
     MenuLine {

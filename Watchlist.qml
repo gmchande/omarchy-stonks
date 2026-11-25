@@ -54,10 +54,6 @@ Flickable {
   // its remove button waits for the pointer to move or a key.
   property string scrolledUnder: ""
   property var displayedSymbols: []
-  property string dragSymbol: ""
-  property real dragY: 0
-  property int dragTarget: -1
-  property real dragOffset: 0
   property var arrangedView: null
 
   readonly property int rowPitch: rowHeight + rowGap
@@ -80,7 +76,7 @@ Flickable {
   readonly property real headedY: glide.running ? glide.to : contentY
   // Read where the list is headed, so a key gliding the list to its row
   // keeps it.
-  readonly property string cursorRow: Rows.cursorRow(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, featuredSymbol,
+  readonly property string cursorRow: Rows.cursorRow(displayedSymbols, cursorSymbol, cursorSymbol === reorder.lifted, featuredSymbol,
     rowSize(), headedY, sightHeight)
   // A cursor of your own that leaves sight is let go, on these changes
   // rather than on cursorRow's, which reads the cursor it would clear.
@@ -88,12 +84,12 @@ Flickable {
   onSightHeightChanged: keepCursorInSight()
   onDisplayedSymbolsChanged: letGoUnseen()
   function letGoUnseen() {
-    if (cursorSymbol !== "" && !Rows.chosenSeen(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, rowSize(), headedY, sightHeight))
+    if (cursorSymbol !== "" && !Rows.chosenSeen(displayedSymbols, cursorSymbol, cursorSymbol === reorder.lifted, rowSize(), headedY, sightHeight))
       cursorSymbol = ""
   }
   property real lastSight: 0
   function keepCursorInSight() {
-    var keep = cursorSymbol !== "" ? (cursorSymbol !== dragSymbol ? cursorSymbol : "")
+    var keep = cursorSymbol !== "" ? (cursorSymbol !== reorder.lifted ? cursorSymbol : "")
       : featuredSymbol
     var at = displayedSymbols.indexOf(keep)
     // The featured row only if it was whole in sight before, so a resize
@@ -113,7 +109,7 @@ Flickable {
   }
   // Set while a row's menu is open: it takes the pointer's hover from the list.
   property bool held: false
-  readonly property bool sortHeld: listHover.hovered || dragSymbol !== "" || held
+  readonly property bool sortHeld: listHover.hovered || reorder.lifted !== "" || held
   readonly property bool manualOrder: view.order === "manual"
 
   signal featureRequested(string symbol)
@@ -201,7 +197,7 @@ Flickable {
     var seen = mapFromItem(null, x, y)
     // A lifted row is the drag's, and the gutter the scrollbar's: neither
     // moves the cursor.
-    if (dragSymbol !== "" || seen.x >= rowsBox.width) return false
+    if (reorder.lifted !== "" || seen.x >= rowsBox.width) return false
     var at = Math.floor((seen.y + headedY) / rowPitch)
     if (at < 0 || at >= displayedSymbols.length) return false
     cursorSymbol = displayedSymbols[at]
@@ -456,67 +452,37 @@ Flickable {
     return !!row && row.place >= 0 && row.resting
   }
 
-  function slotOf(symbol) {
-    return Rows.slotOf(displayedSymbols, symbol, dragSymbol, dragTarget)
+  // A row dragged in your own order: lifted under the pointer, the others
+  // making room, and dropped in the place it is over.
+  readonly property ReorderDrag reorder: ReorderDrag {
+    keys: root.displayedSymbols
+    pitch: root.rowPitch
+    contentY: root.contentY
+    onDropped: function(from, to) {
+      if (from !== to) root.commitManualOrder(Settings.movedSymbols(root.displayedSymbols, from, to))
+    }
+    // The dropped row comes whole into view, as a key's row does.
+    onLanded: function(at) { if (at >= 0) root.scrollToRow(at) }
   }
-
-  // So a lifted row stays under the pointer as the wheel scrolls.
-  property real dragPointer: 0
-  onContentYChanged: if (dragSymbol !== "" && !dropAnim.running) dragTo(dragPointer + contentY)
 
   function beginDrag(symbol, y) {
     if (!manualOrder) { moveRefused(); return }
-    var from = displayedSymbols.indexOf(symbol)
-    if (from < 0) return
+    if (displayedSymbols.indexOf(symbol) < 0) return
     takeOver()
-    dropAnim.stop()
+    reorder.begin(symbol, y)
     cursorSymbol = symbol
-    dragOffset = y - from * rowPitch
-    dragPointer = y - contentY
-    dragY = from * rowPitch
-    dragTarget = from
-    dragSymbol = symbol
-  }
-
-  function dragTo(y) {
-    if (dragSymbol === "") return
-    dragPointer = y - contentY
-    dragY = Math.max(0, Math.min((displayedSymbols.length - 1) * rowPitch, y - dragOffset))
-    dragTarget = Rows.dragSlot(dragY / rowPitch, dragTarget, displayedSymbols.length)
-  }
-
-  function endDrag() {
-    var from = displayedSymbols.indexOf(dragSymbol)
-    var to = dragTarget
-    if (from < 0 || to < 0) { cancelDrag(); return }
-    if (from !== to) root.commitManualOrder(Settings.movedSymbols(displayedSymbols, from, to))
-    dropAnim.to = to * rowPitch
-    dropAnim.start()
-  }
-
-  function cancelDrag() {
-    dropAnim.stop()
-    dragSymbol = ""
-  }
-
-  // The dropped row comes whole into view, as a key's row does.
-  function landDrop() {
-    var at = displayedSymbols.indexOf(dragSymbol)
-    cancelDrag()
-    if (at >= 0) scrollToRow(at)
   }
 
   // Closing mid-drag, every row, the lifted one too, stays where it is on
   // screen until the next open.
   function releaseDragInPlace() {
-    if (dragSymbol === "") return
+    if (reorder.lifted === "") return
     var rows = []
     for (var i = 0; i < rowRepeater.count; i++) {
       var row = rowRepeater.itemAt(i)
       if (row) rows.push({ row: row, y: row.y })
     }
-    dropAnim.stop()
-    dragSymbol = ""
+    reorder.cancel()
     rows.forEach(function(r) { r.row.holdAt(r.y) })
   }
 
@@ -541,20 +507,20 @@ Flickable {
     var before = arrangedView
     arrangedView = view
     if (!before) return
-    if (before.allSymbols.join() !== view.allSymbols.join()) syncRows()
+    if (before.allSymbols.join() !== view.allSymbols.join()) Rows.syncModel(rowsModel, "symbol", view.allSymbols)
     // A rename keeps the key. StonksBody holds a closed surface's view, so
     // this runs only while open or opening, before reopen().
     var switched = view.listKey !== before.listKey
     if (switched) {
       places[before.listKey] = headedY
-      cancelDrag()
+      reorder.cancel()
       cursorSymbol = ""
       forgetClicks()
       takeOver()
       layOut()
       contentY = clampY(places[view.listKey] || 0)
     } else if (view.order !== before.order || view.reversed !== before.reversed) {
-      cancelDrag()
+      reorder.cancel()
       layOut()
     } else if (sortHeld) {
       applyMembership()
@@ -580,23 +546,8 @@ Flickable {
     lastPitch = rowPitch
     arrangedView = view
     lineLook = look.retro
-    syncRows()
+    Rows.syncModel(rowsModel, "symbol", view.allSymbols)
     display(view.shown.slice(), false)
-  }
-
-  function syncRows() {
-    var allSymbols = view.allSymbols
-    var wanted = {}
-    for (var j = 0; j < allSymbols.length; j++) wanted[allSymbols[j]] = true
-    var have = {}
-    for (var i = rowsModel.count - 1; i >= 0; i--) {
-      var symbol = rowsModel.get(i).symbol
-      if (wanted[symbol] === true) have[symbol] = true
-      else rowsModel.remove(i)
-    }
-    for (j = 0; j < allSymbols.length; j++) {
-      if (have[allSymbols[j]] !== true) rowsModel.append({ symbol: allSymbols[j] })
-    }
   }
 
   // A look switch swaps each row's day line, a canvas, which a long All
@@ -626,16 +577,6 @@ Flickable {
     }
   }
 
-  NumberAnimation {
-    id: dropAnim
-    target: root
-    property: "dragY"
-    duration: Motion.duration(Style, 160)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
-    onFinished: root.landDrop()
-  }
-
   Item {
     id: rowsBox
     width: Math.max(0, root.width - root.gutter)
@@ -648,10 +589,10 @@ Flickable {
       WatchlistRow {
         id: rowDelegate
         calendars: root.calendars
-        place: root.slotOf(symbol)
+        place: root.reorder.slotOf(symbol)
         visible: place >= 0
         pitch: root.rowPitch
-        liftedY: root.dragY
+        liftedY: root.reorder.liftedY
         rowCount: rowRepeater.count
         onRested: root.rowRested(symbol)
         look: root.look
@@ -713,8 +654,8 @@ Flickable {
         cursor: symbol === root.cursorRow
         // Only a cursor of your own shows the remove button, not the resting one.
         removable: symbol === root.cursorRow && symbol === root.cursorSymbol && symbol !== root.scrolledUnder
-          && root.dragSymbol === ""
-        lifted: symbol === root.dragSymbol
+          && root.reorder.lifted === ""
+        lifted: symbol === root.reorder.lifted
         scrubX: day && sightScrub ? Chart.tradeFraction(day, sightScrub) : -1
         onFeatureRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.featureRequested(symbol) }
         onMenuRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.menuRequested(symbol, x, y) }
@@ -726,9 +667,9 @@ Flickable {
         }
         onListsRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.listsRequested(symbol) }
         onDragStarted: function(y) { root.beginDrag(symbol, y) }
-        onDragMoved: function(y) { root.dragTo(y) }
-        onDragEnded: root.endDrag()
-        onDragCanceled: root.cancelDrag()
+        onDragMoved: function(y) { root.reorder.moveTo(y) }
+        onDragEnded: root.reorder.end()
+        onDragCanceled: root.reorder.cancel()
       }
     }
   }

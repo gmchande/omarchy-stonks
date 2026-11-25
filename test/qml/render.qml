@@ -1298,7 +1298,7 @@ Harness {
           if (root.stateName.indexOf("-lift-") > 0) {
             var at = 3.5 * manage.itemHeight
             manage.beginDrag(manage.names[3], at)
-            manage.dragTo(at - 0.7 * manage.itemHeight)
+            manage.reorder.moveTo(at - 0.7 * manage.itemHeight)
           }
           if (root.stateName.indexOf("-rename-") > 0) {
             manage.startRenaming(2)
