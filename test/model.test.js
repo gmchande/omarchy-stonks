@@ -1180,7 +1180,7 @@ test("every key on the key sheet, and every key the README's prose says to press
   expect(pressed.filter(k => !listed.has(k))).toEqual([])
 })
 
-test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
+test("a letter says its key and Shift, never its text's case, and no key says anything held with Ctrl or Alt", () => {
   const { typed } = load("KeyText.js")
   const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, META = 0x10000000, KEYPAD = 0x20000000
   // Caps Lock sends "O" with no Shift, and "o" with it.
@@ -1193,6 +1193,10 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
   expect(typed({ key: 80, modifiers: META, text: "p" })).toBe("")
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
+  expect(typed({ key: 47, modifiers: KEYPAD, text: "/" })).toBe("/")
+  // Qt gives Alt+/ and Alt+[ their own text, and Ctrl+Shift+/ a "?".
+  expect([typed({ key: 47, modifiers: ALT, text: "/" }), typed({ key: 91, modifiers: ALT, text: "[" }),
+    typed({ key: 63, modifiers: CTRL | SHIFT, text: "?" })]).toEqual(["", "", ""])
 })
 
 test("a stock's day is asked for two days from its pre-market until its third bar, and past the bell until it trades, when Yahoo's day no longer holds the last session", () => {
