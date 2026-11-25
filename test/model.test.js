@@ -714,7 +714,7 @@ test("the data file reads as written and repairs hand edits", () => {
   // A save is weighed in the bytes the file holds, as Stonks reads it back:
   // names in any script count as UTF-8 does.
   for (const name of ["Tech", "Énergie", "日本株", "Rockets 🚀", "x".repeat(4096)])
-    expect(M.fileBytes(JSON.stringify({ name }))).toBe(Buffer.byteLength(JSON.stringify({ name })))
+    expect(load("Commands.js").fileBytes(JSON.stringify({ name }))).toBe(Buffer.byteLength(JSON.stringify({ name })))
   // Sounds start off, in a new install and in a file from before them, and
   // only a saved true turns them on; the version check stays on unless a
   // saved false turns it off. Newer settings may add other defaults.
@@ -743,6 +743,10 @@ test("the data file reads as written and repairs hand edits", () => {
   // {"length": 1e12}, would hold the shell's thread for each index it names.
   const posing = M.fileSettings({ symbols: { length: 2, 0: "NEST", 1: "SILK" }, lists: { length: 1, 0: { name: "Growth", symbols: ["BO"] } } })
   expect([posing.symbols, posing.lists]).toEqual([["NVDA", "AAPL", "MSFT", "SPY", "TSLA"], []])
+  // A symbol holding half a UTF-16 pair can't go in a URL, so it is left
+  // out, in All and in a list.
+  const halved = M.fileSettings({ symbols: ["NEST", "\ud800X"], lists: [{ name: "Growth", symbols: ["BO", "Y\udc00"] }] })
+  expect([halved.symbols, halved.lists[0].symbols]).toEqual([["NEST", "BO"], ["BO"]])
   // The cadence stays between 30 seconds and 15 minutes.
   for (const [given, kept] of [[15, 30], [1000, 900], [120, 120], ["nope", 60]])
     expect([given, M.fileSettings({ refreshIntervalSec: given }).refreshIntervalSec]).toEqual([given, kept])
@@ -769,6 +773,12 @@ test("the data file reads as written and repairs hand edits", () => {
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
+  // Thousands of lists of one name, as a hand edit or a sync could leave
+  // them, read at once, each under its own free name.
+  const began = performance.now()
+  const many = M.readListsFile(JSON.stringify({ lists: Array.from({ length: 2000 }, () => ({ name: "a" })) }))
+  expect(performance.now() - began).toBeLessThan(1000)
+  expect([many.lists.length, many.lists[1].name, many.lists[1999].name, new Set(many.lists.map(l => l.name)).size]).toEqual([2000, "a 2", "a 2000", 2000])
   // An order an older build saved by the amount reads as % change, on All
   // and on a list, each keeping its direction and members.
   const byAmount = M.fileSettings({ symbols: ["AAPL", "MSFT"], order: "abs", reversed: true,
@@ -782,6 +792,8 @@ test("the data file reads as written and repairs hand edits", () => {
   const moved = fromBar({ symbols: ["nvda", "spy"], order: "name", barStyle: "icon" })
   expect([moved.symbols, moved.order, "barStyle" in moved]).toEqual([["NVDA", "SPY"], "name", false])
   expect(fromBar({ barStyle: "icon" })).toBeNull()
+  // A section a hand edit made an object with a length is no list.
+  expect(M.settingsFromBar({ bar: { layout: { right: { length: 1, 0: { id: "grvc.stonks", symbols: ["NEST"] } } } } }, "grvc.stonks")).toBeNull()
 })
 
 // Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
@@ -813,7 +825,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
   const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
   // A switch to a list, as the Service persists it.
-  const switched = (s, name) => M.fileSettings(Object.assign({}, s, { list: name }))
+  const switched = (s, name) => M.fileSettings(M.copyWith(s, { list: name }))
   const names = lists => lists.map(list => list.name)
   const current = made.lists.find(list => list.name === made.list)
   test("the file reads", () => expect(read).not.toBeNull())
@@ -830,14 +842,19 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   for (const list of made.lists) test(label(list), () => expect(label(shown(switched(read, list.name)))).toBe(label(list)))
   // After a downgrade, or on a machine sharing the file: the other machine's
   // file is on US; this one switches back to World and sorts it, and writes.
-  test("a later version's keys stay through a write: one at the top, one in a list", () => {
+  // A key a hand edit named "__proto__" stays too.
+  test("a later version's keys, and a hand edit's, stay through a write: one at the top, one in a list", () => {
     const later = JSON.parse(text)
     later.alerts = [{ symbol: "AAPL", above: 400 }]
     later.lists[1].pinned = true
     later.list = "US"
+    const proto = { value: { mine: true }, enumerable: true, writable: true, configurable: true }
+    Object.defineProperty(later, "__proto__", proto)
+    Object.defineProperty(later.lists[1], "__proto__", proto)
     const written = JSON.parse(JSON.stringify(M.withListOrder(switched(M.fileSettings(later), made.list), "symbol")))
+    const own = object => Object.getOwnPropertyDescriptor(object, "__proto__")?.value
     expect([written.list, written.lists[1].name, written.lists[1].order]).toEqual([made.list, "World", "symbol"])
-    expect([written.alerts, written.lists[1].pinned]).toEqual([later.alerts, true])
+    expect([written.alerts, written.lists[1].pinned, own(written), own(written.lists[1])]).toEqual([later.alerts, true, { mine: true }, { mine: true }])
   })
 })
 
@@ -2275,7 +2292,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   const quote = { symbol: "SHOP", quoteType: "EQUITY", exchange: "NMS", longname: "Shopify Inc." }
   const result = historicals => ({ symbol: "NEST", historicals })
   const trade = { begins_at: "2026-10-07T00:00:00Z", close_price: "10.00", session: "overnight", interpolated: false }
-  const nest = "M.overnightAnswer(json.results[0], 'NEST').bars.length"
+  const nest = "M.overnightAnswer(json.results, 0, 'NEST').bars.length"
   const cases = [
     { name: "a search, as sent", call: "M.parseSearch(json).results.length", answer: { quotes: [quote] }, want: 1 },
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },

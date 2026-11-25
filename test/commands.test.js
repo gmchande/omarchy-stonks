@@ -96,11 +96,13 @@ test("a file made for Stonks is its owner's alone from the start, holds the text
 }))
 
 test("a saved file is read only when it is a regular file of at most its cap, at once, and a missing one is told apart from one that can't be read", () => scratch(dir => {
+  // Decoded as Qt decodes it: a byte that isn't UTF-8 as U+FFFD, and a
+  // byte-order mark at the start dropped.
   const read = (path, cap = 16) => {
     const began = Date.now()
     const r = Bun.spawnSync(C.readSaved(path, cap), { stdout: "pipe", stderr: "pipe" })
     expect(Date.now() - began).toBeLessThan(2000)
-    return C.readSavedFile(r.exitCode, r.stdout.length, r.stdout.toString(), cap)
+    return C.readSavedFile(r.exitCode, r.stdout.length, new TextDecoder().decode(r.stdout), cap)
   }
   const file = join(dir, "lists.json")
   writeFileSync(file, "x".repeat(16))
@@ -109,6 +111,15 @@ test("a saved file is read only when it is a regular file of at most its cap, at
   expect(read(file)).toEqual({ refused: true })
   writeFileSync(file, "")
   expect(read(file)).toEqual({ text: "" })
+  // A file that isn't UTF-8, as an editor saving Latin-1 leaves "Café", is
+  // read lossily, and says so. A byte-order mark, and a U+FFFD the file
+  // holds, lose nothing.
+  writeFileSync(file, Buffer.from('{"name":"Caf\xe9"}', "latin1"))
+  expect(read(file, 64)).toEqual({ text: '{"name":"Caf\ufffd"}', lossy: true })
+  writeFileSync(file, '\ufeff{"name":"Café"}')
+  expect(read(file, 64)).toEqual({ text: '{"name":"Café"}' })
+  writeFileSync(file, '{"name":"\ufffd"}')
+  expect(read(file, 64)).toEqual({ text: '{"name":"\ufffd"}' })
   // Through a link to a regular file, as a hand-made setup may have it.
   writeFileSync(file, "{}")
   symlinkSync(file, join(dir, "linked"))

@@ -169,8 +169,9 @@ Harness {
       harness.check("a save is read back and found as it was written",
         backed && harness.checks.indexOf(false) < 0 && !service.saveFailed, [backed, JSON.stringify(harness.checks), service.saveFailed].join(" | "))
 
-      // A read still out as a save lands holds the text from before the
-      // save; it goes unheard, and the save is read back as it landed.
+      // A save asked while a read is out waits for it: the read holds the
+      // text from before the save, which leaves the change in memory, and
+      // the save is read back as it landed.
       good = harness.readFile(harness.file)
       // The stand-in dd says when it has read the file (bin/dd).
       sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && cp "$1" "$1.new" && mv "$1.new" "$1"')
@@ -179,16 +180,35 @@ Harness {
       service.setRange("1M")
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
       var through = held && landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
-      // The held read comes in after the save's own: it must say nothing.
       through = through && !within(500, function() { return harness.checks.indexOf(false) >= 0 })
-      harness.check("a read still out as a save lands goes unheard, and the save is read back as it landed",
+      harness.check("a save asked while a read is out waits for it, and is read back as it landed",
         through && harness.checks.indexOf(false) < 0 && !service.saveFailed && footer().indexOf("aren't saved") < 0 && service.range === "1M"
           && JSON.parse(harness.readFile(harness.file)).range === "1M",
         [through, service.saveFailed, footer(), service.range, JSON.stringify(harness.checks)].join(" | "))
 
-      // A file larger than 128 KiB, and where the file was a folder, a FIFO
-      // or a link to a device: each can't be read, the footer says so, and
-      // none is written over. The FIFO holds nothing up.
+      // A file that can't be read, put in place while a read is out, as a
+      // sync tool replaces one: a change made before that read lands writes
+      // nothing over it, and the footer says the change isn't saved.
+      good = harness.readFile(harness.file)
+      var halfObject = "{\n  \"symbols\": [\"AAPL\",\n"
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', halfObject)
+      var heldBroken = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
+      service.setRange("1W")
+      // Time for a write that must not come to land.
+      wait(300)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var refusedBroken = within(3000, function() { return service.listsUnreadable })
+      var keptBroken = harness.readFile(harness.file) === halfObject
+      var toldBroken = footer()
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
+      var mended = within(3000, function() { return !service.listsUnreadable && service.range === "1M" })
+      harness.check("a change made while a read is out writes nothing over a file that can't be read, put there meanwhile, and the footer says it isn't saved",
+        heldBroken && refusedBroken && keptBroken && toldBroken.indexOf("aren't saved") >= 0 && mended,
+        [heldBroken, refusedBroken, keptBroken, toldBroken, mended].join(" | "))
+
+      // A file larger than 128 KiB, one that isn't UTF-8, and where the file
+      // was a folder, a FIFO or a link to a device: each can't be read, the
+      // footer says so, and none is written over. The FIFO holds nothing up.
       good = harness.readFile(harness.file)
       // Each kind: how it's made, and how it's seen, the same after a save
       // asked of it. The large one is the file with a 128 KiB note added,
@@ -206,6 +226,9 @@ Harness {
       }
       var refusals = [
         ["over 128 KiB", 'sed "\\$d" "$1" > "$1.new" && { printf \',"note": "\'; head -c 131072 /dev/zero | tr "\\0" x; printf \'"\\n}\\n\'; } >> "$1.new" && mv "$1.new" "$1"', 'md5sum < "$1"'],
+        // "CAFÉ" as an editor saving Latin-1 leaves it: Qt reads the É as
+        // U+FFFD, and a save would write that over it.
+        ["not UTF-8", 'printf \'{"symbols": ["CAF\\311"]}\\n\' > "$1.new" && mv "$1.new" "$1"', 'md5sum < "$1"'],
         ["a folder", 'rm -f "$1" && mkdir "$1"', 'stat -c %F "$1" && ls -A "$1" | wc -l'],
         ["a FIFO", 'rm -f "$1" && mkfifo "$1"', 'stat -c %F "$1"']
       ].map(refused).filter(function(s) { return s !== "" })
@@ -325,7 +348,7 @@ Harness {
       // it names, so it says no more of the file's place, mended or not.
       var link = refused(["a link to a device", 'rm -f "$1" && ln -s /dev/zero "$1"', 'readlink "$1"', true])
       if (link !== "") refusals.push(link)
-      harness.check("a file over 128 KiB, a folder, a FIFO or a link to a device in the file's place can't be read, the footer says so, and none is written over",
+      harness.check("a file over 128 KiB, not UTF-8, a folder, a FIFO or a link to a device in the file's place can't be read, the footer says so, and none is written over",
         refusals.length === 0, refusals.join(" | "))
 
       app.close()

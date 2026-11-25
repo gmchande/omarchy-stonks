@@ -4,10 +4,11 @@
 # what was saved; a file that can't be read is never written over, the
 # footer says what to do, and once fixed it is read again; a save that
 # can't land is said and lands when tried again; a save is read back, and a
-# read out as it lands goes unheard; a file too large, or no regular file,
-# is never read or written over; a file that appears, or is edited by hand,
-# is read; and every older release's file reads whole. HOME and curl are
-# scratch.
+# save asked while a read is out waits for it, writing nothing over a file
+# that can't be read; a file too large, not UTF-8, or no regular file, is
+# never read or written over; a file that appears, or is edited by hand, is
+# read; every older release's file reads whole; and a sound whose file
+# couldn't be written is written once it can be. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree saving.qml
 scratch_home v1-data.json grvc.stonks.json

@@ -1,12 +1,15 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Commands.js" as Commands
 import "Settings.js" as Settings
 // The lists file, ~/.config/omarchy/<id>.json: read as the shell starts and
 // whenever it changes, written on each change, and read back to be sure the
 // write landed. A file that can't be read is never written over. It is read
 // outside the shell's thread, and only a regular file of at most `cap`
 // bytes is read (`FileRead`): one larger, or anything else there, can't be.
+// Nor can one that isn't UTF-8, which Qt reads with U+FFFD in place of a
+// name's letter, and a save would write that over the letter.
 Item {
   id: root
 
@@ -37,7 +40,7 @@ Item {
   signal saveChecked(bool saved)
 
   function persist(values, settles) {
-    root.store(Settings.fileSettings(Object.assign({}, root.fileSettings, values)), settles)
+    root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles)
   }
 
   function save(next) {
@@ -105,10 +108,8 @@ Item {
   property string known: ""
   // Quickshell skips a write of the text it last wrote or read, and this
   // view reads nothing, so it forgets each write before the next: after a
-  // lost save, the same text is written again. A write drops a read still
-  // out, which may hold the text before it.
+  // lost save, the same text is written again.
   function writeText(text) {
-    reader.drop()
     root.known = text
     file.path = ""
     file.path = root.path
@@ -125,11 +126,19 @@ Item {
     if (root.path !== "") reader.read(root.path, root.cap)
   }
 
+  // A save asked while a read is out waits for it (`writeFile`), since the
+  // file may have changed since the last read: one that can't be read now
+  // is never written over. Otherwise the change, the newest, is written.
+  property bool writeOwed: false
+
   // Only a file not there is missing: one that can't be read is never
   // written over, a save still awaiting its read-back included. What is
   // there now is no text of Stonks', so that wait ends, as for a save from
   // elsewhere.
-  function take(answer) {
+  function take(read) {
+    var answer = read.lossy ? { refused: true } : read
+    var owed = root.writeOwed
+    root.writeOwed = false
     if (answer.text !== undefined) {
       root.missing = false
       root.known = answer.text
@@ -142,19 +151,33 @@ Item {
         root.saveFailed = true
         return
       }
-      if (root.takesRead(answer.text)) root.takeLoadedSettings(answer.text)
+      var taken = root.takesRead(answer.text)
+      if (!owed) {
+        if (taken) root.takeLoadedSettings(answer.text)
+        return
+      }
+      if (taken && !Settings.readListsFile(answer.text)) {
+        root.takeUnreadableFile()
+        root.editsUnsaved = true
+        return
+      }
+      root.unreadable = false
+      root.writeFile(root.fileSettings)
       return
     }
     root.missing = !!answer.missing
     root.known = ""
     if (root.missing) {
-      if (root.takesRead(null)) root.takeMissingFile()
+      var gone = root.takesRead(null)
+      if (owed) root.writeFile(root.fileSettings)
+      else if (gone) root.takeMissingFile()
       return
     }
     if (root.making) return
     root.staleTexts = null
     root.saveFailed = false
     root.takeUnreadableFile()
+    if (owed) root.editsUnsaved = true
   }
 
   // While a save awaits its read-back: each text the file may still hold
@@ -196,7 +219,7 @@ Item {
       return
     }
     root.unreadable = false
-    if (settleWrite.running) parsed = Settings.fileSettings(Object.assign({}, parsed, { featured: root.fileSettings.featured }))
+    if (settleWrite.running) parsed = Settings.fileSettings(Settings.copyWith(parsed, { featured: root.fileSettings.featured }))
     if (root.ready && Settings.settingsEqual(parsed, root.fileSettings)) return
     root.adopt(parsed)
   }
@@ -239,12 +262,16 @@ Item {
   // written, since Stonks couldn't read it back: the file keeps what it
   // held, and the footer says the changes aren't saved until they fit.
   function tooLarge(settings) {
-    return Settings.fileBytes(JSON.stringify(settings, null, 2) + "\n") > root.cap
+    return Commands.fileBytes(JSON.stringify(settings, null, 2) + "\n") > root.cap
   }
   function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    if (Settings.fileBytes(body) > root.cap) {
+    if (Commands.fileBytes(body) > root.cap) {
       root.saveFailed = true
+      return
+    }
+    if (reader.out) {
+      root.writeOwed = true
       return
     }
     var before = root.known
