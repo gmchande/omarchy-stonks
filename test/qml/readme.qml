@@ -11,9 +11,12 @@ import "plugin" as Stonks
 // demo watchlist at the saved moment readme.sh names. Each picture is
 // grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
 // With STONKS_README_LIGHT set, it grabs only the light picture: readme.sh
-// runs it again in Catppuccin Latte. With STONKS_README_MARKETPLACE naming
-// a symbol on the list, it grabs only the marketplace picture's two: that
-// symbol's smooth panel and its pill on the bar.
+// runs it again in Catppuccin Latte. With STONKS_README_NIGHT naming a
+// symbol on the list, it grabs only the night picture, that symbol's panel:
+// readme.sh runs it again at the night's capture. With
+// STONKS_README_MARKETPLACE naming a symbol, alone on the list, it grabs
+// only the marketplace picture's two: that symbol's smooth panel and its
+// pill on the bar.
 Harness {
   id: harness
   walk: false
@@ -21,9 +24,10 @@ Harness {
 
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
   readonly property string marketplace: Quickshell.env("STONKS_README_MARKETPLACE") || ""
-  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].concat(marketplace ? [marketplace] : [])
-  readonly property var us: ["AAPL", "JNJ", "SPY"].concat(marketplace ? [marketplace] : [])
+  readonly property var demo: marketplace ? [marketplace] : ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
+  readonly property var us: marketplace ? [marketplace] : ["AAPL", "JNJ", "SPY"]
   readonly property bool light: Quickshell.env("STONKS_README_LIGHT") === "1"
+  readonly property string night: Quickshell.env("STONKS_README_NIGHT") || ""
 
   // The clock stands still a minute after the capture (readme.sh).
   readonly property int at: Number(Quickshell.env("STONKS_README_AT"))
@@ -194,6 +198,7 @@ Harness {
       verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
         && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
       if (harness.light) return lightPicture()
+      if (harness.night) return nightPicture()
 
       panel.open()
       var body = panel.body
@@ -251,11 +256,23 @@ Harness {
       harness.finish()
     }
 
+    // The night's stock featured, its closed day faint and tonight bright
+    // once Robinhood's prints say it trades at night.
+    function nightPicture() {
+      service.feature(harness.night)
+      tryVerify(function() { return service.featuredSymbol === harness.night }, 3000, harness.night + " featured")
+      panel.open()
+      var body = panel.body
+      grab("night", panel.keyboardPanel.card, body, function() { return body.surfaceOpen && robinhoodIn() })
+      panel.close()
+      harness.finish()
+    }
+
     // The marketplace picture's: the symbol featured in smooth, from a fresh
     // open, and its pill on the bar.
     function marketplacePictures() {
       var symbol = harness.marketplace
-      verify(service.symbols.join(",") === harness.demo.join(","), "the demo watchlist and " + symbol + ": " + service.symbols.join(","))
+      verify(service.symbols.join(",") === symbol, symbol + " alone on the list: " + service.symbols.join(","))
       service.persist({ style: "smooth" })
       service.feature(symbol)
       tryVerify(function() { return service.featuredSymbol === symbol }, 3000, symbol + " featured")
