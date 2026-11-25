@@ -1788,7 +1788,7 @@ Harness {
             console.error("FAIL fading refusal state contains the move refusal")
             root.failures++
           }
-          body.noteShown = 0.5
+          one("noteTime").shown = 0.5
         } else if (pose === "breadth") {
           one("breadthRule").still = true
           one("breadthRule").upShare = 0.5

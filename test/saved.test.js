@@ -25,6 +25,8 @@ const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overn
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
+// The day the rows measure, as the list's header names it at `now`.
+const rowsDay = (symbols, quotes, newest, now) => M.rowsDayName(M.rowsSharedDay(symbols, quotes, newest, calendars), now)
 // Each listing's newest trade, as the service works them out one by one
 // (`Chart.newestTradeOf`).
 const newestTrades = (symbols, quotes, nights) => Object.fromEntries(symbols
@@ -2193,7 +2195,7 @@ test("through a night the chart keeps the day that closed with tonight at its en
   const lateNewest = M.newestTrade(stale, late.latest, calendars, late.day)
   const tue = at("2026-10-27", "01:30")
   const lateLines = M.heroLines(stale, M.rowModel(stale, 0, "pct", lateNewest), late.latest, tue, late.day, calendars, "pct", false)
-  expect([pillHover(stale, lateNewest, tue), M.rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue, calendars),
+  expect([pillHover(stale, lateNewest, tue), rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue),
     lateLines.close.label, lateLines.caption.label]).toEqual(["tonight \u22123.07% as of 01:25", "MON", "FRI CLOSE", ""])
 })
 
@@ -2431,7 +2433,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // The list's header names the day the rows measure: Friday all weekend,
   // Sunday night too, today until midnight, then Monday until the new day's
   // first trade.
-  const header = set => { const at = topsAt(set); return M.rowsDay(at.symbols, at.quotes, at.newest, at.now, calendars) }
+  const header = set => { const at = topsAt(set); return rowsDay(at.symbols, at.quotes, at.newest, at.now) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
     .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
   // A row Yahoo sent no time for measures no day it can name: the rest
@@ -2439,13 +2441,13 @@ test("in every phase, a stock that has traded since its close shows that newest 
   {
     const at = topsAt("watch-2026-10-25-1000")
     const untimed = { ...at.quotes.NBIS, symbol: "UNTIMED", marketTime: undefined }
-    expect(M.rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now, calendars)).toBe("FRI")
+    expect(rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now)).toBe("FRI")
   }
   // Rows that measure tomorrow, from tonight's trades, say TODAY.
   {
     const at = topsAt("watch-2026-10-26-2005")
     const tomorrow = Object.fromEntries(Object.entries(at.newest).map(([s, n]) => [s, { ...n, dayStart: n.dayStart + DAY, joined: false }]))
-    expect(M.rowsDay(Object.keys(tomorrow), at.quotes, tomorrow, at.now, calendars)).toBe("TODAY")
+    expect(rowsDay(Object.keys(tomorrow), at.quotes, tomorrow, at.now)).toBe("TODAY")
   }
   // Monday 20:05 the low, high, open and volume under the chart are
   // today's; past midnight they are Monday's, and say so.
