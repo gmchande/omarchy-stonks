@@ -89,8 +89,9 @@ Harness {
       // The file is made its owner's a moment after each write.
       var mode = ""
       within(3000, function() { mode = sh('stat -c %a "$1"'); return mode === "600" })
-      // The prices are saved once the first answers are in.
-      var cached = within(5000, function() { return harness.readFile(service.quotesPath) !== "" })
+      // The prices are saved, in the cache folder's quotes.json, once the
+      // first answers are in.
+      var cached = within(5000, function() { return harness.readFile(service.files.folder + "/quotes.json") !== "" })
       var priced = Object.keys(service.quotes)
       var next = restart.createObject(started)
       // Ready once the lists file is read; the saved prices, read beside it,
