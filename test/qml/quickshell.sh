@@ -18,7 +18,9 @@
 # the group, shrugging off TERM, until the run kills it: so the group is
 # known to be the run's until its last member is stopped, a child that
 # cleared its environment included, and its number can't have passed to
-# another group.
+# another group. A run killed outright never gets to stop it, so the leader
+# dies with the shell that started it, and Quickshell with the leader
+# (setpriv's parent-death signal, which outlasts their execs).
 #
 # Each run has a runtime folder of its own, which goes with the run, so a
 # test's Quickshell leaves nothing in the session's: Quickshell 0.3.1 puts
@@ -88,9 +90,9 @@ quickshell_run() {
   mkfifo "$log.ended"
   exec {fd}<> "$log.ended"
   set -m
-  STONKS_RUN=${qs_mark#STONKS_RUN=} XDG_RUNTIME_DIR=$qs_runtime bash -c '
+  STONKS_RUN=${qs_mark#STONKS_RUN=} XDG_RUNTIME_DIR=$qs_runtime setpriv --pdeathsig KILL bash -c '
     log=$1; shift
-    QS_DISABLE_CRASH_HANDLER=1 quickshell "$@" > "$log" 2>&1 < /dev/null &
+    QS_DISABLE_CRASH_HANDLER=1 setpriv --pdeathsig KILL quickshell "$@" > "$log" 2>&1 < /dev/null &
     trap "" TERM
     wait $!
     echo "$! $?" > "$log.ended"
