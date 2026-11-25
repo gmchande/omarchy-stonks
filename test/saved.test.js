@@ -417,7 +417,7 @@ test("a scrub reads the trade at or before it, from the day's first trade throug
   expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true, at: pts[pts.length - 1].t })
 })
 
-test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
+test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it, and the header says the lunch break; either side of it the dot is on the line", () => {
   const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
   const pts = M.chartGeometry(toyota, calendars).points
   const reopen = pts.findIndex(p => p.brk)
@@ -428,6 +428,9 @@ test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leav
   expect([M.yAt(pts, morning.x), M.yAt(pts, afternoon.x)]).toEqual([morning.y, afternoon.y])
   const beforeLunch = (pts[reopen - 2].x + morning.x) / 2
   expect(M.yAt(pts, beforeLunch)).toBeCloseTo((pts[reopen - 2].y + morning.y) / 2, 9)
+  const jst = clock => Date.parse(`2026-10-07T${clock}:00+09:00`) / 1000
+  expect(["11:00", "12:00", "12:29", "13:00"].map(clock => marketStatus(toyota, jst("14:55"), jst(clock), calendars)))
+    .toEqual(["At 11:00 JST · Market open", "At 12:00 JST · Lunch break", "At 12:29 JST · Lunch break", "At 13:00 JST · Market open"])
 })
 
 // Smooth's replay of `day`, from its first trade to its last over 2 s, as a
