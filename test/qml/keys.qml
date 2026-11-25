@@ -339,10 +339,13 @@ Harness {
       base(s)
       var kept = service.fileSettings
       var b = s.body, list = b.watchlist
-      for (var n = 100; list.displayedSymbols.length * list.rowPitch < 2.5 * list.sightHeight; n++) {
-        service.addSymbol("LONG" + n)
-        within(1500, function() { return list.displayedSymbols.indexOf("LONG" + n) >= 0 })
-      }
+      // In one save, as a list opened with them would hold them: one at a
+      // time, each add asks Robinhood on its own.
+      var count = Math.floor((2 * list.sightHeight) / list.rowPitch) + 2
+      var extra = []
+      for (var n = 100; kept.symbols.length + extra.length < count; n++) extra.push("LONG" + n)
+      service.save(Object.assign({}, kept, { symbols: kept.symbols.concat(extra) }))
+      within(3000, function() { return list.displayedSymbols.length === count })
       quiet()
       base(s)
       var rows = list.displayedSymbols.slice()
