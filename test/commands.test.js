@@ -323,7 +323,7 @@ test("the silence's word that it reached the output comes while it plays, and wh
   }
 }, 10000)
 
-test("an update that restarts the shell restarts it only when the plugin's folder moved", () => scratch(dir => {
+test("an update asks Stonks to restart the shell only when the plugin's folder moved, and a second update, opened while the first asks, runs nothing", () => scratch(dir => {
   const home = join(dir, "home")
   const plugin = join(home, ".config/omarchy/plugins/grvc.stonks")
   mkdirSync(plugin, { recursive: true })
@@ -332,25 +332,50 @@ test("an update that restarts the shell restarts it only when the plugin's folde
   git("commit", "-q", "--allow-empty", "-m", "one")
   const bin = join(dir, "bin")
   const log = join(dir, "omarchy.log")
-  const update = (moves, restarts = true) => {
+  // While `hold` is there, Omarchy's update waits on its question, and says
+  // so in `asking`.
+  const hold = join(dir, "hold"), asking = join(dir, "asking")
+  const env = { HOME: home, PATH: bin + ":" + process.env.PATH }
+  const standIns = moves => {
     standIn(bin, "omarchy", `echo "$*" >> "${log}"
 case "$1 $2" in
   "launch floating") shift 5; exec bash -c "$1" ;;
   "plugin update") echo "the changes' pager: $(git var GIT_PAGER)" >> "${log}"
+    if [ -e "${hold}" ]; then touch "${asking}"; while [ -e "${hold}" ]; do sleep 0.05; done; fi
     ${moves ? `git -C "${plugin}" -c user.name=t -c user.email=t@t commit -q --allow-empty -m next` : ":"} ;;
 esac
 `)
+    standIn(bin, "omarchy-shell", `echo "omarchy-shell $*" >> "${log}"`)
     writeFileSync(log, "")
-    run((restarts ? C.updateAndRestart : C.update)("grvc.stonks"), { HOME: home, PATH: bin + ":" + process.env.PATH })
-    return readFileSync(log, "utf8").trim().split("\n").slice(1)
+  }
+  const said = () => readFileSync(log, "utf8").trim().split("\n").filter(line => !line.startsWith("launch "))
+  const update = (moves, restarts = true) => {
+    standIns(moves)
+    run(C.update("grvc.stonks", restarts), env)
+    return said()
   }
   // Omarchy's update shows the changes with git, whose pager would hold a
   // long list until q is pressed, with nothing saying so: git runs without
   // one, so the changes print and Omarchy's question follows.
   expect(update(false)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat"])
-  expect(update(true)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat", "restart shell"])
+  // Stonks restarts the shell if it holds no change unsaved then.
+  expect(update(true)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat", "omarchy-shell grvc.stonks restartIfSaved"])
   // The update alone, as while a change is unsaved, never restarts.
   expect(update(true, false)).toEqual(["plugin update grvc.stonks", "the changes' pager: cat"])
+  // A second update, opened while the first waits on its question, says so
+  // and runs nothing: the first moving the folder would have had it ask for
+  // the restart whatever its own answer.
+  standIns(true)
+  writeFileSync(hold, "")
+  const first = Bun.spawn(C.update("grvc.stonks", true), { env, stdout: "ignore", stderr: "ignore" })
+  const until = (done, ms) => { for (const end = Date.now() + ms; !done() && Date.now() < end;) Bun.sleepSync(20); return done() }
+  expect(until(() => existsSync(asking), 3000)).toBe(true)
+  const second = run(C.update("grvc.stonks", true), env)
+  expect([second.code, second.out.trim()]).toEqual([1, "Stonks is already updating in another terminal."])
+  rmSync(hold)
+  expect(until(() => said().length === 3, 3000)).toBe(true)
+  first.kill()
+  expect(said()).toEqual(["plugin update grvc.stonks", "the changes' pager: cat", "omarchy-shell grvc.stonks restartIfSaved"])
 }))
 
 // The clipboard's owner is the stand-in wl-paste beside the stand-in curl

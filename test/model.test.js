@@ -2684,7 +2684,7 @@ test("at every open the calendars hold, a row's move counts from the close befor
 
 // The update check offers main's version only when it comes after the
 // running one, number by number.
-test("a version is newer number by number, and a manifest names one only whole", () => {
+test("a version is newer number by number, a manifest names one only whole, and main's is offered only to a clone of this repo", () => {
   const R = load("Release.js")
   expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
   expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
@@ -2692,6 +2692,13 @@ test("a version is newer number by number, and a manifest names one only whole",
   expect([R.isNewer("1.0.10", ""), R.isNewer("2.x", "1.0.9")]).toEqual([false, false])
   expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
   expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
+  // `omarchy plugin update` updates a clone from its origin: a clone made by
+  // any URL of this repo is offered main's version, a fork's never.
+  const config = url => `[core]\n\tbare = false\n[remote "origin"]\n\turl = ${url}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`
+  expect(["https://github.com/gmchande/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks",
+    "git@github.com:gmchande/omarchy-stonks.git", "https://github.com/someone/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks-fork.git"]
+    .map(url => R.updatesFromMain(config(url)))).toEqual([true, true, true, false, false])
+  expect(R.updatesFromMain('[remote "upstream"]\n\turl = https://github.com/gmchande/omarchy-stonks.git\n[remote "origin"]\n\turl = https://github.com/someone/omarchy-stonks.git\n')).toBe(false)
 })
 
 test("search finds the list's own stocks by symbol or by a word of their name, the symbol typed first", () => {

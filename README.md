@@ -399,8 +399,10 @@ charts stop.
   picture in `omasnap`, or without it in `tensaku-edit` or the editor
   `OMARCHY_SCREENSHOT_EDITOR` names.
 - Only when you ask for an update: `omarchy plugin update grvc.stonks` in
-  a terminal, then `omarchy restart shell` when `git` shows the update
-  moved Stonks' folder. After an update run elsewhere, `omarchy restart
+  a terminal, under `flock` so only one runs at a time. When `git` shows
+  the update moved Stonks' folder, `omarchy-shell grvc.stonks
+  restartIfSaved`, and Stonks runs `omarchy restart shell` unless it has
+  changes it hasn't saved. After an update run elsewhere, `omarchy restart
   shell` alone, when you click the footer.
 
 **Sites**, and nothing else:
@@ -433,7 +435,8 @@ charts stop.
   hour or more of the pre-market, and the same for a US stock or ETF you
   pause on in search.
 - `raw.githubusercontent.com` for the newest version number, as the shell
-  starts and once a day. To turn this off, add `"updateCheck": false` to
+  starts and once a day, when Stonks' folder is a clone of this repo. To
+  turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.
 
 Stonks asks for nothing while every screen is off. When a site turns it

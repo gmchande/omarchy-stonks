@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.Commons as Commons
+import "Release.js" as Release
 
 // `omarchy-shell ID <function>`, ID being the plugin's id, with or without
 // a pill on the bar. The panel's verbs go through the shell, which opens the
@@ -13,8 +14,20 @@ Item {
   property string pluginId: ""
   property var service: null
   property var windowHost: null
+  property var updates: null
 
   signal refreshed()
+
+  // An update's terminal asks this once the update moved the plugin's
+  // folder (`Commands.updateAndRestart`). The shell restarts only while no
+  // change is unsaved, as now, not as when the update was asked for: else
+  // the footer says so, and offers the restart once the change is saved.
+  function restartIfSaved() {
+    if (!root.service || !root.updates) return
+    var says = Release.footerNotice({ unreadable: root.service.listsUnreadable, saveFailed: root.service.saveFailed,
+      editsUnsaved: root.service.editsUnsaved }, "")
+    if (says.restartable) root.updates.restart()
+  }
 
   // IpcHandler offers its every property and signal over IPC, so what it
   // is wired to lives on the item around it. Where the shell answers
@@ -44,5 +57,7 @@ Item {
 
     function toggleWindow(): void { if (root.windowHost) root.windowHost.toggle() }
     function openWindow(payloadJson: string): void { if (root.windowHost) root.windowHost.open(payloadJson) }
+
+    function restartIfSaved(): void { root.restartIfSaved() }
   }
 }

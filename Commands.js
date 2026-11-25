@@ -343,27 +343,23 @@ function chimePlayer(names, folder) {
     + "( timeout -k 1 2 pw-play --media-role Notification --latency 30ms \"$1/$name\" & ) ;; esac; done", "sh", folder]
 }
 
-// The update that restarts the shell: in a terminal Omarchy opens, which
-// shows what changes and asks, and only when the plugin's folder moved. Git
-// shows the changes for it, and runs here without its pager, which would
-// hold a long list until q is pressed with nothing saying so. The
-// launcher joins its arguments into a `bash -c` script, so the last one is
-// shell code.
-function updateAndRestart(pluginId) {
+// The update, in a terminal Omarchy opens, which shows what changes and
+// asks; Git shows the changes for it, and runs here without its pager,
+// which would hold a long list until q is pressed with nothing saying so.
+// One runs at a time: a second, opened while the first waits on its
+// question, would see the first move the folder. With `restart`, and only
+// when the plugin's folder moved, it asks Stonks to restart the shell,
+// which Stonks does only while it holds no change unsaved
+// (`IpcTarget.restartIfSaved`): one made while the terminal waits may not
+// have saved. Without, Stonks holds what a restart would lose. The launcher
+// joins its arguments into a `bash -c` script, so the last one is shell
+// code.
+function update(pluginId, restart) {
   return ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-    "p=$HOME/.config/omarchy/plugins/" + pluginId + "; was=$(git -C \"$p\" rev-parse HEAD);"
-    + " " + updating(pluginId) + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
-    + " && echo 'Restarting the shell…' && omarchy restart shell"]
-}
-
-// The update alone, in the same terminal, while Stonks holds what a restart
-// would lose.
-function update(pluginId) {
-  return ["omarchy", "launch", "floating", "terminal", "with", "presentation", updating(pluginId)]
-}
-
-function updating(pluginId) {
-  return "GIT_PAGER= omarchy plugin update " + pluginId
+    "p=$HOME/.config/omarchy/plugins/" + pluginId + "; exec 9< \"$p\" && flock -n 9"
+    + " || { echo 'Stonks is already updating in another terminal.'; exit 1; };"
+    + " was=$(git -C \"$p\" rev-parse HEAD); GIT_PAGER= omarchy plugin update " + pluginId
+    + (restart ? " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]] && omarchy-shell " + pluginId + " restartIfSaved" : "")]
 }
 
 // A paste's (`Field`): the clipboard's text, or the primary selection's, as

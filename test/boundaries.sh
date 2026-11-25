@@ -101,7 +101,7 @@ done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # `sh -c`, `bash -c` or Omarchy's terminal. Each here must be in the code
 # and the README, and each the README names must be here.
 programs="curl timeout setpriv stdbuf sh bash mkdir chmod mktemp ln rm dd head md5sum sed tail date pw-play pw-cat pw-dump
-  omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git"
+  omarchy-shell wl-copy wl-paste omarchy-notification-send omasnap tensaku-edit omarchy git flock"
 programs=$(tr -s ' \n' '\n' <<< "$programs" | sed '/^$/d' | sort -u)
 named=$(awk '/^\*\*Commands\*\*/,/^\*\*Sites\*\*/' README.md | rg -o '`[a-z][a-z0-9-]*' | tr -d '`' | sort -u)
 # A script's words at a command's place: its string pieces joined, each

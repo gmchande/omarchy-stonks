@@ -20,6 +20,8 @@ Harness {
   Stonks.Camera { id: camera }
   // Off until its step: the sounds' files, in the cache folder.
   Stonks.Sounds { id: sounds; files: service.files }
+  // What an update's terminal asks of Stonks (`omarchy-shell ID ...`).
+  Stonks.IpcTarget { id: ipc; service: service; updates: updates }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
   // A fresh start on the same file.
   Component { id: restart; Stonks.Service { pluginId: "grvc.stonks" } }
@@ -140,6 +142,27 @@ Harness {
         failed && unsaved && asked.indexOf("aren't saved") >= 0 && asked.indexOf("try again") >= 0 && landed()
           && within(3000, function() { return footer().indexOf("aren't saved") < 0 }),
         [failed, unsaved, asked, footer()].join(" | "))
+
+      // An update's terminal asks Stonks for the restart once the update
+      // moved the plugin's folder: with a change unsaved then, the shell
+      // isn't restarted; once the change is saved, it is.
+      var restarts = function() {
+        return harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/omarchy.log").split("\n")
+          .filter(function(line) { return line === "restart shell" }).length
+      }
+      var restartsBefore = restarts()
+      sh('chmod 500 "$2"')
+      service.setRange("1Y")
+      var lostSave = within(4000, function() { return service.saveFailed })
+      ipc.restartIfSaved()
+      var waitedForSave = !within(1000, function() { return restarts() > restartsBefore })
+      sh('chmod 700 "$2"')
+      clickFooter()
+      var savedThen = landed() && within(3000, function() { return !service.saveFailed })
+      ipc.restartIfSaved()
+      var restarted = within(3000, function() { return restarts() === restartsBefore + 1 })
+      harness.check("an update's restart waits while a change isn't saved, and goes once it is",
+        lostSave && waitedForSave && savedThen && restarted, [lostSave, waitedForSave, savedThen, restarted].join(" | "))
 
       // Lists a hand edit named oddly: a case twin, All, and none, the last
       // holding a symbol no other list or All holds, beside a key Stonks
