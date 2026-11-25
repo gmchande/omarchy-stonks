@@ -469,6 +469,11 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
+      // pill-sheet-day: an hour before the close, its price a minute old.
+      if (root.stateName === "pill-sheet-day") {
+        root.now = nestDay.session.regular.end - 3600
+        root.pillQuote = Object.assign({}, nestDay, { marketTime: root.now - 60 })
+      }
       // pill-sheet-night: JNJ on Sunday 25 October at 23:35, as the service
       // reads it: Friday's close and move on the pill, down, over Friday's
       // line and tonight's, and tonight's price, up, in its hover.
