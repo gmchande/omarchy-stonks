@@ -1197,6 +1197,8 @@ test("a letter says its key and Shift, never its text's case, and no key says an
   // Qt gives Alt+/ and Alt+[ their own text, and Ctrl+Shift+/ a "?".
   expect([typed({ key: 47, modifiers: ALT, text: "/" }), typed({ key: 91, modifiers: ALT, text: "[" }),
     typed({ key: 63, modifiers: CTRL | SHIFT, text: "?" })]).toEqual(["", "", ""])
+  // AltGr, which some layouts type [ and ] with, may come as Qt's group switch.
+  expect([91, 93].map(key => typed({ key, modifiers: 0x40000000, text: String.fromCharCode(key) }))).toEqual(["[", "]"])
 })
 
 test("a stock's day is asked for two days from its pre-market until its third bar, and past the bell until it trades, when Yahoo's day no longer holds the last session", () => {
@@ -2695,9 +2697,9 @@ test("a version is newer number by number, a manifest names one only whole, and 
   // `omarchy plugin update` updates a clone from its origin: a clone made by
   // any URL of this repo is offered main's version, a fork's never.
   const config = url => `[core]\n\tbare = false\n[remote "origin"]\n\turl = ${url}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`
-  expect(["https://github.com/gmchande/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks",
+  expect(["https://github.com/gmchande/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks", '"https://github.com/gmchande/omarchy-stonks.git"',
     "git@github.com:gmchande/omarchy-stonks.git", "https://github.com/someone/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks-fork.git"]
-    .map(url => R.updatesFromMain(config(url)))).toEqual([true, true, true, false, false])
+    .map(url => R.updatesFromMain(config(url)))).toEqual([true, true, true, true, false, false])
   expect(R.updatesFromMain('[remote "upstream"]\n\turl = https://github.com/gmchande/omarchy-stonks.git\n[remote "origin"]\n\turl = https://github.com/someone/omarchy-stonks.git\n')).toBe(false)
 })
 

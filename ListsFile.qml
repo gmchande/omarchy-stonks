@@ -70,18 +70,18 @@ Item {
     interval: 400
     onTriggered: root.writeSettled()
   }
-  function writeSettled(atOnce) {
-    if (root.ready && !root.unreadable) root.writeFile(root.fileSettings, atOnce)
+  function writeSettled() {
+    if (root.ready && !root.unreadable) root.writeFile(root.fileSettings)
   }
   // The footer's try again.
   function saveAgain() {
     settleWrite.stop()
     root.writeSettled()
   }
-  // The shell is going, and no read can land after: a change still waiting,
-  // for the wheel to rest or for a read out, is written now, as the last
-  // read allows.
-  Component.onDestruction: if (settleWrite.running || root.writeOwed) root.writeSettled(true)
+  // The shell is going: the wheel's change is written now, unless a read
+  // is out. That read can't land any more, and the file it reads may be one
+  // Stonks can't read, or another copy's newer one, so the change goes.
+  Component.onDestruction: if (settleWrite.running) root.writeSettled()
 
   // Says when the file changes, and reads nothing.
   FileView {
@@ -176,7 +176,12 @@ Item {
       else if (gone) root.takeMissingFile()
       return
     }
-    if (root.making) return
+    // A read while the file is being made is no answer: a write it held
+    // waits for the next.
+    if (root.making) {
+      root.writeOwed = owed
+      return
+    }
     root.staleTexts = null
     root.saveFailed = false
     root.takeUnreadableFile()
@@ -267,13 +272,13 @@ Item {
   function tooLarge(settings) {
     return Commands.fileBytes(JSON.stringify(settings, null, 2) + "\n") > root.cap
   }
-  function writeFile(settings, atOnce) {
+  function writeFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
     if (Commands.fileBytes(body) > root.cap) {
       root.saveFailed = true
       return
     }
-    if (reader.out && !atOnce) {
+    if (reader.out) {
       root.writeOwed = true
       return
     }

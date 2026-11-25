@@ -5,8 +5,9 @@
 var MANIFEST_URL = "https://raw.githubusercontent.com/gmchande/omarchy-stonks/main/manifest.json"
 
 // A clone `omarchy plugin update` moves to main: one whose origin, in its
-// `.git/config`, is this repo on GitHub, by any URL git takes for it. A
-// fork's clone updates from the fork, so main's version isn't its to offer.
+// `.git/config`, is this repo on GitHub, by any URL git takes for it,
+// quoted or not. A fork's clone updates from the fork, so main's version
+// isn't its to offer.
 function updatesFromMain(config) {
   var origin = false
   return String(config).split("\n").some(function(line) {
@@ -15,7 +16,7 @@ function updatesFromMain(config) {
       origin = /^remote\s+"origin"$/i.test(section[1].trim())
       return false
     }
-    var url = origin ? line.match(/^\s*url\s*=\s*(\S+)\s*$/i) : null
+    var url = origin ? line.match(/^\s*url\s*=\s*"?([^"\s;#]+)"?\s*(?:[;#].*)?$/i) : null
     return !!url && /github\.com[:\/]gmchande\/omarchy-stonks(\.git)?\/?$/i.test(url[1])
   })
 }
