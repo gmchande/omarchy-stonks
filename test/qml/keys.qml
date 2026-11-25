@@ -472,6 +472,18 @@ Harness {
       press("Esc")
       harness.check("in a list's rename, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
         undoneRename === undoWanted && b.managingLists, undoneRename + " | managing " + b.managingLists)
+      // Enter saves a rename, once: the list takes the name, and the rows
+      // behind the field take no Enter, so no rename opens again.
+      press("⏎")
+      var renameOpen = typing("renameField")
+      type("crypto")
+      press("⏎")
+      var manage = harness.find(b, "manageLists")
+      var saved = within(2000, function() { return service.lists.some(function(l) { return l.name === "crypto" }) })
+      var once = saved && !within(500, function() { return manage.renaming })
+      harness.check("in Manage lists Enter saves a rename once, and the rows behind it take no Enter",
+        renameOpen && saved && once && b.managingLists,
+        [renameOpen, saved, once, b.managingLists, service.lists.map(function(l) { return l.name }).join(",")].join(" "))
       press("Delete")
       press("⏎")
       var gone = within(2000, function() { return service.lists.length === 1 && service.listName === "" })

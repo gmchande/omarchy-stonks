@@ -44,7 +44,7 @@ OverRows {
     showCursor()
     if (problem !== "") Qt.callLater(showProblem)
   }
-  readonly property string typedName: renaming ? nameField.text : ""
+  readonly property string typedName: renaming ? newName.text : ""
 
   readonly property int itemHeight: Style.space(30)
   function rowSize() { return { pitch: itemHeight, height: itemHeight } }
@@ -68,7 +68,7 @@ OverRows {
   // Closed, it gives up its rename field's keys too, and a lifted list
   // drops where it was.
   onClosed: {
-    nameField.focus = false
+    newName.release()
     scroll.cancelFlick()
     reorder.cancel()
   }
@@ -77,7 +77,6 @@ OverRows {
     renaming = false
     confirming = false
     problem = ""
-    nameField.focus = false
     cursor = choices.length > 1 ? 1 : 0
     scroll.contentY = 0
   }
@@ -116,13 +115,9 @@ OverRows {
     pendingName = choices[index].name
     confirming = false
     problem = ""
-    nameField.text = choices[index].name
+    newName.text = choices[index].name
     renaming = true
-    Qt.callLater(function() {
-      if (!root.active || !root.renaming) return
-      nameField.forceActiveFocus()
-      nameField.selectAll()
-    })
+    newName.edit(true)
   }
 
   // Back after a close that couldn't save the rename.
@@ -130,26 +125,24 @@ OverRows {
     var at = choices.map(function(c) { return c.name }).indexOf(name)
     if (at < 1) return
     startRenaming(at)
-    nameField.text = text
+    newName.text = text
     problem = reason
   }
 
-  // The field drops its focus first, or the scope hands it straight back.
   function stopEditing() {
     renaming = false
     confirming = false
     problem = ""
-    nameField.focus = false
-    if (root.active) root.forceActiveFocus()
+    newName.release()
   }
 
   function saveName() {
-    renameRequested(pendingName, nameField.text)
+    renameRequested(pendingName, newName.text)
   }
 
   // An emptied field keeps the old name.
   function keepName() {
-    if (nameField.text.trim() === "") stopEditing()
+    if (newName.text.trim() === "") stopEditing()
     else saveName()
   }
 
@@ -315,7 +308,7 @@ OverRows {
           readonly property bool showsActions: named && !editing && !asking && isCursor && !lifted
           readonly property bool lifted: named && name === root.reorder.lifted
           width: column.width
-          height: root.itemHeight * (editing && root.problem !== "" ? 2 : 1)
+          height: root.itemHeight
           visible: index >= 0
 
           // Where the list sits while another is dragged (`Rows.slotOf`), and
@@ -499,75 +492,30 @@ OverRows {
               onActivated: root.confirming = false
             }
           }
-
-          Text {
-            visible: entry.editing && root.problem !== ""
-            y: root.itemHeight
-            x: root.inset
-            width: parent.width - x
-            height: root.itemHeight
-            verticalAlignment: Text.AlignVCenter
-            textFormat: Text.PlainText
-            text: root.problem
-            color: root.look.foreground
-            font.family: root.look.fontFamily
-            font.pixelSize: Style.font.caption
-            elide: Text.ElideRight
-          }
         }
       }
     }
 
-    // Clear of the cursor's bar, its words where the name's were.
-    Field {
-      id: nameField
-      objectName: "renameField"
-      visible: root.renaming
-      x: Style.space(6)
+    // Over the cursor's row, clear of its bar, its words where the name's
+    // were; under it, why the name was refused, the rows below a row lower.
+    InlineNameRow {
+      id: newName
       y: root.cursor * root.itemHeight
-      width: renameChoices.x - x - Style.space(12)
-      leftPadding: root.inset - x
-      height: root.itemHeight
-      verticalPadding: 0
-      retro: root.look.retro
-      foreground: root.look.foreground
-      dim: root.look.dim
-      font.family: root.look.fontFamily
-      font.pixelSize: Style.font.bodySmall
+      width: column.width
+      host: root
+      look: root.look
+      editing: root.renaming
+      problem: root.problem
+      action: "SAVE"
+      lineHeight: root.itemHeight
+      textX: root.inset
+      fieldX: Style.space(6)
+      fieldGap: Style.space(12)
+      actionsRight: root.inset
+      fieldName: "renameField"
       onTextChanged: root.problem = ""
-      // Enter is taken here, not on accepted: the press would go on to the
-      // view, which by then has the keys back and would rename again.
-      Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Escape) { root.stopEditing(); event.accepted = true }
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          event.accepted = true
-          root.saveName()
-        }
-      }
-    }
-
-    Row {
-      id: renameChoices
-      visible: root.renaming
-      anchors.right: parent.right
-      anchors.rightMargin: root.gutter + root.inset
-      y: root.cursor * root.itemHeight
-      height: root.itemHeight
-      spacing: Style.space(14)
-
-      ListAction {
-        look: root.look
-        anchors.verticalCenter: parent.verticalCenter
-        text: "SAVE"
-        enterTakes: true
-        onActivated: root.saveName()
-      }
-      ListAction {
-        look: root.look
-        anchors.verticalCenter: parent.verticalCenter
-        text: "CANCEL"
-        onActivated: root.stopEditing()
-      }
+      onSubmitted: root.saveName()
+      onCancelled: root.stopEditing()
     }
   }
 }
