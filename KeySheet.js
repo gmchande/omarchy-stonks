@@ -12,7 +12,7 @@ function sheet() {
         { key: "Home End", does: "First or last row" },
         { key: "⏎", does: "Show the row's chart" },
         { key: "a /", does: "Find or add a symbol" },
-        { key: "Del ⌫", does: "Remove the selected row" },
+        { key: "Del ⌫", does: "Remove the row" },
         { key: "Ctrl+Z", does: "Undo a removal" },
         { key: "r", does: "Refresh the prices" }
       ]},
