@@ -1414,12 +1414,16 @@ test("outside trading an old close is normal, but a failed refresh still shows",
   expect(M.freshness(failed, closeQuote, night, 0).state).toBe("failed")
   // So does Robinhood's while a night trades: a US stock's trades that
   // failed, on its first ask or after an answer, leave unknown whether it
-  // traded, whether or not it trades at night; so does a failed quote. By
+  // traded, whether or not it trades at night; so does a failed quote of
+  // one that trades at night. A quote that failed on a night BLDP traded
+  // says nothing once its trades show none, as it is no longer asked. By
   // day Yahoo's price is the newest, and nothing is said.
+  const cal = M.overnightMarket(calendars)
+  const nightly = { status: "ok", bars: [{ t: night - 600, p: 10, s: "overnight" }], through: night - 300, at: night - 60 }
   const nights = { AAPL: { status: "failed", bars: [], through: null, at: night - 60 }, MSFT: { status: "failed", bars: [], through: night - 3600, at: night - 60 },
-    NVDA: { status: "ok", bars: [], through: null, at: night - 60 }, JNJ: { status: "ok", bars: [], through: night - 600, at: night - 60 } }
-  const lastTrades = { NVDA: { status: "failed", trade: null, at: night - 30 } }
-  expect([M.nightFailures(nights, lastTrades, true), M.nightFailures(nights, lastTrades, false)])
+    NVDA: nightly, JNJ: { status: "ok", bars: [], through: night - 600, at: night - 60 }, BLDP: { status: "ok", bars: [], through: night - 300, at: night - 60 } }
+  const lastTrades = { NVDA: { status: "failed", trade: null, at: night - 30 }, BLDP: { status: "failed", trade: null, at: night - DAY } }
+  expect([M.nightFailures(nights, lastTrades, true, cal), M.nightFailures(nights, lastTrades, false, cal)])
     .toEqual([{ AAPL: true, MSFT: true, NVDA: true }, {}])
   const robinhoodFailed = M.freshness(ok, closeQuote, night, 0, false, null, true)
   expect([robinhoodFailed.state, M.freshnessWarns(robinhoodFailed), M.freshnessText(robinhoodFailed, q)]).toEqual(["failed", true, "REFRESH FAILED · AS OF 16:00"])
@@ -1896,14 +1900,28 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
   const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
   const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }
-  const joined = M.joinHour(earlier, overnight(hour, ["NEST"]).NEST)
+  const joined = M.joinTrades(earlier, overnight(hour, ["NEST"]).NEST)
   const day = overnight(later, ["NEST"]).NEST
   expect(joined.through).toBe(day.through)
   expect(joined.bars.filter(b => b.t >= day.from)).toEqual(day.bars)
   // The older trades stay: a chart of the day before still has them.
   expect(joined.bars[0]).toEqual(earlier.bars[0])
   // An hour that answers nothing keeps the trades in hand.
-  expect(M.joinHour(earlier, { bars: [], from: null, through: null })).toEqual({ bars: earlier.bars, through: earlier.through })
+  expect(M.joinTrades(earlier, { bars: [], from: null, through: null })).toEqual({ bars: earlier.bars, through: earlier.through })
+  // A day asked again joins on to the trades in hand too, so a thin stock
+  // keeps the night before that the day no longer reaches. BLDP traded on
+  // Wednesday night until 00:20, and, its Thursday night's trades taken
+  // out, not since: a day asked at 00:35 on Friday reaches back only to
+  // 00:35 on Thursday, and alone would put BLDP to sleep mid-night.
+  const cal = M.overnightMarket(calendars)
+  const thin = traded("night-2026-11-19-2216", fixture("moments/night-2026-11-19-2216/robinhood-day.json").results.map(r => r.symbol)).BLDP
+  const quiet = { ...thin, bars: thin.bars.filter(b => !(b.s === "overnight" && b.t >= at("2026-11-19", "20:00"))) }
+  const from = at("2026-11-20", "00:35") - DAY
+  const again = { bars: quiet.bars.filter(b => b.t >= from), from, through: at("2026-11-20", "00:30") }
+  expect([M.tradesAtNight(again, cal), M.tradesAtNight(M.keptTrades(quiet, again, "day"), cal)]).toEqual([false, true])
+  // With none in hand, a day stands as it came, and an hour is left
+  // unanswered.
+  expect([M.keptTrades(undefined, again, "day"), M.keptTrades(undefined, again, "hour")]).toEqual([{ bars: again.bars, through: again.through }, null])
   // Ten minutes after the newest slot in hand, the hour reaches back past
   // it; an hour after, it would leave slots out, so the day is asked again,
   // as it is for a listing never answered.
@@ -2001,7 +2019,7 @@ test("the trades Stonks keeps for a listing hold every one its 1D chart draws, h
   let drawn = 0
   for (const { set, parsed } of sets) {
     for (const [symbol, answer] of Object.entries(parsed)) {
-      kept[symbol] = kept[symbol] ? M.joinHour(kept[symbol], answer) : answer
+      kept[symbol] = M.keptTrades(kept[symbol], answer, "day")
       sent[symbol] = sent[symbol] || new Map()
       for (const bar of answer.bars) sent[symbol].set(bar.t, bar)
     }

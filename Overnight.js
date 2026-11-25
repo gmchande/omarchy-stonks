@@ -83,7 +83,7 @@ function overnightBatches(symbols, entries, now) {
 }
 
 // Past these, an answer is bad (`Format.fetchedList`). MOST_TRADES also caps
-// the trades kept (`joinHour`): a 1D chart draws at most 336 slots.
+// the trades kept (`joinTrades`): a 1D chart draws at most 336 slots.
 var MOST_RESULTS = 2 * HOUR_BATCH
 var MOST_TRADES = 1000
 
@@ -171,14 +171,25 @@ function overnightAnswer(result, symbol) {
   return out
 }
 
-// A bar still forming may be among the hour's slots, so they replace what
+// A bar still forming may be among an answer's slots, so they replace what
 // was kept from their first on.
-function joinHour(had, hour) {
-  if (hour.from === null) return { bars: had.bars, through: had.through }
+function joinTrades(had, answer) {
+  if (answer.from === null) return { bars: had.bars, through: had.through }
   return {
-    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_TRADES),
-    through: had.through === null || hour.through > had.through ? hour.through : had.through
+    bars: had.bars.filter(function(b) { return b.t < answer.from }).concat(answer.bars).slice(-MOST_TRADES),
+    through: had.through === null || answer.through > had.through ? answer.through : had.through
   }
+}
+
+// What a listing keeps of an answer: joined on to the trades in hand, so a
+// day asked again keeps the night before that it no longer reaches, and the
+// listing keeps trading at night (`tradesAtNight`). An hour can't stand for
+// a day: one with none in hand, whose trades went meanwhile
+// (`Service.forgetLeft`), is left unanswered.
+function keptTrades(had, answer, span) {
+  if (!answer) return null
+  if (had) return joinTrades(had, answer)
+  return span === "hour" ? null : { bars: answer.bars, through: answer.through }
 }
 
 function sameBars(a, b) {
@@ -314,17 +325,18 @@ function nightTrades(quote, atNight, t, calendars) {
 }
 
 // The listings whose newest price may be a trade Robinhood failed to send,
-// while the night trades (`open`): those whose trades or quote failed, so
-// Stonks can't tell whether they traded. `nights` and `lastTrades` are
-// Robinhood's entries.
-function nightFailures(nights, lastTrades, open) {
+// while the night trades (`open`): those whose trades failed, so Stonks
+// can't tell whether they traded, and those that trade at night whose
+// quote failed. A quote is asked only of those (`Asks.lastTradeListings`),
+// so one left from a night a listing traded counts no more once it
+// doesn't. `nights` and `lastTrades` are Robinhood's entries, `cal` the
+// night's calendar.
+function nightFailures(nights, lastTrades, open, cal) {
   var out = {}
   if (!open) return out
-  var mark = function(entries) {
-    for (var symbol in entries) if (entries[symbol].status === "failed") out[symbol] = true
-  }
-  mark(nights)
-  mark(lastTrades)
+  for (var symbol in nights) if (nights[symbol].status === "failed") out[symbol] = true
+  for (var quoted in lastTrades)
+    if (lastTrades[quoted].status === "failed" && tradesAtNight(nights[quoted], cal)) out[quoted] = true
   return out
 }
 

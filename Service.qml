@@ -672,7 +672,7 @@ Item {
     var night = cal ? Overnight.nightAt(cal, now) : null
     return !!night && night.open
   }
-  readonly property var nightFailed: Overnight.nightFailures(overnightFeed.entries, lastTradeFeed.entries, nightTrading)
+  readonly property var nightFailed: Overnight.nightFailures(overnightFeed.entries, lastTradeFeed.entries, nightTrading, Overnight.overnightMarket(calendars))
   // The feeds themselves, for whoever waits until no run is out.
   readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed, listDates: listDateFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked each

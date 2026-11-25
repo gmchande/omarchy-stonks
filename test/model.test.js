@@ -2272,7 +2272,7 @@ test("a hostile Robinhood's hours keep at most a day's request's trades, and tim
   const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
     ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
   let kept = hour(0)
-  for (let k = 1; k <= 100; k++) kept = M.joinHour(kept, hour(k))
+  for (let k = 1; k <= 100; k++) kept = M.joinTrades(kept, hour(k))
   expect(kept.bars.length).toBe(M.MOST_TRADES)
   expect(kept.bars.slice(-150)).toEqual(hour(100).bars)
   expect(M.overnightSpan(kept, T0)).toBe("day")
