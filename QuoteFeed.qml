@@ -281,11 +281,14 @@ Item {
     if (more) landTimer.start()
   }
 
+  // A listing's night, whose bars in Yahoo's answers are set aside (`Quote.answerBars`).
+  function nightOf(listing) { return Overnight.yahooNight(listing, calendars) }
+
   function readAnswer(answer, request) {
     if (answer.kind !== "ok" || !request) return true
     if (!request.spark) {
       var quote = null
-      try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges, root.stamp()) } catch (e) { quote = null }
+      try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges, root.stamp(), root.nightOf) } catch (e) { quote = null }
       answer.body = null
       answer.outcomes = {}
       answer.outcomes[request.symbols[0]] = quote ? { quote: quote, unjudged: false } : null
@@ -303,7 +306,7 @@ Item {
     var outcome = null
     try {
       outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
-        : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp())
+        : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp(), root.nightOf)
     } catch (e) { outcome = null }
     answer.outcomes[symbol] = outcome
     if (answer.done < request.symbols.length) return false

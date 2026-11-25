@@ -479,6 +479,52 @@ test("a spark day takes its open from the chart of the same session, and waits f
   expect([tuesday.unjudged, tuesday.quote.dayOpen, M.change(tuesday.quote, 105, "open").pct]).toEqual([true, null, null])
 })
 
+test("a price Yahoo stamps in a US stock's night is set aside as its answer is read, so the night stays Robinhood's and the rows keep the day", () => {
+  // Yahoo sends none today; from 6 December 2026 its answers may. Monday
+  // 30 November: a pre-market from 04:00, a session, an after hours whose
+  // last bar, 19:55's, the night's first opens back from, then the night's
+  // bars from 20:00 to 03:55, and Tuesday's pre-market from 04:00.
+  const mon = c => at("2026-11-30", c)
+  const tue = c => at("2026-12-01", c)
+  const est = (start, end) => ({ start, end, gmtoffset: -18000, timezone: "EST" })
+  const day = d => ({ pre: est(d("04:00"), d("09:30")), regular: est(d("09:30"), d("16:00")), post: est(d("16:00"), d("20:00")) })
+  const sent = [[mon("04:00"), 99.5], [mon("09:30"), 100.2], [mon("09:35"), 100.4], [mon("15:55"), 100], [mon("19:50"), 100], [mon("19:55"), 101],
+    [mon("20:00"), 100], [mon("20:05"), 100.6], [mon("21:00"), 100.8], [mon("23:55"), 101.2], [tue("03:55"), 101.4], [tue("04:00"), 101.5], [tue("04:05"), 101.6]]
+  const answer = (until, days, exchangeName = "NMS", withOpens = true) => {
+    const bars = sent.filter(([t]) => t <= until)
+    const quote = { close: bars.map(([, p]) => p) }
+    if (withOpens) quote.open = bars.map(([t, p], i) => t === mon("20:00") ? 100 : i > 0 ? bars[i - 1][1] : p)
+    const list = name => days.map(d => [day(d)[name]])
+    return { meta: { symbol: "NITE", instrumentType: "EQUITY", exchangeName, priceHint: 2, gmtoffset: -18000, range: days.length > 1 ? "2d" : "1d",
+      regularMarketPrice: 100, regularMarketTime: mon("16:00"), chartPreviousClose: 99, previousClose: 99, regularMarketDayHigh: 100.6, regularMarketDayLow: 99.8,
+      currentTradingPeriod: day(days.at(-1)), tradingPeriods: { pre: list("pre"), regular: list("regular"), post: list("post") } },
+      timestamp: bars.map(([t]) => t), indicators: { quote: [quote] } }
+  }
+  const nightOf = listing => M.yahooNight(listing, calendars)
+  const times = q => q.points.map(p => p.t)
+  const monday = [mon("04:00"), mon("09:30"), mon("09:35"), mon("15:55"), mon("19:50"), mon("19:55")]
+  // At 21:05 the day is Yahoo's to 19:55, its last after-hours price kept,
+  // and the night Robinhood's alone: one price a slot.
+  const evening = M.parseChart({ chart: { result: [answer(mon("21:00"), [mon])] } }, [], mon("21:05"), nightOf)
+  expect(times(evening)).toEqual(monday)
+  const robinhood = [{ t: mon("20:00"), p: 100.1, s: "overnight" }, { t: mon("20:05"), p: 100.3, s: "overnight" }]
+  const { day: drawn, latest } = M.dayChart(evening, { bars: robinhood, through: mon("20:05") }, calendars, mon("21:05"))
+  expect(drawn.points.filter(p => p.t >= mon("19:55")).map(p => [p.t, p.p, p.s])).toEqual([[mon("19:55"), 101, "post"]].concat(robinhood.map(b => [b.t, b.p, b.s])))
+  // The newest price is Robinhood's night trade, so the rows and the pill
+  // keep Monday's close and move until 04:00.
+  const newest = M.newestTrade(evening, latest, calendars, drawn)
+  expect([newest.p, newest.phase, M.keepsDay(newest)]).toEqual([100.3, "overnight", true])
+  // The rows' spark answer reads the same.
+  const spark = M.sparkQuote(answer(mon("21:00"), [mon], "NMS", false), evening.verdict, [], mon("21:05"), nightOf)
+  expect(times(spark.quote)).toEqual(monday)
+  // At 05:00 the two-day answer keeps Tuesday's pre-market from 04:00.
+  const dawn = M.parseChart({ chart: { result: [answer(tue("04:05"), [mon, tue])] } }, [], tue("05:00"), nightOf)
+  expect(times(dawn)).toEqual(monday.concat([tue("04:00"), tue("04:05")]))
+  // A stock abroad has no night here, so nothing is set aside.
+  const london = M.parseChart({ chart: { result: [answer(mon("21:00"), [mon], "LSE")] } }, [], mon("21:05"), nightOf)
+  expect(times(london)).toContain(mon("21:00"))
+})
+
 test("a screenshot's file name carries only its symbol's letters, digits, dots, and dashes, so no symbol names another folder", () => {
   expect(M.fileSymbol("AAPL")).toBe("aapl")
   expect(M.fileSymbol("^GSPC")).toBe("gspc")

@@ -442,18 +442,25 @@ Harness {
     return out
   }
 
+  // Yahoo's chart answer read as the feed reads it, its night set aside
+  // (`QuoteFeed.nightOf`).
+  function readChart(json, centExchanges, receivedAt) {
+    return Quote.parseChart(json, centExchanges, receivedAt, function(listing) { return Overnight.yahooNight(listing, stub.calendars) })
+  }
+
   function load() {
-    var aapl = Quote.parseChart(JSON.parse(aaplFile.text()))
-    var nestDay = Quote.parseChart(JSON.parse(nestDayFile.text()))
-    var spyDay = Quote.parseChart(JSON.parse(spyDayFile.text()))
-    var shop = Quote.parseChart(JSON.parse(shopFile.text()))
+    stub.calendars = JSON.parse(calendarFile.text())
+    var aapl = root.readChart(JSON.parse(aaplFile.text()))
+    var nestDay = root.readChart(JSON.parse(nestDayFile.text()))
+    var spyDay = root.readChart(JSON.parse(spyDayFile.text()))
+    var shop = root.readChart(JSON.parse(shopFile.text()))
     var history = History.parseHistory(JSON.parse(historyFile.text()), "1Y")
     var nestJson = JSON.parse(nestWeekFile.text())
     // A day cut from the week's answer, saved that Friday evening: its
     // current period is that day, its trading periods the week's.
     var nestCut = JSON.parse(nestWeekFile.text())
     delete nestCut.chart.result[0].meta.tradingPeriods
-    var nest = Quote.parseChart(nestCut)
+    var nest = root.readChart(nestCut)
     nest.prevClose = nestJson.chart.result[0].meta.previousClose
     nest.points = nest.points.filter(function(point) { return point.t >= nest.session.pre.start })
     var nestWeek = History.parseHistory(nestJson, "1W")
@@ -463,7 +470,6 @@ Harness {
     root.savedFigures = { AAPL: root.figures("aapl"), NEST: root.figures("nest"), "SHOP.TO": root.figures("shop-to"),
       "7203.T": root.figures("7203-t"), "SHEL.L": root.figures("shel-l") }
     root.savedRates = { USDCAD: root.rate("USDCAD"), USDGBP: root.rate("USDGBP") }
-    stub.calendars = JSON.parse(calendarFile.text())
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
@@ -486,7 +492,7 @@ Harness {
         }
         var nightAt = nightState[1] ? Calendar.epochAt(stub.calendars.calendars.US, nightState[2], nightState[3] + ":" + nightState[4])
           : Calendar.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
-        var listing = Quote.parseChart(moment(nightState[5] || "jnj"), Calendar.centExchanges(stub.calendars), nightAt)
+        var listing = root.readChart(moment(nightState[5] || "jnj"), Calendar.centExchanges(stub.calendars), nightAt)
         var day = moment("robinhood-day")
         var asked = day.results.map(function(r) { return r.symbol })
         var printed = robinhoodAnswers(day, asked)
@@ -513,7 +519,7 @@ Harness {
           return text
         }
         var at = Calendar.epochAt(stub.calendars.calendars.US, "2026-11-19", ipo[1] + ":" + ipo[2])
-        var ant = Quote.parseChart(load("ant"), Calendar.centExchanges(stub.calendars), at)
+        var ant = root.readChart(load("ant"), Calendar.centExchanges(stub.calendars), at)
         var instruments = load("robinhood-instruments")
         var prints = load("robinhood-day")
         root.ipoPill = { quote: Object.assign({}, ant, { listDate: Overnight.listDates(instruments, ["ANT"]).ANT }),
@@ -533,7 +539,7 @@ Harness {
       }
       stub.symbols = ["AAPL", "SHEL.L", "BTC-USD"]
       stub.shown = stub.symbols.slice()
-      stub.quotes = { AAPL: aapl, "SHEL.L": Quote.parseChart(dayOf("shel-l-day")), "BTC-USD": Quote.parseChart(dayOf("btc-usd-day")) }
+      stub.quotes = { AAPL: aapl, "SHEL.L": root.readChart(dayOf("shel-l-day")), "BTC-USD": root.readChart(dayOf("btc-usd-day")) }
       root.now = stub.quotes[held].marketTime + 120
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now }, "SHEL.L": { status: "ok", receivedAt: root.now }, "BTC-USD": { status: "ok", receivedAt: root.now } }
       stub.featuredSymbol = held
@@ -587,7 +593,7 @@ Harness {
     }
 
     if (root.fill) {
-      var days = { up: ["SPY", spyDay], down: ["AAPL", Quote.parseChart(JSON.parse(aaplDownFile.text()))], cross: ["NEST", nestDay] }
+      var days = { up: ["SPY", spyDay], down: ["AAPL", root.readChart(JSON.parse(aaplDownFile.text()))], cross: ["NEST", nestDay] }
       var fillQuotes = {}, fillEntries = {}
       ;["up", "down", "cross"].forEach(function(day) {
         fillQuotes[days[day][0]] = days[day][1]
@@ -646,7 +652,7 @@ Harness {
       var ranges = {}
       var answers = {}
       var parsed = function(answer, held) {
-        var quote = CarriedClose.carryClose(held || null, Quote.parseChart(answer, Calendar.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
+        var quote = CarriedClose.carryClose(held || null, root.readChart(answer, Calendar.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
         return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
       }
       listed.forEach(function(s) {
@@ -768,7 +774,7 @@ Harness {
       if (root.overnight.own) {
         var own = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         own.path = fixtureDir + "/" + root.overnight.own.file + ".json"
-        quotes[root.overnight.symbol] = Quote.parseChart(JSON.parse(own.text()))
+        quotes[root.overnight.symbol] = root.readChart(JSON.parse(own.text()))
         own.destroy()
         root.now = root.overnight.own.at
       }
@@ -805,7 +811,7 @@ Harness {
     if (root.closure) {
       var closed = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
       closed.path = fixtureDir + "/" + root.closure.file + ".json"
-      var closedQuote = Quote.parseChart(JSON.parse(closed.text()))
+      var closedQuote = root.readChart(JSON.parse(closed.text()))
       closed.destroy()
       root.now = Calendar.epochAt(Calendar.calendarFor(stub.calendars, closedQuote), root.closure.date, "12:00")
       stub.symbols = [root.closure.symbol, "AAPL"]
@@ -828,7 +834,7 @@ Harness {
       stub.symbols = Object.keys(listed)
       stub.shown = stub.symbols.slice()
       var dayQuotes = {}
-      stub.symbols.forEach(function(symbol) { dayQuotes[symbol] = Quote.parseChart(saved(listed[symbol] + "-day")) })
+      stub.symbols.forEach(function(symbol) { dayQuotes[symbol] = root.readChart(saved(listed[symbol] + "-day")) })
       root.now = dayQuotes.RGTI.marketTime + 120
       var answered = {}
       stub.symbols.forEach(function(symbol) { answered[symbol] = { status: "ok", receivedAt: root.now } })
@@ -856,7 +862,7 @@ Harness {
       var states = {}
       for (var n = 0; n < fixture.quotes.length; n++) {
         var entry = fixture.quotes[n]
-        var chart = entry.response ? Quote.parseChart(entry.response) : null
+        var chart = entry.response ? root.readChart(entry.response) : null
         var name = chart ? chart.symbol : entry.symbol
         names.push(name)
         states[name] = entry.status

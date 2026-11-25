@@ -63,8 +63,8 @@ function sparkResults(json) {
 // spark shows what that verdict didn't see: a jump past its settled bars once
 // a new bar is whole, a bar changed or filled in, or the session opened since.
 // Only a chart answer can say whether that is a stray, or what the open was.
-function sparkQuote(day, verdict, centExchanges, receivedAt) {
-  var quote = parseChart({ chart: { result: [day] } }, centExchanges, receivedAt)
+function sparkQuote(day, verdict, centExchanges, receivedAt, nightOf) {
+  var quote = parseChart({ chart: { result: [day] } }, centExchanges, receivedAt, nightOf)
   if (!quote) return null
   var pts = quote.points
   var tick = answerTick(day.meta, pts.map(function(p) { return { c: p.p } }), centExchanges)
@@ -250,7 +250,9 @@ function answerTick(meta, bars, centExchanges) {
 
 // Null for a malformed answer. Yahoo never sends bars out of time order,
 // and one would land off the chart's grid. `receivedAt` is when it came.
-function parseChart(json, centExchanges, receivedAt) {
+// `nightOf` gives a listing's night (`Overnight.yahooNight`), whose bars
+// are set aside (`answerBars`).
+function parseChart(json, centExchanges, receivedAt, nightOf) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -283,7 +285,11 @@ function parseChart(json, centExchanges, receivedAt) {
   // counts from its session.
   if (!periods.regular || (from !== null && !days[chosen - 1].regular)) return null
   var series = { o: opens, c: closes, v: volumes, h: highs, l: lows }
-  var bars = answerBars(timestamps, series, from)
+  var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
+  var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
+  var exchange = exchangeOf(meta)
+  var night = nightOf ? nightOf({ symbol: symbol, exchange: exchange, instrumentType: instrumentType }) : null
+  var bars = answerBars(timestamps, series, from, night)
   if (!bars) return null
   var tick = answerTick(meta, bars, centExchanges)
   var offered = offerTimes(meta, bars)
@@ -298,15 +304,13 @@ function parseChart(json, centExchanges, receivedAt) {
   // isn't.
   var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
   var firstRegular = regular && !ahead ? firstRegularBar(kept, regular) : null
-  var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
-  var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   var out = {
     symbol: symbol,
     // Yahoo's short name comes in capitals for some listings, cut at 31.
     name: Format.fetchedText(meta.longName, Format.MOST_NAME) || Format.fetchedText(meta.shortName, Format.MOST_NAME) || symbol,
     // Yahoo can name no currency, as ^STOXX50E's answer did.
     currency: Format.fetchedText(meta.currency, Format.MOST_CODE),
-    exchange: exchangeOf(meta),
+    exchange: exchange,
     timezoneName: Format.fetchedText(meta.exchangeTimezoneName, Format.MOST_CODE),
     gmtoffset: isOffset(meta.gmtoffset) ? meta.gmtoffset : 0,
     // "EDT", "JST": the zone's short name at that offset.
@@ -347,7 +351,7 @@ function parseChart(json, centExchanges, receivedAt) {
       post: index ? null : periodOf(current.post)
     },
     next: next && !index ? { pre: periodOf(next.pre), regular: periodOf(next.regular), post: periodOf(next.post) } : null,
-    before: from !== null ? dayBefore(timestamps, series, days[chosen - 1], from, tick, index) : null,
+    before: from !== null ? dayBefore(timestamps, series, days[chosen - 1], from, tick, index, night) : null,
     points: points,
     droppedTimes: filtered.droppedTimes,
     verdict: chartVerdict(bars, opens, filtered, offered, firstRegular, regular)
@@ -371,8 +375,8 @@ function headlineDay(days, quoted, timestamps, closes) {
 
 // The day before the headline's in a two-day answer: its session, its
 // trades and its open, read as the headline day's are.
-function dayBefore(timestamps, series, periods, until, tick, index) {
-  var bars = answerBars(timestamps, series, periodsStart(periods)).filter(function(b) { return b.t < until })
+function dayBefore(timestamps, series, periods, until, tick, index, night) {
+  var bars = answerBars(timestamps, series, periodsStart(periods), night).filter(function(b) { return b.t < until })
   var kept = filterStrayCloses(bars, periods, tick).bars
   var regular = periodOf(periods.regular)
   var firstRegular = regular ? firstRegularBar(kept, regular) : null
@@ -394,12 +398,21 @@ function dayBefore(timestamps, series, periods, until, tick, index) {
 // The bars from `from` on that have a close; null if a time is malformed or
 // out of order. `series` holds the answer's opens, closes, volumes, highs and
 // lows by the bar's own names, the last three null in a spark answer.
-function answerBars(timestamps, series, from) {
+//
+// Yahoo sends no bar in a US stock's night today, none in the saved answers,
+// but the exchanges plan to trade through it from 6 December 2026, and its
+// answers may then carry those trades beside Robinhood's, which are the
+// night's (`Overnight.ownTrades`). The owner asked, before that date, that
+// such a bar be set aside here (`night`), before the stray filter judges the
+// after hours' last bar against it. If Yahoo still sends none after 6
+// December 2026, this goes.
+function answerBars(timestamps, series, from, night) {
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
     if (knownPrice(series.c[i]) === null) continue
     if (from !== null && timestamps[i] < from) continue
+    if (night && night(timestamps[i])) continue
     bars.push({
       t: timestamps[i],
       o: series.o[i],
