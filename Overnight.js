@@ -67,15 +67,27 @@ function overnightSpan(entry, now) {
   return !!entry && entry.through !== null && entry.through !== undefined && entry.through <= now && now - entry.through <= HOUR_REACH ? "hour" : "day"
 }
 
+// Robinhood answered with no slot at all: a symbol it doesn't carry, such
+// as a preferred share (BAC.PL), whose place in its answer is a
+// placeholder. Each symbol it carries answers every slot, traded or not.
+function uncarried(entry) {
+  return !!entry && entry.status === "ok" && entry.through === null
+}
+
+// One Robinhood doesn't carry goes in a day's request that goes anyway, or
+// one of its own, so it never draws the others into a day's.
 function overnightBatches(symbols, entries, now) {
-  var day = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
-  var hour = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
+  var none = symbols.filter(function(s) { return uncarried(entries[s]) })
+  var carried = symbols.filter(function(s) { return !uncarried(entries[s]) })
+  var day = carried.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
+  var hour = carried.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
   var dayRequests = Math.ceil(day.length / OVERNIGHT_BATCH)
-  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(symbols.length / OVERNIGHT_BATCH)) {
+  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(carried.length / OVERNIGHT_BATCH)) {
     var room = dayRequests * OVERNIGHT_BATCH - day.length
     day = day.concat(hour.slice(0, room))
     hour = hour.slice(room)
   }
+  day = day.concat(none)
   var batches = []
   for (var i = 0; i < day.length; i += OVERNIGHT_BATCH) batches.push({ span: "day", symbols: day.slice(i, i + OVERNIGHT_BATCH) })
   for (var j = 0; j < hour.length; j += HOUR_BATCH) batches.push({ span: "hour", symbols: hour.slice(j, j + HOUR_BATCH) })

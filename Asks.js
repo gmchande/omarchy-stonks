@@ -319,6 +319,9 @@ function overnightAsks(s) {
     // must be in.
     if (holeDue(x)) return true
     if (!kept) return false
+    // One Robinhood doesn't carry, once a day, as its listing date is, in
+    // case it carries it later.
+    if (Overnight.uncarried(entry)) return at - entry.at >= Overnight.LIST_DATE_INTERVAL
     var key = at + " " + entry.at + " " + entry.status
     if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, s.calendars, entry.status === "failed")
     return judged[key]

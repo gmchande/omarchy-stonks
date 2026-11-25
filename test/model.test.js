@@ -1208,6 +1208,13 @@ test("a run of Robinhood's trades never takes more requests than a day for all w
   expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
   // Three added to it meanwhile: their days, and the rest's hour.
   expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
+  // A stock Robinhood doesn't carry, answered with its placeholder, no slot
+  // at all, among 14 in hand: the 14's hour, and a day of its own, never
+  // the 14 drawn into a day; with a day going anyway, it rides in that.
+  const fourteen = names(14)
+  const uncarried = { ...Object.fromEntries(fourteen.map(s => [s, warm])), P: { status: "ok", bars: [], through: null } }
+  expect(spans(M.overnightBatches(fourteen.concat(["P"]), uncarried, now))).toBe("day 1, hour 14")
+  expect(spans(M.overnightBatches(["N1"].concat(fourteen, ["P"]), uncarried, now))).toBe("day 16")
 })
 
 test("the close the day's move counts from is named by the trading day before, across a weekend and a holiday", () => {
@@ -1744,6 +1751,11 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const quiet = { status: "ok", bars: [], through: now - 10 * 60, at: now - 5 * 60 }
   const listed = { AAPL: { status: "ok", listDate: null, at: now - 60 }, MSFT: { status: "ok", listDate: null, at: now - 60 } }
   expect(asks({ ...pillAnswered(60), listDates: listed, nights: { ...pillAnswered(60).nights, MSFT: quiet } })).toEqual({ listDates: [], trades: ["MSFT"] })
+  // One Robinhood doesn't carry answers its placeholder, no slot at all: it
+  // is asked again a day on, as its listing date is, and not with each of
+  // the night's 5 minutes.
+  const uncarried = ago => ({ ...pillAnswered(60), listDates: listed, nights: { ...pillAnswered(60).nights, MSFT: { status: "ok", bars: [], through: null, at: now - ago } } })
+  expect([asks(uncarried(5 * 60)), asks(uncarried(DAY - 60)), asks(uncarried(DAY))]).toEqual([null, null, { listDates: [], trades: ["MSFT"] }])
   // A preview outside All on view, a US stock by search's result before its
   // quote, is asked with them, alone first while it has no answer; off
   // view, it waits.
