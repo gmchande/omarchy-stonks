@@ -38,6 +38,22 @@ function hasOvernight(quote, calendars) {
   return !!cal && !!cal.overnight
 }
 
+// For `Quote.parseChart` to set aside a bar Yahoo stamps in a US stock's or
+// ETF's night, by the clock, from 20:00 to 04:00 every day: whether `t` is
+// in it. Null for a listing with no night. Asked of every bar, so each day's
+// hours are worked out once.
+function yahooNight(listing, calendars) {
+  var cal = hasOvernight(listing, calendars) ? Calendar.calendarFor(calendars, listing) : null
+  if (!cal) return null
+  var day = { from: 0, to: 0 }
+  return function(t) {
+    if (t >= day.from && t < day.to) return false
+    var date = Calendar.dateStringOf(Calendar.localDate(t, cal))
+    day = { from: Calendar.epochAt(cal, date, cal.overnight.close), to: Calendar.epochAt(cal, date, cal.overnight.open) }
+    return t < day.from || t >= day.to
+  }
+}
+
 // Yahoo writes BRK-B, Robinhood BRK.B.
 function robinhoodSymbol(symbol) {
   return String(symbol).replace(/-/g, ".")
