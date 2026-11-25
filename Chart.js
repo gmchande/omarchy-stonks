@@ -106,11 +106,15 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // or the open, whichever is earlier, so the line reaches the bell from where it
 // came, to hold every trade; or, for a US stock or ETF, from 04:00 to its
 // 20:00 (`Day.js`), so a quiet hour shows as one, the hours to come stay
-// empty, and a finished day ends at its last trade. `ext` marks
-// trades outside the regular session, and `dim` those drawn dim: the extended
-// hours, or on a day lit where it trades now (`Day.litFrom`), every trade
-// before that. `brk` lifts the line across hours of the exchange's day that
-// take room, such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
+// empty, and a finished day ends at its last trade. `ext` marks trades
+// outside the regular session. `dim` marks those that don't trade now: the
+// extended hours, or on a day lit where it trades now (`Day.litFrom`),
+// every trade before that. The dot sits on the newest trade it leaves, and
+// a row's columns light what it leaves. `faint` marks what the panel's
+// chart draws lighter: the extended hours, so the session stays full at
+// any hour, or once the closed day is set apart (`aside`), as `dim`.
+// `brk` lifts the line across hours of the exchange's day that take room,
+// such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
 // session. Hours that take no room (`axis.skip`), such as a weekend, are no
 // break: the line runs across them. Neither is a stretch with no trade, as a
 // thin night or pre-market leaves: more than half an hour of room between two
@@ -157,13 +161,15 @@ function chartGeometry(quote, calendars, dayMove) {
   var out = []
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
+    var dim = lit ? pts[k].t < quote.litFrom : session !== "reg"
     var prev = k > 0 ? pts[k - 1] : null
     var brk = !!prev && across(prev.t, pts[k].t)
     out.push({
       x: axisFraction(axis, pts[k].t),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      dim: lit ? pts[k].t < quote.litFrom : session !== "reg",
+      dim: dim,
+      faint: stepped ? dim : session !== "reg",
       brk: brk,
       untraded: !!prev && !brk && clockRoom(axis, pts[k].t) - clockRoom(axis, prev.t) > Overnight.HOLE_SLOTS * Overnight.SLOT
     })
@@ -279,7 +285,7 @@ function stepTime(quote, t, steps, last) {
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], faint: [], lastLit: -1, ownStart: false }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var aside = geometry.aside
@@ -302,10 +308,12 @@ function retroGrid(geometry, width, height, pixel, gap) {
       g.levels[held] = g.levels[last]
       g.above[held] = g.above[last]
       g.dim[held] = g.dim[last]
+      g.faint[held] = g.faint[last]
     }
     g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
     g.above[col] = pts[i].y <= (hasBaseline(geometry) ? geometry.baselineY : 1)
     g.dim[col] = pts[i].dim
+    g.faint[col] = pts[i].faint
     last = col
   }
   if (last >= 0 && !g.dim[last]) g.lastLit = last

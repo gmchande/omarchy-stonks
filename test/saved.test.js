@@ -2883,7 +2883,8 @@ test("a night's trades join the day that closed, dashed at the close before it u
   const tonight = day.points.filter(p => p.t >= at("2026-10-06", "20:00"))
   expect([tonight.length, tonight.every(p => p.s === "overnight"), M.dayBase(day), day.litFrom]).toEqual([35, true, close, at("2026-10-06", "20:00")])
   expect([M.chartSpan(day).end, M.nightBell(day)]).toEqual([M.lastTradeTime(day), at("2026-10-06", "16:00")])
-  expect(M.chartGeometry(day).points.map(p => p.dim)).toEqual(day.points.map(p => p.t < at("2026-10-06", "20:00")))
+  // With the closed day set apart, all but tonight draws lighter.
+  expect(M.chartGeometry(day).points.map(p => [p.dim, p.faint])).toEqual(day.points.map(p => Array(2).fill(p.t < at("2026-10-06", "20:00"))))
   const top = M.rowModel(quote, 0, "pct", M.newestTrade(quote, built.latest, calendars, day))
   expect(M.rowModel(day, built.latest.t, "pct").changeText).toBe(top.changeText)
   expect(againstDashedLine(day, "23:00")).toBe(`23:00 all against ${M.money(close)} then ${M.money(quote.price)}`)
@@ -2903,6 +2904,13 @@ test("a night's trades join the day that closed, dashed at the close before it u
   expect(M.chartSpan(dayAt("watch-2026-10-26-1955", "nbis").day)).toMatchObject({ start: at("2026-10-26", "04:00"), end: at("2026-10-26", "20:00") })
   // Tuesday 18:00: NEST's after hours is bright from the bell.
   expect(dayAt("2026-10-06-1800", "nest").day.litFrom).toBe(at("2026-10-06", "16:00"))
+  // Its session still draws full and its pre-market and after hours
+  // lighter, so a picture after the close shows the day's move at full
+  // strength; the dot is on the after hours' newest trade.
+  const evening = dayAt("2026-10-06-1800", "nest").day
+  const lit = M.chartGeometry(evening)
+  expect(lit.points.map(p => p.faint)).toEqual(evening.points.map(p => M.pointSession(evening, p) !== "reg"))
+  expect(M.lastLitPoint(lit)).toBe(lit.points.at(-1))
 })
 
 // When a watch moment's answers came, by its times.txt: how long after

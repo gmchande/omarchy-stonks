@@ -168,6 +168,7 @@ Item {
         up: root.view ? root.view.dayUp : true
         baselineColor: root.look.dimmer
         glow: true
+        fullSession: true
         live: root.live && root.look.retro
         newestPrice: root.newestPrice
         surfaceOpen: !root.still

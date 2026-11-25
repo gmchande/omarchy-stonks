@@ -312,6 +312,7 @@ Rectangle {
       ghostColor: root.look.ghost
       ground: root.ground
       glow: true
+      fullSession: true
       scrubX: root.scrubX
       surfaceOpen: false
       still: true
