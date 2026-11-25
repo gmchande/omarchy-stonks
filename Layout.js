@@ -6,8 +6,8 @@
 // hands in what its pieces measure and places them by what comes back.
 // Three steps, by what each reads of the body's height, since the panel's
 // card and the window's least height are taken from them: `measure` reads
-// none of it, `place` the window's alone, which its chart grows into, and
-// `rows` the body's.
+// none of it, `chartHeight` and `place` the window's alone, which its chart
+// grows into, and `rows` the body's.
 
 // Whole rows, at most `count`, in `space`.
 function rowsHeight(count, space, rowPitch, rowGap) {
@@ -76,22 +76,29 @@ function measure(s) {
   }
 }
 
-// `m` from `measure`, with the chart in a window whose body is
-// `windowHeight` high, 0 in the panel, and what stands under it. The
-// window's chart is sized from the window and the chrome beside it, never
-// the list or itself, so a list switch moves nothing: it takes the spare
-// height past whole rows, and gives way first as the window gets short, so
-// three rows still show.
-function place(m, windowHeight) {
+// The chart for `m` from `measure`, in a window whose body is
+// `windowHeight` high, 0 in the panel. The window's chart is sized from the
+// window and the chrome beside it, never the list or itself, so a list
+// switch moves nothing: it takes the spare height past whole rows, and
+// gives way first as the window gets short, so three rows still show.
+function chartHeight(m, windowHeight) {
+  if (!m.chartFitsSurface) return m.screenChart
   var room = windowHeight - m.besideChart - m.chartHeight
-  var chart = !m.chartFitsSurface ? m.screenChart
-    : room < m.threeRows ? m.chartHeight - Math.min(m.chartHeight - m.minChartHeight, m.threeRows - room)
+  return room < m.threeRows ? m.chartHeight - Math.min(m.chartHeight - m.minChartHeight, m.threeRows - room)
     : m.chartHeight + room - rowsHeight(Infinity, room, m.rowPitch, m.rowGap)
+}
+
+// `m` from `measure`, with the chart and what stands under it, around the
+// band as laid out, `bandHeight`, which takes a new chart a layout later:
+// the panel's card and what opens over the band move with the band on
+// screen. The window's chrome counts the chart it sizes from the window.
+function place(m, windowHeight, bandHeight) {
+  var chart = chartHeight(m, windowHeight)
   return Object.assign({}, m, {
     drawnChartHeight: chart,
-    bandHeight: m.bandBesideChart + chart,
-    chromeHeight: m.besideChart + chart,
-    listMenuTop: m.margins + m.headerHeight + m.groupGap + m.bandBesideChart + chart + m.listMenuGap,
+    bandHeight: bandHeight,
+    chromeHeight: m.chartFitsSurface ? m.besideChart + chart : m.besideChart - m.bandBesideChart + bandHeight,
+    listMenuTop: m.margins + m.headerHeight + m.groupGap + bandHeight + m.listMenuGap,
     // The panel's menu ends one gap above the footer, which stays in sight
     // under it; the window's may reach the margin.
     listMenuBelow: m.margins + (m.chartFitsSurface ? 0 : m.groupGap + m.footerHeight)

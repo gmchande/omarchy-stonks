@@ -2464,14 +2464,18 @@ test("the header says trouble first, then a chart loading, a refresh asked for, 
 })
 
 // What the pieces measured in the panel at the default text size, and in
-// the window at text size 20.
+// the window at text size 20; and the band laid out round the chart.
 const panelSizes = { screenRoom: 0, margins: 0, groupGap: 8, listMenuGap: 4, rowHeight: 40, rowGap: 2, chartHeight: 190, minChartHeight: 0,
   headerTitledHeight: 56, headerBareHeight: 28, bandBesideChart: 220, footerBarHeight: 36, hintRoom: 36, named: false, symbolCount: 20 }
 const windowSizes20 = { screenRoom: 0, margins: 27, groupGap: 13, listMenuGap: 7, rowHeight: 67, rowGap: 3, chartHeight: 367, minChartHeight: 227,
   headerTitledHeight: 91, headerBareHeight: 47, bandBesideChart: 375, footerBarHeight: 60, hintRoom: 0, named: false, symbolCount: 7 }
+const placed = (sizes, windowHeight) => {
+  const m = M.measure(sizes)
+  return M.place(m, windowHeight, m.bandBesideChart + M.chartHeight(m, windowHeight))
+}
 
 test("on a short screen the panel's hint gives way, then its chart down to a fifth, then its title, so three whole rows still show", () => {
-  const panel = screenRoom => M.place(M.measure({ ...panelSizes, screenRoom }), 0)
+  const panel = screenRoom => placed({ ...panelSizes, screenRoom }, 0)
   const threeRows = 3 * 42 - 2
   expect(panel(1000)).toMatchObject({ headerTitled: true, hintShown: true, drawnChartHeight: 190 })
   // The hint goes where it and the whole chart leave fewer than three rows.
@@ -2491,17 +2495,17 @@ test("at text size 20 the smallest window shows three whole rows beside the leas
   const sizes = M.measure(windowSizes20)
   const pitch = 67 + 3
   expect(sizes.smallestHeight).toBe(1053)
-  const smallest = M.place(sizes, 1053)
+  const smallest = placed(windowSizes20, 1053)
   expect(smallest.drawnChartHeight).toBe(227)
   expect(M.rows(smallest, 1053, 0).listHeight).toBe(3 * pitch - 3)
   for (let height = 1053; height <= 1600; height++) {
-    const placed = M.place(sizes, height)
-    const rows = M.rows(M.place(M.measure({ ...windowSizes20, symbolCount: 40 }), height), height, 0).listHeight
+    const window = placed(windowSizes20, height)
+    const rows = M.rows(placed({ ...windowSizes20, symbolCount: 40 }, height), height, 0).listHeight
     expect((rows + 3) % pitch).toBe(0)
-    expect(placed.drawnChartHeight).toBeGreaterThanOrEqual(227)
-    expect(placed.chromeHeight + rows).toBe(height)
+    expect(window.drawnChartHeight).toBeGreaterThanOrEqual(227)
+    expect(window.chromeHeight + rows).toBe(height)
     // A list switch moves nothing.
-    expect(M.place(M.measure({ ...windowSizes20, symbolCount: 2, named: true }), height).drawnChartHeight).toBe(placed.drawnChartHeight)
+    expect(placed({ ...windowSizes20, symbolCount: 2, named: true }, height).drawnChartHeight).toBe(window.drawnChartHeight)
   }
 })
 

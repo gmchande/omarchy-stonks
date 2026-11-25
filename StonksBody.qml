@@ -436,10 +436,10 @@ Item {
   readonly property int rowGap: Style.space(2)
 
   // Every height, from what the pieces measure beside the chart and the
-  // rows, never from their heights, which these set (`Layout.js`). The
-  // panel's card takes its height from `fit`, and the window its least
-  // height from `measured`, so neither reads the body's height but the
-  // window's chart.
+  // rows, and the band as laid out, never from the header's or the footer's
+  // height, which these set (`Layout.js`). The panel's card takes its height
+  // from `fit`, and the window its least height from `measured`, so neither
+  // reads the body's height but the window's chart.
   readonly property var measured: Layout.measure({
     screenRoom: screenRoom,
     margins: margins,
@@ -457,8 +457,11 @@ Item {
     named: listName !== "",
     symbolCount: symbols.length
   })
-  readonly property var fit: Layout.place(measured, minChartHeight > 0 ? height : 0)
-  readonly property var rowsFit: Layout.rows(fit, height, rowsRoom)
+  function windowHeight() { return minChartHeight > 0 ? height : 0 }
+  readonly property var fit: Layout.place(measured, windowHeight(), heroBand.implicitHeight)
+  // Placed afresh, not read from `fit`, which a new height reaches after it
+  // reaches this: the rows never count a height against stale chrome.
+  readonly property var rowsFit: Layout.rows(Layout.place(measured, windowHeight(), heroBand.implicitHeight), height, rowsRoom)
   readonly property int rowPitch: fit.rowPitch
   readonly property int chromeHeight: fit.chromeHeight
   readonly property int smallestHeight: measured.smallestHeight
@@ -1193,7 +1196,7 @@ Item {
     scrubX: root.scrubX
     reveal: motion.reveal
     replayX: motion.replayX
-    chartHeight: root.fit.drawnChartHeight
+    chartHeight: Layout.chartHeight(root.measured, root.windowHeight())
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel
