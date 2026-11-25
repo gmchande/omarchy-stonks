@@ -144,8 +144,9 @@ Harness {
         [failed, unsaved, asked, footer()].join(" | "))
 
       // An update's terminal asks Stonks for the restart once the update
-      // moved the plugin's folder: with a change unsaved then, the shell
-      // isn't restarted; once the change is saved, it is.
+      // moved the plugin's folder: with a change unsaved then, or still on
+      // its way to the file as the wheel's is, the shell isn't restarted;
+      // once the change is saved, it is.
       var restarts = function() {
         return harness.readFile(Quickshell.env("STONKS_FAKE_STATE") + "/omarchy.log").split("\n")
           .filter(function(line) { return line === "restart shell" }).length
@@ -159,10 +160,15 @@ Harness {
       sh('chmod 700 "$2"')
       clickFooter()
       var savedThen = landed() && within(3000, function() { return !service.saveFailed })
+      service.persist({ range: "6M" }, true)
+      ipc.restartIfSaved()
+      var waitedForWheel = !within(1000, function() { return restarts() > restartsBefore })
+      var wheelSaved = landed() && within(3000, function() { return !service.saving })
       ipc.restartIfSaved()
       var restarted = within(3000, function() { return restarts() === restartsBefore + 1 })
-      harness.check("an update's restart waits while a change isn't saved, and goes once it is",
-        lostSave && waitedForSave && savedThen && restarted, [lostSave, waitedForSave, savedThen, restarted].join(" | "))
+      harness.check("an update's restart waits while a change isn't saved, or is still on its way to the file, and goes once it is",
+        lostSave && waitedForSave && savedThen && waitedForWheel && wheelSaved && restarted,
+        [lostSave, waitedForSave, savedThen, waitedForWheel, wheelSaved, restarted].join(" | "))
 
       // Lists a hand edit named oddly: a case twin, All, and none, the last
       // holding a symbol no other list or All holds, beside a key Stonks

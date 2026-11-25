@@ -466,6 +466,7 @@ Item {
   readonly property bool listsUnreadable: listsFile.unreadable
   readonly property bool editsUnsaved: listsFile.editsUnsaved
   readonly property bool saveFailed: listsFile.saveFailed
+  readonly property bool saving: listsFile.saving
   signal saveChecked(bool saved)
   function persist(values, settles) { listsFile.persist(values, settles) }
   function save(next) { listsFile.save(next) }

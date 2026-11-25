@@ -19,11 +19,11 @@ Item {
   signal refreshed()
 
   // An update's terminal asks this once the update moved the plugin's
-  // folder (`Commands.updateAndRestart`). The shell restarts only while no
-  // change is unsaved, as now, not as when the update was asked for: else
-  // the footer says so, and offers the restart once the change is saved.
+  // folder (`Commands.update`). The shell restarts only while every change
+  // is in the file for sure, as now, not as when the update was asked for:
+  // else the footer says the change isn't saved, or offers the restart.
   function restartIfSaved() {
-    if (!root.service || !root.updates) return
+    if (!root.service || !root.updates || root.service.saving) return
     var says = Release.footerNotice({ unreadable: root.service.listsUnreadable, saveFailed: root.service.saveFailed,
       editsUnsaved: root.service.editsUnsaved }, "")
     if (says.restartable) root.updates.restart()

@@ -38,6 +38,10 @@ Item {
   // text before it (`takesRead`). The next save writes everything in memory.
   property bool saveFailed: false
   signal saveChecked(bool saved)
+  // A change not yet in the file for sure: one waiting for the wheel to
+  // rest, for a read out, or for the file to be made, or a save awaiting its
+  // read-back.
+  readonly property bool saving: settleWrite.running || writeOwed || making || staleTexts !== null
 
   function persist(values, settles) {
     root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles)
