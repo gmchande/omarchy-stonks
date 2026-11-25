@@ -194,11 +194,11 @@ Harness {
       sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', halfObject)
       var heldBroken = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
       service.setRange("1W")
-      // Time for a write that must not come to land.
-      wait(300)
+      // No write comes to land while the read is out, nor once it lands.
+      var keptBroken = !within(300, function() { return harness.readFile(harness.file) !== halfObject })
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
       var refusedBroken = within(3000, function() { return service.listsUnreadable })
-      var keptBroken = harness.readFile(harness.file) === halfObject
+      keptBroken = keptBroken && harness.readFile(harness.file) === halfObject
       var toldBroken = footer()
       sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
       var mended = within(3000, function() { return !service.listsUnreadable && service.range === "1M" })
@@ -334,15 +334,15 @@ Harness {
       sh('mkdir "$3"', chime)
       sounds.turnedOn = true
       var surveyed = within(5000, function() { return sounds.surveyed })
-      // Time to try the first chime ahead, and fail.
-      wait(500)
+      // The first chime ahead is tried, and fails.
+      var chimeFailed = within(3000, function() { return service.files.failed })
       sh('rmdir "$3"', chime)
       sounds.turnedOn = false
       sounds.turnedOn = true
       var chimed = within(3000, function() { return sh('[ -f "$3" ] && echo made', chime) === "made" })
       sounds.turnedOn = false
       harness.check("a sound whose file couldn't be written is written once sounds are next on and it can be",
-        surveyed && chimed, [surveyed, chimed].join(" | "))
+        surveyed && chimeFailed && chimed, [surveyed, chimeFailed, chimed].join(" | "))
 
       // Last, a link to a device: Quickshell's watch follows a link to what
       // it names, so it says no more of the file's place, mended or not.
