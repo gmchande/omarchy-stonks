@@ -339,14 +339,20 @@ Harness {
       base(s)
       var kept = service.fileSettings
       var b = s.body, list = b.watchlist
-      // In one save, as a list opened with them would hold them: one at a
-      // time, each add asks Robinhood on its own.
-      var count = Math.floor((2 * list.sightHeight) / list.rowPitch) + 2
-      var extra = []
-      for (var n = 100; kept.symbols.length + extra.length < count; n++) extra.push("LONG" + n)
-      service.save(Object.assign({}, kept, { symbols: kept.symbols.concat(extra) }))
-      within(3000, function() { return list.displayedSymbols.length === count })
-      quiet()
+      // A screen's worth at a time, as a list opened with them would hold
+      // them: one at a time, each add asks Robinhood on its own. A window
+      // grows with its rows, so it tops up until they pass two of its
+      // screens.
+      var n = 100
+      for (var round = 0; round < 4 && list.displayedSymbols.length * list.rowPitch <= 2 * list.sightHeight + list.rowPitch; round++) {
+        var extra = []
+        while ((list.displayedSymbols.length + extra.length) * list.rowPitch <= 2 * list.sightHeight + list.rowPitch) extra.push("LONG" + n++)
+        var wanted = list.displayedSymbols.length + extra.length
+        service.save(Object.assign({}, service.fileSettings, { symbols: service.fileSettings.symbols.concat(extra) }))
+        within(3000, function() { return list.displayedSymbols.length === wanted })
+        quiet()
+        wait(100)
+      }
       base(s)
       var rows = list.displayedSymbols.slice()
       var seen = function(i) { return i * list.rowPitch < list.contentY + list.sightHeight && i * list.rowPitch + list.rowHeight > list.contentY }

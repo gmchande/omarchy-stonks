@@ -259,7 +259,7 @@ clipboard, with a notification that opens it in your screenshot editor.
 | --- | --- |
 | `↑` `↓` | Move the selection |
 | Page Up or Page Down | Move a screenful |
-| Home or End | Go to the first or last row |
+| Home or End | First or last row |
 | `⏎` | Show the selected row's chart |
 | `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
