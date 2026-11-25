@@ -36,10 +36,12 @@ qs_session_runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
 qs_runtime=""
 
 # link_runtime FROM TO: a link in TO to every entry of FROM but quickshell,
-# sockets too. A glob, not find: an agent's shell can put a find of its own
-# first that skips sockets, and without Wayland's a run that draws through
-# it, such as the anchor states, aborts.
+# sockets too; fails when FROM is no folder it can read. A glob, not find:
+# an agent's shell can put a find of its own first that skips sockets, and
+# without Wayland's a run that draws through it, such as the anchor states,
+# aborts.
 link_runtime() (
+  [ -d "$1" ] && [ -r "$1" ] && [ -x "$1" ] || exit 1
   shopt -s nullglob dotglob
   local entry entries=()
   for entry in "$1"/*; do [ "${entry##*/}" = quickshell ] || entries+=("$entry"); done
