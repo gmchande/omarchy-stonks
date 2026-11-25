@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release", "Undo"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release", "Undo", "Layout"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -1313,7 +1313,7 @@ test("the close the day's move counts from is named by the trading day before, a
   expect(lines(at("2026-09-15", "12:00"))).toMatchObject({ close: { label: "4 SEP CLOSE" }, caption: { label: "8 SEP" } })
   const night = { t: at("2026-09-08", "20:30"), p: 103, phase: "overnight", base: 100, own: true, closed: true, dayStart: at("2026-09-08", "09:30") }
   expect(M.heroLines(quote, M.rowModel(quote, 0, "pct", night), null, at("2026-09-15", "12:00"), null, calendars, "pct", false).close.label).toBe("8 SEP CLOSE")
-  expect(M.rowsDay(["X"], { X: quote }, { X: night }, at("2026-09-15", "12:00"), calendars)).toBe("8 SEP")
+  expect(M.rowsDayName(M.rowsSharedDay(["X"], { X: quote }, { X: night }, calendars), at("2026-09-15", "12:00"))).toBe("8 SEP")
   // A scrub rests the line under the price, whose place the dashed line's
   // legend takes; the moment's move keeps its amount.
   expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "+2.50 USD", tone: "up" }, move: "+2.50%" })
@@ -1321,6 +1321,33 @@ test("the close the day's move counts from is named by the trading day before, a
   const unpriced = { ...quote, price: null, marketTime: null, points: [] }
   expect(M.heroLines(unpriced, M.rowModel(unpriced, 0, "pct"), null, at("2026-09-08", "12:00"), null, calendars, "pct", false))
     .toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false }, caption: { label: "", changeText: "", tone: "flat" }, move: "—" })
+})
+
+// The rows' day is worked out from their prices, and only its name from the
+// clock, so it turns at the exchange's midnight and at no other second.
+test("the rows name the day their US stocks share, turning at the exchange's midnight, and say TODAY where they disagree or none names one", () => {
+  const quote = (symbol, date) => ({
+    symbol, instrumentType: "EQUITY", exchange: "NASDAQ", currency: "USD", gmtoffset: -14400, prevClose: 100, price: 101,
+    priceDigits: 2, marketTime: at(date, "12:00"),
+    session: {
+      pre: { start: at(date, "04:00"), end: at(date, "09:30") },
+      regular: { start: at(date, "09:30"), end: at(date, "16:00") },
+      post: { start: at(date, "16:00"), end: at(date, "20:00") }
+    },
+    points: [{ t: at(date, "09:30"), p: 100.5 }, { t: at(date, "11:55"), p: 101 }]
+  })
+  const quotes = { A: quote("A", "2026-09-08"), B: quote("B", "2026-09-08"), C: quote("C", "2026-09-04"),
+    T: { ...quote("7203.T", "2026-09-08"), exchange: "JPX", currency: "JPY", gmtoffset: 32400 } }
+  const day = (rows, now, newest = {}) => M.rowsDayName(M.rowsSharedDay(rows, quotes, newest, calendars), now)
+  expect(day(["A", "B"], at("2026-09-08", "23:59") + 59)).toBe("TODAY")
+  expect(day(["A", "B"], at("2026-09-09", "00:00"))).toBe("TUE")
+  expect(day(["A", "B"], at("2026-09-15", "00:00"))).toBe("8 SEP")
+  expect(day(["A", "C"], at("2026-09-10", "12:00"))).toBe("TODAY")
+  expect(day(["T", "C"], at("2026-09-10", "12:00"))).toBe("FRI")
+  expect(day(["T"], at("2026-09-10", "12:00"))).toBe("TODAY")
+  expect(day(["MISSING"], at("2026-09-10", "12:00"))).toBe("TODAY")
+  // Tonight's trades name the day they joined.
+  expect(day(["C"], at("2026-09-10", "12:00"), { C: { dayStart: at("2026-09-08", "09:30") } })).toBe("TUE")
 })
 
 test("each trade says its own time across a change of clocks, the 1D's day keeps its hours across it, and the day marks an early close", () => {
@@ -2390,6 +2417,117 @@ test("a paused host says why prices stopped and when Stonks tries again, on the 
     forms: ["The price server is busy · Retrying at 16:12", "Server busy · Retrying at 16:12", "Server busy · 16:12"] })
   expect(M.hostPause("refused", at, at).forms).toEqual(["The price server is busy · Retrying now", "Server busy · Retrying now",
     "Server busy · Retrying"])
+})
+
+// The "!" and "Can't get prices" count the stocks whose freshness warns.
+// Counted again from the clock only as a refresh owed turns overdue, the
+// count is the one each stock's own freshness gives, at every second.
+test("the stocks that warn are those whose own freshness warns, at every second, previews and owed refreshes included", () => {
+  const T = at("2026-09-08", "12:00")
+  const quote = { symbol: "Q", instrumentType: "EQUITY", exchange: "NASDAQ", currency: "USD", gmtoffset: -14400, prevClose: 100, price: 101,
+    priceDigits: 2, marketTime: T - 600,
+    session: { regular: { start: at("2026-09-08", "09:30"), end: at("2026-09-08", "16:00") } },
+    points: [{ t: at("2026-09-08", "09:30"), p: 100.5 }, { t: T - 600, p: 101 }] }
+  const ok = { status: "ok", answeredAt: T - 600 }
+  const entries = { A: { status: "failed", answeredAt: T - 60 }, B: ok, C: ok, E: { status: "saved", answeredAt: 0 }, G: ok, H: ok }
+  const previewEntries = { D: { status: "failed" }, H: { status: "failed" }, I: ok }
+  const quotes = { A: quote, B: quote, C: quote, E: quote, G: quote, H: quote, I: quote }
+  const owed = { B: T - 100, C: T - 30, E: T - 89, F: T - 90, I: T + 20, OTHER: T - 50 }
+  const asking = { G: true, C: true }
+  const lists = [["A", "B", "C", "D", "E", "F", "G", "H", "I"], ["C", "E"], ["G", "H"], []]
+  for (let now = T - 120; now <= T + 240; now++) {
+    for (const symbols of lists) {
+      for (const owing of [owed, {}]) {
+        const warns = symbols.filter(s => M.freshnessWarns(M.freshness(entries[s] || previewEntries[s] || null, quotes[s] || null, now,
+          owing[s] || 0, !!asking[s]))).length
+        expect(M.warningCount(symbols, entries, previewEntries, owing, M.overdueClock(owing, now))).toBe(warns)
+      }
+    }
+  }
+})
+
+test("the header says trouble first, then a chart loading, a refresh asked for, a range that failed, a range's scrub, and the market's words", () => {
+  const pause = M.hostPause("none", at("2026-09-08", "12:01"), at("2026-09-08", "12:00"))
+  const market = ["Market open · Closes at 16:00", "Open"]
+  const base = { hasService: true, whenMissing: "No data", scrubbed: false, refreshing: false, rangeFailed: false, chartRange: "1Y",
+    pause: null, warnings: 0, compact: false, yahooDown: false, quoted: true, featuredFailed: false, symbol: "NVDA",
+    loading: false, hasChart: true, loadingText: "Loading NVDA 1Y", scrubForms: null, marketForms: market }
+  const line = change => M.headerLine({ ...base, ...change })
+  const said = (forms, trouble = false, offersRetry = false) => ({ forms, trouble, offersRetry })
+  const cantGet = said(["Can't get prices · Stonks keeps trying", "Can't get prices"], true)
+  const failed = said(["Refresh failed for NVDA · Retrying", "Refresh failed · Retrying", "Refresh failed"], true)
+  expect(line({})).toEqual(said(market))
+  expect(line({ hasService: false, yahooDown: true, warnings: 3 })).toEqual(said(["No data"]))
+  expect(line({ quoted: false })).toEqual(said(["No data"]))
+  // Yahoo's pause is said only where a stock warns, and short in the panel.
+  expect(line({ pause })).toEqual(said(market))
+  expect(line({ pause, warnings: 1 })).toEqual(said(pause.forms, true))
+  expect(line({ pause, warnings: 1, compact: true })).toEqual(said(pause.forms.slice(1), true))
+  expect(line({ pause, warnings: 4, yahooDown: true, featuredFailed: true })).toEqual(said(pause.forms, true))
+  expect(line({ yahooDown: true, warnings: 4, featuredFailed: true })).toEqual(cantGet)
+  expect(line({ yahooDown: true, warnings: 4, quoted: false })).toEqual(cantGet)
+  expect(line({ featuredFailed: true })).toEqual(failed)
+  expect(line({ featuredFailed: true, quoted: false })).toEqual(said(["No data"]))
+  // Trouble is said over a chart loading; a chart loading over a refresh.
+  expect(line({ featuredFailed: true, loading: true })).toEqual(failed)
+  expect(line({ loading: true, refreshing: true })).toEqual(said(["Loading NVDA 1Y"]))
+  expect(line({ loading: true, hasChart: false })).toEqual(said([""]))
+  // A refresh asked for, a range that failed, or a scrub hides trouble.
+  expect(line({ refreshing: true, featuredFailed: true })).toEqual(said(["Refreshing"]))
+  expect(line({ rangeFailed: true, yahooDown: true, warnings: 4 })).toEqual(said(["1Y unavailable"], false, true))
+  expect(line({ rangeFailed: true, refreshing: true })).toEqual(said(["Refreshing"]))
+  expect(line({ scrubbed: true, featuredFailed: true })).toEqual(said(market))
+  // A scrub reads its moment, even while a refresh is out.
+  const scrub = ["12 MAR 2026 · 101.00", "12 MAR · 101.00"]
+  expect(line({ scrubForms: scrub })).toEqual(said(scrub))
+  expect(line({ scrubbed: true, refreshing: true, scrubForms: scrub })).toEqual(said(scrub))
+  expect(line({ scrubbed: true, refreshing: true })).toEqual(said(market))
+})
+
+// What the pieces measured in the panel at the default text size, and in
+// the window at text size 20; and the band laid out round the chart.
+const panelSizes = { screenRoom: 0, margins: 0, groupGap: 8, listMenuGap: 4, rowHeight: 40, rowGap: 2, chartHeight: 190, minChartHeight: 0,
+  headerTitledHeight: 56, headerBareHeight: 28, bandBesideChart: 220, footerBarHeight: 36, hintRoom: 36, named: false, symbolCount: 20 }
+const windowSizes20 = { screenRoom: 0, margins: 27, groupGap: 13, listMenuGap: 7, rowHeight: 67, rowGap: 3, chartHeight: 367, minChartHeight: 227,
+  headerTitledHeight: 91, headerBareHeight: 47, bandBesideChart: 375, footerBarHeight: 60, hintRoom: 0, named: false, symbolCount: 7 }
+const placed = (sizes, windowHeight) => {
+  const m = M.measure(sizes)
+  return M.place(m, windowHeight, m.bandBesideChart + M.chartHeight(m, windowHeight))
+}
+
+test("on a short screen the panel's hint gives way, then its chart down to a fifth, then its title, so three whole rows still show", () => {
+  const panel = screenRoom => placed({ ...panelSizes, screenRoom }, 0)
+  const threeRows = 3 * 42 - 2
+  expect(panel(1000)).toMatchObject({ headerTitled: true, hintShown: true, drawnChartHeight: 190 })
+  // The hint goes where it and the whole chart leave fewer than three rows.
+  expect(panel(650)).toMatchObject({ headerTitled: true, hintShown: false, drawnChartHeight: 190 })
+  expect(panel(520)).toMatchObject({ headerTitled: true, hintShown: false, drawnChartHeight: 60 })
+  // The title goes where three rows won't fit beside a fifth of the chart.
+  expect(panel(498)).toMatchObject({ headerTitled: true, drawnChartHeight: 38 })
+  expect(panel(497)).toMatchObject({ headerTitled: false, headerHeight: 28, drawnChartHeight: 65 })
+  for (const room of [1000, 650, 520, 498, 497, 470]) expect(panel(room).chromeHeight + threeRows).toBeLessThanOrEqual(room)
+  // Shorter still, the chart keeps its fifth and the rows give way.
+  expect(panel(400)).toMatchObject({ headerTitled: false, drawnChartHeight: 38 })
+  // The rows' sight is measured at the card's most, whatever its height.
+  expect(M.rows(panel(650), 400, 650)).toMatchObject({ sightHeight: threeRows })
+})
+
+test("at text size 20 the smallest window shows three whole rows beside the least chart, and a taller one gives the chart its spare height past whole rows", () => {
+  const sizes = M.measure(windowSizes20)
+  const pitch = 67 + 3
+  expect(sizes.smallestHeight).toBe(1053)
+  const smallest = placed(windowSizes20, 1053)
+  expect(smallest.drawnChartHeight).toBe(227)
+  expect(M.rows(smallest, 1053, 0).listHeight).toBe(3 * pitch - 3)
+  for (let height = 1053; height <= 1600; height++) {
+    const window = placed(windowSizes20, height)
+    const rows = M.rows(placed({ ...windowSizes20, symbolCount: 40 }, height), height, 0).listHeight
+    expect((rows + 3) % pitch).toBe(0)
+    expect(window.drawnChartHeight).toBeGreaterThanOrEqual(227)
+    expect(window.chromeHeight + rows).toBe(height)
+    // A list switch moves nothing.
+    expect(placed({ ...windowSizes20, symbolCount: 2, named: true }, height).drawnChartHeight).toBe(window.drawnChartHeight)
+  }
 })
 
 test("a fetched name or code past its length reads as not sent", () => {

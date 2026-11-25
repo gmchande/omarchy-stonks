@@ -10,13 +10,12 @@ import "Fundamentals.js" as Fundamentals
 import "History.js" as History
 import "KeySheet.js" as KeySheet
 import "KeyText.js" as KeyText
+import "Layout.js" as Layout
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Release.js" as Release
 import "Search.js" as Search
 import "Settings.js" as Settings
-import "Share.js" as Share
-import "Motion.js" as Motion
 // The body the window and the panel share. It reads the service and acts
 // through it; the surface keeps its lifecycle, keys, and look. Each of its
 // jobs stands under a banner: what it is handed and what the service says,
@@ -141,6 +140,14 @@ Item {
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
   Binding on histories { when: root.reading; value: root.service?.histories; restoreMode: Binding.RestoreNone }
   Binding on lists { when: root.reading; value: root.service?.lists; restoreMode: Binding.RestoreNone }
+  // Each list's identity (`Service.listKey`), by which the rows keep their
+  // place in each list.
+  property var listKeys: []
+  Binding on listKeys {
+    when: root.reading
+    value: root.service && root.service.listKey ? root.service.lists.map(function(list) { return root.service.listKey(list.name) }) : []
+    restoreMode: Binding.RestoreNone
+  }
   Binding on members { when: root.reading; value: root.service?.symbols; restoreMode: Binding.RestoreNone }
   Binding on arriving { when: root.reading; value: root.service?.arriving; restoreMode: Binding.RestoreNone }
   Binding on removal { when: root.reading; value: root.service?.lastRemoval; restoreMode: Binding.RestoreNone }
@@ -369,42 +376,44 @@ Item {
   readonly property var breadth: Object.assign({ list: view.list }, rowLinesWork ? { up: 0, flat: 0, down: 0, none: 0 }
     : Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
 
+  // The day the rows share, worked out again only as their prices change;
+  // the clock reads only its name (`Figures.rowsDayName`).
+  readonly property var rowsShared: Figures.rowsSharedDay(view.rows, quotes, newestTrades, calendars)
+
   // ---- The header's words
 
-  readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
-    return Freshness.freshnessWarns(Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
-  }).length : 0
+  // Counted again as All, its prices' answers, or what is owed changes, and
+  // as one owed turns overdue: never at a tick that can't change the count.
+  readonly property int overdueClock: Freshness.overdueClock(owed, now)
+  readonly property int warnings: lists.length > 0
+    ? Freshness.warningCount(lists[0].symbols, entries, previewEntries, owed, overdueClock) : 0
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
-  readonly property var hostPause: Freshness.hostPause(yahooPause.pause, yahooPause.until, now)
 
-  readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
-  readonly property bool offersRetry: headerText === unavailableText
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.tradesAtNight, now, calendars)) : []
-  // The panel says Yahoo's pause short; the window has room for a sentence.
-  readonly property var troubleForms: {
-    if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
-    if (hostPause && warnings > 0) return switchesPanels ? hostPause.forms.slice(1) : hostPause.forms
-    if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
-    if (featuredQuote && featuredFreshness.state === "failed")
-      return ["Refresh failed for " + (chartSymbol || featuredSymbol) + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]
-    return null
-  }
-  readonly property var headerForms: {
-    if (!service) return [headerWhenMissing]
-    if (troubleForms) return troubleForms
-    // Before any chart, only the empty hero names what's loading.
-    if (chartLoading) return [chart ? loadingText : ""]
-    // A refresh you asked for is said while out, unless a scrub reads a moment.
-    if (refreshing && !scrubShown) return ["Refreshing"]
-    if (historyActive && historyFailed) return [unavailableText]
-    // A refetch the service makes itself says nothing, out or failed.
-    if (historyShown && historyBar) return History.historyScrubForms(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return marketForms
-    return [headerWhenMissing]
-  }
-  readonly property string headerText: headerForms[0] || ""
+  readonly property var headerLine: Figures.headerLine({
+    hasService: !!service,
+    whenMissing: headerWhenMissing,
+    scrubbed: scrubShown !== 0,
+    refreshing: refreshing,
+    rangeFailed: historyActive && historyFailed,
+    chartRange: chartRange,
+    pause: Freshness.hostPause(yahooPause.pause, yahooPause.until, now),
+    warnings: warnings,
+    // The panel says Yahoo's pause short; the window has room for a sentence.
+    compact: switchesPanels,
+    yahooDown: yahooDown,
+    quoted: !!featuredQuote,
+    featuredFailed: featuredFreshness.state === "failed",
+    symbol: chartSymbol || featuredSymbol,
+    loading: chartLoading,
+    hasChart: !!chart,
+    loadingText: loadingText,
+    scrubForms: historyShown && historyBar ? History.historyScrubForms(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined) : null,
+    marketForms: marketForms
+  })
+  readonly property string headerText: headerLine.forms[0] || ""
 
   // ---- What fits
 
@@ -425,69 +434,50 @@ Item {
   readonly property int rowHeight: Style.space(30)
   readonly property int listRowHeight: Style.space(40)
   readonly property int rowGap: Style.space(2)
-  readonly property int rowPitch: listRowHeight + rowGap
-  readonly property int threeRowsHeight: 3 * rowPitch - rowGap
 
-  readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
-  readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
-  // The title gives way after the chart: where three rows won't fit beside
-  // the least chart, the header is the status words alone.
-  readonly property bool headerTitled: screenRoom <= 0
-    || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
-  // From the screen's room, never the card's, which fits the chart.
-  readonly property int leastScreenChart: Math.round(chartHeight / 5)
-  readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
-    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
-  // The hint gives way, after the chart, where it would leave fewer than
-  // three rows: read from the screen's room, never the card's, which fits
-  // the footer.
-  readonly property bool hintShown: hint !== "" && (screenRoom <= 0
-    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
-
-  readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
-    : margins * 2 + header.height + heroBand.implicitHeight + footer.height + groupGap * 3
-  readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + groupGap * 3
-  // The window's chart is sized from the surface and the chrome beside it,
-  // never the list or itself, so a list switch moves nothing.
-  readonly property bool chartFitsSurface: minChartHeight > 0 && minChartHeight < chartHeight
-  readonly property int roomBesideChart: height - chromeBesideChart - chartHeight
-  readonly property int shownChartHeight: roomBesideChart < threeRowsHeight
-    ? chartHeight - Math.min(chartHeight - minChartHeight, threeRowsHeight - roomBesideChart)
-    : chartHeight + roomBesideChart - rowsHeight(Infinity, roomBesideChart)
-  // Counted from the rows, not the chart's give: at a larger text size each
-  // rounds on its own (275 less 170 is not two 53 px rows).
-  readonly property int smallestHeight: chartFitsSurface ? chromeBesideChart + minChartHeight + threeRowsHeight
-    : chromeBesideChart + chartHeight + listRowHeight
-  readonly property int helpHeight: margins * 2 + header.height + groupGap + helpSheet.contentHeight
-  readonly property int searchHeight: margins * 2 + header.height + heroBand.implicitHeight
-    + groupGap * 2 + search.desiredHeight
-  readonly property int wholeListHeight: wholeRowsHeight(height - chromeHeight)
-
-  readonly property int rowsSightHeight: rowsRoom > 0 ? wholeRowsHeight(rowsRoom - chromeHeight) : wholeListHeight
-  readonly property int listMenuTop: margins + header.height + groupGap + heroBand.implicitHeight + Style.space(4)
-  // The menu ends one gap above the footer, which stays in sight under it.
-  readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + groupGap + footer.height + margins
-  readonly property int listMenuLeastBottom: listMenuTop + listMenu.leastHeight + groupGap + footer.height + margins
-  readonly property int listViewHeight: margins * 2 + header.height + heroBand.implicitHeight + groupGap * 2
-    + (managingLists ? manageLists.contentHeight : symbolLists.contentHeight)
-
-  function rowsHeight(count, space) {
-    var rows = Math.min(count, Math.floor((Math.max(0, space) + rowGap) / rowPitch))
-    return rows > 0 ? rows * rowPitch - rowGap : 0
-  }
-
-  function wholeRowsHeight(space) {
-    return rowsHeight(listName !== "" ? Math.max(1, symbols.length) : symbols.length, space)
-  }
+  // Every height, from what the pieces measure beside the chart and the
+  // rows, and the band as laid out, never from the header's or the footer's
+  // height, which these set (`Layout.js`). The panel's card takes its height
+  // from `fit`, and the window its least height from `measured`, so neither
+  // reads the body's height but the window's chart.
+  readonly property var measured: Layout.measure({
+    screenRoom: screenRoom,
+    margins: margins,
+    groupGap: groupGap,
+    listMenuGap: Style.space(4),
+    rowHeight: listRowHeight,
+    rowGap: rowGap,
+    chartHeight: chartHeight,
+    minChartHeight: minChartHeight,
+    headerTitledHeight: header.titledHeight,
+    headerBareHeight: header.bareHeight,
+    bandBesideChart: heroBand.heightBesideChart,
+    footerBarHeight: footer.barHeight,
+    hintRoom: footer.hintRoom,
+    named: listName !== "",
+    symbolCount: symbols.length
+  })
+  function windowHeight() { return minChartHeight > 0 ? height : 0 }
+  readonly property var fit: Layout.place(measured, windowHeight(), heroBand.implicitHeight)
+  // Placed afresh, not read from `fit`, which a new height reaches after it
+  // reaches this: the rows never count a height against stale chrome.
+  readonly property var rowsFit: Layout.rows(Layout.place(measured, windowHeight(), heroBand.implicitHeight), height, rowsRoom)
+  readonly property int rowPitch: fit.rowPitch
+  readonly property int chromeHeight: fit.chromeHeight
+  readonly property int smallestHeight: measured.smallestHeight
 
   function fittedHeight(maxHeight) {
-    var rows = chromeHeight + wholeRowsHeight(maxHeight - chromeHeight)
-    // The sheet keeps the rows' height, so opening it moves nothing, and
-    // grows the panel only past rows shorter than itself.
-    if (showingHelp) return Math.max(rows, Math.min(maxHeight, helpHeight))
-    var view = listViewOpen ? listViewHeight : adding ? searchHeight : listMenuOpen ? listMenuBottom : 0
-    var least = listMenuOpen ? Math.min(maxHeight, listMenuLeastBottom) : 0
-    return Math.max(rows, least, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
+    return Layout.fittedHeight(fit, {
+      help: showingHelp,
+      helpHeight: helpSheet.contentHeight,
+      lists: listViewOpen,
+      listsHeight: managingLists ? manageLists.contentHeight : symbolLists.contentHeight,
+      search: adding,
+      searchHeight: search.desiredHeight,
+      menu: listMenuOpen,
+      menuHeight: listMenu.contentHeight,
+      menuLeast: listMenu.leastHeight
+    }, maxHeight)
   }
 
   // ---- What is open over the rows
@@ -550,7 +540,7 @@ Item {
   // shows at rest, and All's while a new list is being filled, so a stock
   // Stonks already follows comes at once, without asking Yahoo. Asked only
   // while search is open.
-  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, filling && service ? service.allSymbols : members, quotes).map(function(symbol) {
+  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, filling ? lists[0].symbols : members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
     var row = quote ? Figures.listRow(quote, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
@@ -613,12 +603,12 @@ Item {
   function land() {
     // Rows joining together are heard once.
     if (unheardAdds.length && service) {
-      var joined = unheardAdds.filter(function(a) { return service.arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
+      var joined = unheardAdds.filter(function(a) { return arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
       if (joined.length) sound("add")
       var still = unheardAdds.filter(function(a) { return joined.indexOf(a) < 0 && members.indexOf(a) >= 0 })
       if (still.length !== unheardAdds.length) unheardAdds = still
     }
-    if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
+    if (landing === "" || !service || arriving.indexOf(landing) >= 0) return
     var failed = !quotes[landing] && !!entries[landing] && entries[landing].status === "failed"
     // A new symbol's failed first fetch is done: the hero stays where it
     // was, its row saying it failed. A Show of a member still features it.
@@ -900,40 +890,25 @@ Item {
     watchlist.select(symbol, pointed)
   }
 
-  // Ctrl+Z works long after the offer goes. Its time waits while the
-  // pointer is on it.
+  // Ctrl+Z works long after the offer goes, which lasts 5 s
+  // (`TimedNote`).
   property var undoOffered: null
-  property real undoShown: 1
   onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
   function offerUndo() {
     undoOffered = removal
-    holdUndo()
-  }
-  function holdUndo() {
-    undoFade.stop()
-    undoShown = 1
-    if (undoOffered !== null && surfaceOpen && !footer.undoHovered) undoTimer.restart()
-    else undoTimer.stop()
+    undoTime.hold()
   }
   function endUndo() {
-    undoTimer.stop()
-    undoFade.stop()
-    undoShown = 1
+    undoTime.reset()
     undoOffered = null
   }
-  Timer {
-    id: undoTimer
-    interval: 5000 - undoFade.duration
-    onTriggered: undoFade.start()
-  }
-  NumberAnimation {
-    id: undoFade
-    target: root
-    property: "undoShown"
-    from: 1
-    to: 0
-    duration: Motion.duration(Style, 600)
-    onFinished: root.endUndo()
+  TimedNote {
+    id: undoTime
+    lasts: 5000
+    says: root.undoOffered !== null
+    hovered: footer.undoHovered
+    surfaceOpen: root.surfaceOpen
+    onEnded: root.endUndo()
   }
 
   // ---- The chart's range, scrub, replay and screenshot
@@ -990,13 +965,13 @@ Item {
   property bool cameraLit: false
   function takeScreenshot() {
     showingHelp = false
-    if (!camera || camera.busy || String(shareLoader.source) !== "") return
+    if (shareShot.busy) return
     // With no chart on show, the footer says why nothing was taken.
     if (!featuredQuote || !featuredDay || !featured) {
       say("No chart to take a screenshot of")
       return
     }
-    shareLoader.setSource("ShareCard.qml", {
+    shareShot.take({
       symbol: chartSymbol || featuredSymbol,
       quote: featuredQuote,
       day: featuredDay,
@@ -1020,69 +995,42 @@ Item {
       fontFamily: fontFamily
     })
   }
-  // The other surface may take the camera while this card waits: then this
-  // card goes.
-  function shootCard(card) {
-    var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
-    var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function() {
-      shareLoader.source = ""
-      // As the picture is taken; the footer says after how the save went.
-      sound("shutter")
-    }, function(code) {
-      shareLoader.source = ""
-      if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
-      cameraLit = true
-      say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
-    })
-    if (!taken) shareLoader.source = ""
+  ShareShot {
+    id: shareShot
+    camera: root.camera
+    onShutter: root.sound("shutter")
+    onTold: function(words, saved) {
+      if (saved) root.cameraLit = true
+      root.say(words)
+    }
   }
 
   // ---- The footer's notes, hint and notices
 
   // Why an action did nothing, or what a screenshot did, said in the
-  // footer's place for a moment.
+  // footer's place for 2.5 s (`TimedNote`). It waits while the pointer is
+  // on it, so it never turns into the add under a click.
   property string note: ""
   function say(text) {
     note = text
-    holdNote()
-  }
-
-  // The note waits while the pointer is on it, so it never turns into the
-  // add under a click. A closed surface's note stays as the close left it.
-  function holdNote() {
-    if (!surfaceOpen) {
-      noteTimer.stop()
-      return
-    }
-    noteFade.stop()
-    noteShown = 1
-    if (note !== "" && surfaceOpen && !footer.hovered) noteTimer.restart()
-    else noteTimer.stop()
+    noteTime.hold()
   }
 
   function clearNote() {
-    noteTimer.stop()
-    noteFade.stop()
-    noteShown = 1
+    noteTime.reset()
     note = ""
   }
 
   // What a refusal covered fades in after it: a click meant for the note,
   // just after it went, would otherwise open search.
-  property real noteShown: 1
-  Timer {
-    id: noteTimer
-    interval: 2500 - noteFade.duration
-    onTriggered: noteFade.start()
-  }
-  NumberAnimation {
-    id: noteFade
-    target: root
-    property: "noteShown"
-    from: 1
-    to: 0
-    duration: Motion.duration(Style, 600)
-    onFinished: {
+  TimedNote {
+    id: noteTime
+    objectName: "noteTime"
+    lasts: 2500
+    says: root.note !== ""
+    hovered: footer.hovered
+    surfaceOpen: root.surfaceOpen
+    onEnded: {
       root.clearNote()
       footer.fadeIn()
     }
@@ -1122,10 +1070,8 @@ Item {
     keepTyped()
     landing = ""
     unheardAdds = []
-    noteTimer.stop()
-    noteFade.stop()
-    undoTimer.stop()
-    undoFade.stop()
+    noteTime.freeze()
+    undoTime.freeze()
     footer.freeze()
     watchlist.takeOver()
     motion.freeze()
@@ -1193,10 +1139,10 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: root.margins
-    statusForms: root.headerForms
+    statusForms: root.headerLine.forms
     title: root.featured && root.featuredQuote ? root.featured.name : ""
-    titled: root.headerTitled
-    offersRetry: root.offersRetry
+    titled: root.fit.headerTitled
+    offersRetry: root.headerLine.offersRetry
     look: root.look
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
@@ -1204,7 +1150,7 @@ Item {
     seen: root.seen
     scrubbing: root.scrubT !== 0
     live: root.heroLive
-    trouble: !!root.troubleForms
+    trouble: root.headerLine.trouble
     still: !root.surfaceOpen
     helpShown: root.showingHelp
     onStyleRequested: function(v) { root.setStyle(v) }
@@ -1218,7 +1164,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
-    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestTrades, root.now, root.calendars)
+    rowsDay: Figures.rowsDayName(root.rowsShared, root.now)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1241,7 +1187,7 @@ Item {
       : root.yahooDown || !root.chartLoading ? "" : root.loadingText + "…"
     // Before any chart, the coming symbol, never a dash.
     symbol: root.chartSymbol || root.featuredSymbol
-    nameOnLine: !root.headerTitled
+    nameOnLine: !root.fit.headerTitled
     view: root.featured
     quote: root.featuredQuote
     day: root.featuredDay
@@ -1250,7 +1196,7 @@ Item {
     scrubX: root.scrubX
     reveal: motion.reveal
     replayX: motion.replayX
-    chartHeight: root.chartFitsSurface ? root.shownChartHeight : root.screenChartHeight
+    chartHeight: Layout.chartHeight(root.measured, root.windowHeight())
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel
@@ -1290,13 +1236,13 @@ Item {
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
-    height: root.wholeListHeight
-    sightHeight: root.rowsSightHeight
+    height: root.rowsFit.listHeight
+    sightHeight: root.rowsFit.sightHeight
     menuCovers: root.listMenuOpen ? listMenu.y + listMenu.height - watchlist.y : 0
     held: root.rowMenu !== null
     visible: root.rowsShown
     view: root.view
-    listKeys: root.service && root.service.listKey ? root.service.lists.map(function(list) { return root.service.listKey(list.name) }) : []
+    listKeys: root.listKeys
     quotes: root.quotes
     newestTrades: root.newestTrades
     nights: root.nights
@@ -1448,18 +1394,16 @@ Item {
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
-    noteOpacity: root.noteShown
+    noteOpacity: noteTime.shown
     notice: root.footerSays.text
     noticeActions: root.footerSays.actions
     hint: root.hint
-    showsHint: root.hintShown
+    showsHint: root.fit.hintShown
     // The same on every list: the list's name is already at its top.
     label: "+  Find or add a symbol"
     acts: !root.footerSays.unreadable
-    onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
-    undoOpacity: root.undoShown
-    onUndoHoveredChanged: root.holdUndo()
+    undoOpacity: undoTime.shown
     onUndoClicked: root.undoRemoval()
     updateLabel: root.footerSays.updateOffer !== "" ? "Update to " + root.footerSays.updateOffer : ""
     onUpdateClicked: root.updates.update(root.footerSays.restartable)
@@ -1468,25 +1412,6 @@ Item {
       else if (root.saveFailed) root.saveAgain()
       else if (root.note === "" && root.footerSays.updatedTo !== "") root.updates.restart()
       else root.startAdding()
-    }
-  }
-
-  // Clipped to nothing, not hidden: a hidden item's parts read themselves
-  // hidden, and the retro chart's lit cap falls to its top row. A canvas
-  // paints a frame after it is asked, so the grab waits two frames.
-  Item {
-    width: 0
-    height: 0
-    clip: true
-    Loader {
-      id: shareLoader
-      objectName: "shareLoader"
-    }
-    FrameAnimation {
-      property int frames: 0
-      running: shareLoader.status === Loader.Ready
-      onRunningChanged: frames = 0
-      onTriggered: if (++frames === 2) root.shootCard(shareLoader.item)
     }
   }
 
@@ -1565,8 +1490,8 @@ Item {
     active: root.listMenuOpen && root.surfaceOpen
     z: 10
     x: root.margins
-    y: root.listMenuTop
-    maxHeight: root.height - root.listMenuTop - root.margins - (root.chartFitsSurface ? 0 : root.groupGap + footer.height)
+    y: root.fit.listMenuTop
+    maxHeight: root.rowsFit.listMenuRoom
     choices: root.lists
     current: root.listName
     look: root.look

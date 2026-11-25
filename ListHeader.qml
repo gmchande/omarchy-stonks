@@ -15,7 +15,7 @@ Item {
 
   property string listLabel: "All"
   property bool listMenuOpen: false
-  // The day the rows measure (`Figures.rowsDay`): "TODAY", "FRI", or
+  // The day the rows measure (`Figures.rowsDayName`): "TODAY", "FRI", or
   // "MON".
   property string rowsDay: "TODAY"
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })

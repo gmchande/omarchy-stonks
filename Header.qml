@@ -104,11 +104,12 @@ Item {
   readonly property int twoLines: Math.max(Style.space(28),
     titleText.implicitHeight + Style.space(2) + statusWords.implicitHeight)
   readonly property int ruleGap: Style.space(14)
-  // The height with the title, whether or not it shows.
+  // The height with the title, whether or not it shows, and without it.
   readonly property int titledHeight: twoLines + ruleGap * 2 - Style.space(8) + 1
-  readonly property int contentHeight: titled ? twoLines : Style.space(28)
+  readonly property int bareHeight: Style.space(28)
+  readonly property int contentHeight: titled ? twoLines : bareHeight
   readonly property int centerOffset: Math.round((contentHeight - height) / 2)
-  implicitHeight: titled ? titledHeight : Style.space(28)
+  implicitHeight: titled ? titledHeight : bareHeight
   implicitWidth: parent ? parent.width : 0
   height: implicitHeight
   width: parent ? parent.width : implicitWidth

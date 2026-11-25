@@ -159,13 +159,17 @@ function dayTitles() {
   return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }))
 }
 
+// The day the rows measure, "TODAY", "FRI" or "8 SEP", worked out in two
+// steps, so the clock reads only the second: the day the rows share, which
+// changes only with their prices, and its name, which changes only at the
+// exchange's midnight.
 // Only US stocks and ETFs, which trade at night, share one day here;
 // listings abroad and coins name their own on their rows. A row with no
 // time names no day: its freshness says so. Tonight's trades name the day
-// they joined, which the rows keep until 04:00 (`listRow`).
-function rowsDay(symbols, quotes, newest, now, calendars) {
+// they joined, which the rows keep until 04:00 (`listRow`). Null where no
+// row names a day or two name different ones.
+function rowsSharedDay(symbols, quotes, newest, calendars) {
   var shared = null
-  var mixed = false
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
@@ -173,11 +177,51 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
     var t = newest[symbols[i]] ? newest[symbols[i]].dayStart : head ? head.t : null
     if (t === null) continue
     var day = { quote: q, t: t, day: exchangeDay(q, t) }
-    mixed = mixed || (!!shared && shared.day !== day.day)
+    if (shared && shared.day !== day.day) return null
     shared = day
   }
+  return shared
+}
+
+function rowsDayName(shared, now) {
   var today = shared ? exchangeDay(shared.quote, now) : null
-  return !shared || mixed || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today)
+  return !shared || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today)
+}
+
+// What the header says, by what wins: trouble, then a chart loading, a
+// refresh asked for, a range that failed, a scrub of a range, and the
+// market's words. `forms` are its words, each shorter than the last;
+// `trouble`, whether they are trouble; `offersRetry`, whether they offer to
+// try the range again. `s`:
+// - `hasService`, else `whenMissing` says so.
+// - `scrubbed`: a scrub or replay shows a moment. `refreshing`: a refresh
+//   the reader asked for is out. `rangeFailed`: the range on show failed,
+//   and `chartRange` is it.
+// - `pause`: Yahoo's (`Freshness.hostPause`), said where a stock warns
+//   (`warnings`), and short in the panel (`compact`). `yahooDown`: every
+//   stock warns. `quoted`: the stock on show has a quote, whose refresh
+//   failed (`featuredFailed`); `symbol` is it.
+// - `loading`: a chart is on its way, said as `loadingText` where one is on
+//   show (`hasChart`), and nothing before any.
+// - `scrubForms`: a range's scrub, null without. `marketForms`: the
+//   market's.
+// A refetch the service makes itself says nothing, out or failed.
+function headerLine(s) {
+  var said = function(forms) { return { forms: forms, trouble: false, offersRetry: false } }
+  if (!s.hasService) return said([s.whenMissing])
+  if (!s.scrubbed && !s.refreshing && !s.rangeFailed) {
+    var trouble = s.pause && s.warnings > 0 ? (s.compact ? s.pause.forms.slice(1) : s.pause.forms)
+      : s.yahooDown ? ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+      : s.quoted && s.featuredFailed ? ["Refresh failed for " + s.symbol + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]
+      : null
+    if (trouble) return { forms: trouble, trouble: true, offersRetry: false }
+  }
+  if (s.loading) return said([s.hasChart ? s.loadingText : ""])
+  if (s.refreshing && !s.scrubbed) return said(["Refreshing"])
+  if (s.rangeFailed) return { forms: [s.chartRange.toUpperCase() + " unavailable"], trouble: false, offersRetry: true }
+  if (s.scrubForms) return said(s.scrubForms)
+  if (s.quoted) return said(s.marketForms)
+  return said([s.whenMissing])
 }
 
 // The rows' own price and tone rules, so the breadth never disagrees with

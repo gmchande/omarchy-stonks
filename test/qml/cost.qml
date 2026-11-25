@@ -330,8 +330,8 @@ Harness {
       var quotesFeed = service.feeds.quotes
       var held = quotesFeed.quotes
 
-      // A second of the clock. The header's trouble check is among the
-      // readers: it reads every stock's quote in All, in sight or not.
+      // A second of the clock. The header's count of stocks that warn and
+      // the rows' day read no quote at its ticks.
       var reads = { on: false, n: 0 }
       var watched = counted(held, Object.keys(held), reads)
       quotesFeed.quotes = watched
@@ -341,8 +341,8 @@ Harness {
       var unlanded = quotesFeed.quotes === watched
       quotesFeed.quotes = held
       settle()
-      harness.check("a second with the window open reads a stock's quote at most 480 times in all",
-        unlanded && reads.n > 0 && reads.n <= 480, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
+      harness.check("a second with the window open reads a stock's quote at most 172 times in all",
+        unlanded && reads.n > 0 && reads.n <= 172, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
 
       // A batch of prices for the rows in sight lands: the whole view is
       // made again, the stock on show's day with it.

@@ -87,6 +87,32 @@ function freshnessWarns(fresh) {
   return !!fresh && (fresh.state === "failed" || fresh.state === "overdue")
 }
 
+// The clock as the overdue check reads it: the latest moment a refresh owed
+// turned overdue, 0 before any has. It gives every owed symbol the answer
+// `now` would, and moves only when one turns, so a count of them reruns
+// then, not every second.
+function overdueClock(owed, now) {
+  var at = 0
+  for (var symbol in owed) {
+    var due = owed[symbol] + OVERDUE_AFTER
+    if (due <= now && due > at) at = due
+  }
+  return at
+}
+
+// How many of `symbols` warn, as `freshnessWarns` reads each: its refresh
+// failed, or is overdue by `clock`, `overdueClock`'s.
+function warningCount(symbols, entries, previewEntries, owed, clock) {
+  var count = 0
+  for (var i = 0; i < symbols.length; i++) {
+    var symbol = symbols[i]
+    var entry = entries && entries[symbol] || previewEntries && previewEntries[symbol] || null
+    var owedSince = owed[symbol] || 0
+    if (entry && entry.status === "failed" || owedSince > 0 && clock - owedSince >= OVERDUE_AFTER) count++
+  }
+  return count
+}
+
 // From the quote host's gate (`Gate.qml`); null while the host answers. A
 // pause for no answer lasts 72 s at most, so it says minutes, rounded up; a
 // refusal's can last half an hour, so it says the time. `why` and `when` are
