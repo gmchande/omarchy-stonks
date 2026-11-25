@@ -35,10 +35,10 @@ BarWidget {
   // move until the new day's first prices arrive, soon after 04:00.
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
   readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, service.changeMode, newest) : null
-  // The pill has no room for the newest price's session and time, nor at
-  // night for tonight's price and move; the hover says them.
-  readonly property string newestNote: newest
-    ? Figures.pillNote(featuredQuote, newest, service.changeMode, service.now, service.calendars, retro) : ""
+  // What the pill has no room for: at night tonight's move, else a price's
+  // session outside the regular one, and the time of a late price.
+  readonly property string pillNote: featuredQuote && freshness
+    ? Figures.pillNote(featuredQuote, newest, freshness, service.changeMode, service.calendars, retro) : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
@@ -82,8 +82,8 @@ BarWidget {
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
   // to the bar again while it stays: a warning's, a new symbol's, a new
-  // listing's IPO price, and the newest price's, its time and, at night,
-  // tonight's price and move, which the pill shows nowhere else.
+  // listing's IPO price, and the pill's note: tonight's move, a session, a
+  // late price's time, which the pill shows nowhere else.
   // Qt.callLater runs a function once, so changes together show once. A new
   // figure on the pill alone never does, so a resting pointer sees no blink
   // for what it can read on the pill.
@@ -92,7 +92,7 @@ BarWidget {
   }
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
-  onNewestNoteChanged: Qt.callLater(reshowTooltip)
+  onPillNoteChanged: Qt.callLater(reshowTooltip)
   onOpenNoteChanged: Qt.callLater(reshowTooltip)
   onListingNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
@@ -263,15 +263,15 @@ BarWidget {
     // and at least an icon slot; and the mark's room under it all.
     fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
       : root.stackedHeight) + root.markRoom : -1
-    // Only what the pill can't say: the icon form's symbol and change, that
-    // the stacked form's move counts from the open, or on a listing's first
-    // day from its IPO price, a newest price's session and time ("Overnight
-    // 23:25"), at night with whose move the pill shows and tonight's price
-    // and move, what a "!" means, and that a middle-click opens the window.
-    // None while the panel is open: the bubble would land on its header.
-    tooltipText: root.opened ? ""
-      : [[root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.newestNote, root.warningText]
-        .filter(function(part) { return part !== "" }).join(" · "), "Middle-click opens the window"].filter(function(part) { return part !== "" }).join("\n")
+    // Only what the pill can't say, on one line: the icon form's symbol and
+    // change, that the stacked form's move counts from the open, or on a
+    // listing's first day from its IPO price, the pill's note ("tonight
+    // −3.54%", "After hours", "as of 23:12"), and what a "!" means. Its
+    // first word takes a capital: "Tonight −3.54%" alone. None while the
+    // panel is open: the bubble would land on its header.
+    readonly property string hoverLine: [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.pillNote, root.warningText]
+      .filter(function(part) { return part !== "" }).join(" · ")
+    tooltipText: root.opened ? "" : hoverLine.charAt(0).toUpperCase() + hoverLine.slice(1)
 
     onPressed: function(b) {
       // As on Omarchy's clock: a right-click changes the look, a middle-click

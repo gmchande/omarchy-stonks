@@ -1,6 +1,7 @@
 .pragma library
 .import "Calendar.js" as Calendar
 .import "Format.js" as Format
+.import "Freshness.js" as Freshness
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
 .import "Day.js" as Day
@@ -448,24 +449,29 @@ function listingNote(quote, row, mode) {
   return mode !== "open" && !!row && row.close === quote.prevClose ? "From its IPO price, " + price : ""
 }
 
-var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
-// The pill's hover: the newest price's session and time, and while the pill
-// keeps the day (`listRow`), whose day it is and tonight's price and move:
-// "Monday's move · Overnight 01:25 153.87 +0.39%". Since the open, tonight
-// has no open to count from, so its move is left out.
-function pillNote(quote, newest, mode, now, calendars, retro) {
-  if (!newest) return ""
-  var note = newestNote(quote, newest, now, calendars)
-  if (!newest.joined) return note
-  var tonight = rowModel(quote, 0, mode, newest)
-  var day = DAY_NAMES[Format.localClock(quote.session.regular.start, quote.gmtoffset || 0).weekday]
-  return day + "'s move · " + note + " " + tonight.priceText + (tonight.pct === null ? "" : " " + Format.lookSigns(tonight.changeLine, retro))
+// The pill's hover past its symbol and move: only what the pill can't
+// show. While it keeps the day (`listRow`), tonight's move, "tonight
+// −3.54%", and nothing since the open, which tonight has no open to count
+// from. Else the session of a price from outside the regular one, "After
+// hours", unless a warning names it. Either ends "as of 23:12" once its
+// price is late, by the rules the rows and the panel go by: a row's "As
+// of" (`Freshness.freshnessText`) and the panel's dimmed night price
+// (`newestStale`). `fresh` is the pill's own (`Freshness.freshness`).
+function pillNote(quote, newest, fresh, mode, calendars, retro) {
+  var now = fresh.now
+  if (Overnight.keepsDay(newest)) {
+    var tonight = rowModel(quote, 0, mode, newest)
+    if (tonight.pct === null) return ""
+    return "tonight " + Format.lookSigns(tonight.changeLine, retro) + (newestStale(newest, now) ? " " + asOfNote(quote, newest.t, now, calendars) : "")
+  }
+  if (Freshness.freshnessWarns(fresh)) return ""
+  var late = fresh.state === "aged" || fresh.state === "saved" || newestStale(newest, now)
+  return [newest ? Market.phaseLabel(newest.phase) : "", late ? asOfNote(quote, fresh.asOf, now, calendars) : ""]
+    .filter(function(part) { return part !== "" }).join(" ")
 }
 
-// The newest price's session and time.
-function newestNote(quote, newest, now, calendars) {
-  return Market.phaseLabel(newest.phase) + " " + Market.tradeDay(quote, newest.t, now, calendars) + Market.tradeTime(quote, newest.t, calendars)
+function asOfNote(quote, t, now, calendars) {
+  return "as of " + Market.tradeDay(quote, t, now, calendars) + Market.tradeTime(quote, t, calendars)
 }
 
 function newestStale(newest, now) {

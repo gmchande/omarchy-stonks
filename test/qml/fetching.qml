@@ -567,7 +567,8 @@ Harness {
 
       // A pointer resting on the pill at night: Robinhood answers a bar
       // still forming, then the same bar at a new price, and the hover
-      // shows tonight's price as it is now.
+      // shows tonight's move as it is now, with the bar's time, since its
+      // price is late.
       startAt(at(harness.wed7 + 86400, 1, 0))()
       var forming = function(price) {
         runCommand(["sh", "-c", "echo 2026-10-08T05:00:00Z " + price + " > \"$STONKS_FAKE_STATE/NIGHT.bar\""])
@@ -585,20 +586,21 @@ Harness {
       var after = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       remove("NIGHT.bar")
-      harness.check("a pointer resting on the pill at night sees tonight's newest price in its hover, a new price on the same bar included",
-        joinedFirst && / 240\.00 /.test(entered) && tonight(241.5) && / 241\.50 /.test(after),
+      harness.check("a pointer resting on the pill at night sees tonight's newest move in its hover, a new price on the same bar included",
+        joinedFirst && entered === "Tonight +1.99% as of 01:00" && tonight(241.5) && after === "Tonight +2.62% as of 01:00",
         [joinedFirst, entered, pill.newest ? pill.newest.p + " " + pill.newest.joined : "no newest", after].join(" | "))
 
       // Robinhood's quote then brings a trade at 01:19:30, newer than that
-      // bar: within a minute the hover shows it, at its time.
+      // bar: within a minute the hover shows its move, and no time, since
+      // the trade is fresh.
       runCommand(["sh", "-c", "echo 2026-10-08T05:19:30.250Z 242.25 > \"$STONKS_FAKE_STATE/NIGHT.trade\""])
       tick(60, 5, function() {})
       mouseMove(pill, pill.width / 2, pill.height / 2)
       var quoted = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       remove("NIGHT.trade")
-      harness.check("Robinhood's quote brings a newer trade than its bars, and within a minute the pill's hover shows it, at its time",
-        / 242\.25 /.test(quoted) && /01:19/.test(quoted) && !!pill.newest && pill.newest.t === at(harness.wed7 + 86400, 1, 19) + 30,
+      harness.check("Robinhood's quote brings a newer trade than its bars, and within a minute the pill's hover shows its move, with no time while it is fresh",
+        quoted === "Tonight +2.94%" && !!pill.newest && pill.newest.t === at(harness.wed7 + 86400, 1, 19) + 30,
         [quoted, pill.newest ? pill.newest.p + " " + pill.newest.t : "no newest"].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
