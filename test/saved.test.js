@@ -1467,6 +1467,9 @@ test("search names the kinds it leaves out, beside what it shows or alone", () =
 
 test("request URLs are the exact strings Yahoo is sent, and history never takes the 1D path", () => {
   expect(M.searchUrl("a b")).toContain("q=a%20b")
+  // Half a UTF-16 pair, left by a cut between an emoji's halves, is left
+  // out of the words asked; a whole emoji goes.
+  expect([M.searchUrl("AAPL\ud83d"), M.searchUrl("\udc00\udc00X🚀")].map(url => url.match(/q=([^&]*)/)[1])).toEqual(["AAPL", "X%F0%9F%9A%80"])
   expect(M.historyUrl("AAPL", "1D")).toBeNull()
   // The saved fundamentals answers are the feed's own requests.
   const saved = name => readFileSync(join(fixtures, "fundamentals", name + ".url"), "utf8").replace(/^# /, "").trim()
