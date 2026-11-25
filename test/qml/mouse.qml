@@ -72,7 +72,7 @@ Harness {
     function rest() {
       var list = body.watchlist
       within(2500, function() {
-        return list.dragSymbol === "" && !list.settling && list.displayedSymbols.every(function(symbol) { return list.rowResting(symbol) })
+        return list.reorder.lifted === "" && !list.settling && list.displayedSymbols.every(function(symbol) { return list.rowResting(symbol) })
       })
     }
 
@@ -98,13 +98,102 @@ Harness {
       mousePress(body, grip.x, grip.y)
       mouseMove(body, grip.x, grip.y + down / 2, -1, Qt.LeftButton)
       mouseMove(body, grip.x, grip.y + down, -1, Qt.LeftButton)
-      within(1000, function() { return body.watchlist.dragSymbol === rows[0] })
+      within(1000, function() { return body.watchlist.reorder.lifted === rows[0] })
       mouseRelease(body, grip.x, grip.y + down)
       var carried = rows.slice(1, 2).concat([rows[0]]).concat(rows.slice(2))
       harness.check("a row dragged past the next takes its place, and the order is the lists' own",
         within(2000, function() { return service.symbols.join(",") === carried.join(",") }), service.symbols.join(","))
       rows = service.symbols.slice()
       rest()
+
+      // From the top of the rows, a row held and carried `by` down, the
+      // button still held: where the pointer is.
+      var hold = function(symbol, by) {
+        var list = body.watchlist
+        var over = list.mapToItem(body, list.width / 2, list.height / 2)
+        for (var notch = 0; notch < 6; notch++) mouseWheel(body, over.x, over.y, 0, 120)
+        rest()
+        var held = row(symbol)
+        var grip = held.mapToItem(body, held.width / 2, held.height / 2)
+        mousePress(body, grip.x, grip.y)
+        mouseMove(body, grip.x, grip.y + by / 2, -1, Qt.LeftButton)
+        mouseMove(body, grip.x, grip.y + by, -1, Qt.LeftButton)
+        within(1000, function() { return body.watchlist.reorder.lifted === symbol })
+        return Qt.point(grip.x, grip.y + by)
+      }
+      var liftedRow = function() { return body.watchlist.reorder.lifted }
+      var order = function() { return service.symbols.join(",") }
+
+      // The wheel under a held row scrolls the rows, and the row stays under
+      // the pointer: it drops past rows the pointer never reached.
+      var to = hold(rows[0], down)
+      mouseWheel(body, to.x, to.y, 0, -120)
+      mouseRelease(body, to.x, to.y)
+      var landed = within(2000, function() { return service.symbols.indexOf(rows[0]) >= 3 })
+      var wheeled = rows.slice(1)
+      wheeled.splice(service.symbols.indexOf(rows[0]), 0, rows[0])
+      harness.check("a row held as the wheel scrolls stays under the pointer and drops where it is then, past rows the pointer never reached",
+        landed && order() === wheeled.join(","), [service.symbols.indexOf(rows[0]), order()].join(" "))
+      service.setManualOrder(rows)
+      within(1500, function() { return order() === rows.join(",") })
+
+      // Sorted elsewhere while a row is held: the drag ends, and your own
+      // order stays as it was.
+      to = hold(rows[0], down)
+      var wasLifted = liftedRow() === rows[0]
+      service.setOrder("symbol")
+      var sortedEnds = within(1000, function() { return liftedRow() === "" })
+      mouseRelease(body, to.x, to.y)
+      service.setOrder("manual")
+      harness.check("a row held while the order changes elsewhere drops back, and your own order stays as it was",
+        wasLifted && sortedEnds && within(1500, function() { return body.watchlist.displayedSymbols.join(",") === rows.join(",") }) && order() === rows.join(","),
+        [wasLifted, sortedEnds, order()].join(" "))
+      rest()
+
+      // Removed elsewhere while it's held: the drag ends at once, and the
+      // rest keep their order.
+      var vanished = rows[3]
+      to = hold(vanished, down)
+      wasLifted = liftedRow() === vanished
+      service.removeSymbol(vanished)
+      var goneEnds = within(1000, function() { return liftedRow() === "" })
+      mouseRelease(body, to.x, to.y)
+      var left = rows.filter(function(s) { return s !== vanished }).join(",")
+      harness.check("a row removed elsewhere while it's held ends the drag at once, and the rest keep their order",
+        wasLifted && goneEnds && !within(500, function() { return order() !== left }), [wasLifted, goneEnds, order()].join(" "))
+      service.undoRemoval(vanished)
+      within(1500, function() { return order() === rows.join(",") })
+      rest()
+
+      // Held over the last place as the other surface removes another row:
+      // no place is left there, so the drag ends at once, and your order
+      // stays as it was without that row.
+      vanished = rows[2]
+      to = hold(rows[0], rows.length * body.watchlist.rowPitch)
+      var atEnd = liftedRow() === rows[0] && body.watchlist.reorder.slot === rows.length - 1
+      service.removeSymbol(vanished)
+      var endEnds = within(1000, function() { return liftedRow() === "" })
+      mouseRelease(body, to.x, to.y)
+      left = rows.filter(function(s) { return s !== vanished }).join(",")
+      harness.check("a row held over the last place as another row is removed elsewhere ends the drag at once, and your order stays as it was",
+        atEnd && endEnds && !within(500, function() { return order() !== left }), [atEnd, endEnds, order()].join(" "))
+      service.undoRemoval(vanished)
+      within(1500, function() { return order() === rows.join(",") })
+      rest()
+
+      // Closed while a row is held: it drops back, and the window opens on
+      // your order as it was.
+      to = hold(rows[0], down)
+      wasLifted = liftedRow() === rows[0]
+      app.close()
+      var closedEnds = liftedRow() === ""
+      app.open("{}")
+      tryVerify(function() { return body.surfaceOpen }, 3000)
+      mouseRelease(body, to.x, to.y)
+      rest()
+      harness.check("a row held as the window closes drops back, and the window opens on your order as it was",
+        wasLifted && closedEnds && body.watchlist.displayedSymbols.join(",") === rows.join(",") && order() === rows.join(","),
+        [wasLifted, closedEnds, body.watchlist.displayedSymbols.join(","), order()].join(" "))
 
       click(row(rows[0]), Qt.RightButton)
       var menu = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
@@ -205,7 +294,7 @@ Harness {
       mousePress(body, lift.x, lift.y)
       mouseMove(body, lift.x, lift.y - up / 2, -1, Qt.LeftButton)
       mouseMove(body, lift.x, lift.y - up, -1, Qt.LeftButton)
-      var lifted = within(1000, function() { return manage.dragName === "Later" })
+      var lifted = within(1000, function() { return manage.reorder.lifted === "Later" })
       mouseRelease(body, lift.x, lift.y - up)
       var carried = within(2000, function() { return listNames() === "Later," + first })
       // Past All, it stops below it.
@@ -215,7 +304,7 @@ Harness {
       mouseMove(body, lift.x, lift.y - up / 2, -1, Qt.LeftButton)
       mouseMove(body, lift.x, lift.y - up * 2, -1, Qt.LeftButton)
       mouseRelease(body, lift.x, lift.y - up * 2)
-      var kept = !within(500, function() { return listNames() !== "Later," + first }) && within(1500, function() { return manage.dragName === "" })
+      var kept = !within(500, function() { return listNames() !== "Later," + first }) && within(1500, function() { return manage.reorder.lifted === "" })
       harness.check("in Manage lists a list dragged past the one above takes its place, and none goes above All",
         three && lifted && carried && kept, [three, lifted, carried, kept, listNames()].join(" "))
       // The window deletes the list lifted in the panel: the drag ends, and
@@ -225,17 +314,80 @@ Harness {
       mousePress(body, lift.x, lift.y)
       mouseMove(body, lift.x, lift.y + up / 2, -1, Qt.LeftButton)
       mouseMove(body, lift.x, lift.y + up, -1, Qt.LeftButton)
-      var liftedAgain = within(1000, function() { return manage.dragName === "Later" && manage.dragTarget === 2 })
+      var liftedAgain = within(1000, function() { return manage.reorder.lifted === "Later" && manage.reorder.slot === 2 })
       service.deleteList("Later")
       var dropped = within(1500, function() {
         var rows = manageRows()
-        return manage.dragName === "" && rows.length === 2 && rows[0].y === 0 && rows[1].y === manage.itemHeight
+        return manage.reorder.lifted === "" && rows.length === 2 && rows[0].y === 0 && rows[1].y === manage.itemHeight
       })
       mouseRelease(body, lift.x, lift.y + up)
       harness.check("in Manage lists a list deleted elsewhere while lifted ends the drag, and All stays first",
         liftedAgain && dropped, [liftedAgain, dropped, manageRows().map(function(r) { return r.name + "@" + r.y }).join(" ")].join(" "))
       body.closeViews()
       service.deleteList("Later")
+      service.switchList(wasList)
+
+      // A list held in Manage lists while the other surface renames it, the
+      // window closes, or the wheel scrolls.
+      var more = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"]
+      more.forEach(function(name) { service.createList(name) })
+      service.switchList(wasList)
+      var openManage = function() {
+        body.openManageLists()
+        manage = at("manageLists")
+        return within(1500, function() { return manageRows().length === more.length + 2 && harness.inPlace(manageRows()) })
+      }
+      var carry = function(name, by) {
+        var held = manageRows().filter(function(r) { return r.name === name })[0]
+        var grip = held.mapToItem(body, held.width / 4, held.height / 2)
+        mousePress(body, grip.x, grip.y)
+        mouseMove(body, grip.x, grip.y + by / 2, -1, Qt.LeftButton)
+        mouseMove(body, grip.x, grip.y + by, -1, Qt.LeftButton)
+        within(1000, function() { return manage.reorder.lifted === name })
+        return Qt.point(grip.x, grip.y + by)
+      }
+      var named = listNames()
+
+      var opened = openManage()
+      to = carry("One", up)
+      wasLifted = manage.reorder.lifted === "One"
+      service.renameList("One", "Uno")
+      var renamedEnds = within(1000, function() { return manage.reorder.lifted === "" })
+      mouseRelease(body, to.x, to.y)
+      var renamedOrder = named.split(",").map(function(n) { return n === "One" ? "Uno" : n }).join(",")
+      harness.check("in Manage lists a list renamed elsewhere while lifted ends the drag, and the lists keep their order",
+        opened && wasLifted && renamedEnds && !within(500, function() { return listNames() !== renamedOrder }),
+        [opened, wasLifted, renamedEnds, listNames()].join(" "))
+      service.renameList("Uno", "One")
+      within(1500, function() { return listNames() === named })
+
+      to = carry("One", up)
+      wasLifted = manage.reorder.lifted === "One"
+      app.close()
+      closedEnds = manage.reorder.lifted === ""
+      app.open("{}")
+      tryVerify(function() { return body.surfaceOpen }, 3000)
+      mouseRelease(body, to.x, to.y)
+      harness.check("in Manage lists a list lifted as the window closes drops back where it was",
+        wasLifted && closedEnds && !within(500, function() { return listNames() !== named }), [wasLifted, closedEnds, listNames()].join(" "))
+
+      // The wheel under a lifted list scrolls the lists, and the list stays
+      // under the pointer: it drops past lists the pointer never reached.
+      opened = openManage()
+      var scrolls = manage.contentHeight > manage.height
+      to = carry("One", up)
+      mouseWheel(body, to.x, to.y, 0, -120)
+      var carriedOn = within(1500, function() { return manage.reorder.slot > 4 })
+      mouseRelease(body, to.x, to.y)
+      var oneAt = function() { return listNames().split(",").indexOf("One") }
+      var landedOn = within(1500, function() { return oneAt() > 3 })
+      var wheeledOrder = named.split(",").filter(function(n) { return n !== "One" })
+      wheeledOrder.splice(oneAt(), 0, "One")
+      harness.check("in Manage lists a list lifted as the wheel scrolls stays under the pointer and drops where it is then",
+        opened && scrolls && carriedOn && landedOn && listNames() === wheeledOrder.join(","),
+        [opened, scrolls, carriedOn, landedOn, listNames()].join(" "))
+      body.closeViews()
+      more.forEach(function(name) { service.deleteList(name) })
       service.switchList(wasList)
 
       // By symbol, A to Z, then Z to A: the rows themselves, not the setting.

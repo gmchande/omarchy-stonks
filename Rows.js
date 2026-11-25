@@ -77,6 +77,27 @@ function slotOf(symbols, symbol, dragged, slot) {
   return i
 }
 
+// A ListModel of one row per key, in `role`, kept to `keys` as they come
+// and go. A row that stays is never moved or rebuilt: it finds its place by
+// its key, so it can slide there.
+function syncModel(model, role, keys) {
+  var wanted = {}
+  for (var j = 0; j < keys.length; j++) wanted[keys[j]] = true
+  var have = {}
+  for (var i = model.count - 1; i >= 0; i--) {
+    var key = model.get(i)[role]
+    if (wanted[key] === true) have[key] = true
+    else model.remove(i)
+  }
+  for (var k = 0; k < keys.length; k++) {
+    if (have[keys[k]] !== true) {
+      var row = {}
+      row[role] = keys[k]
+      model.append(row)
+    }
+  }
+}
+
 // ---- Sight
 //
 // A list's rows by `row`, { pitch, height }: row i runs from i * pitch, for

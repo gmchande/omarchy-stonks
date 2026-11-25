@@ -35,13 +35,10 @@ OverRows {
   // By name: the other surface can reorder, rename or delete it meanwhile.
   property string pendingName: ""
   onChoicesChanged: {
-    syncRows()
-    // The other surface can delete or rename the lifted list, or one below
-    // the place it's over: the drag ends where things are.
     var listed = choices.map(function(c) { return c.name })
-    if (dragName !== "" && (listed.indexOf(dragName) < 0 || dragTarget >= choices.length)) cancelDrag()
+    Rows.syncModel(rowsModel, "name", listed)
     if (!renaming && !confirming) return
-    var at = choices.map(function(c) { return c.name }).indexOf(pendingName)
+    var at = listed.indexOf(pendingName)
     if (at < 0) { stopEditing(); return }
     cursor = at
     showCursor()
@@ -73,7 +70,7 @@ OverRows {
   onClosed: {
     nameField.focus = false
     scroll.cancelFlick()
-    cancelDrag()
+    reorder.cancel()
   }
 
   function reset() {
@@ -92,7 +89,7 @@ OverRows {
   }
 
   function pointAt(x, y) {
-    if (renaming || confirming || dragName !== "") return
+    if (renaming || confirming || reorder.lifted !== "") return
     var at = scroll.mapFromItem(null, x, y)
     // The scrollbar's gutter beside the rows is no row's.
     if (at.x < 0 || at.x >= column.width || at.y < 0 || at.y >= scroll.height) return
@@ -109,7 +106,7 @@ OverRows {
   // too short for one, the list across its middle. A rename or a delete's
   // question keeps its row, and a lifted list the cursor.
   function keepCursorInSight() {
-    if (renaming || confirming || dragName !== "") return
+    if (renaming || confirming || reorder.lifted !== "") return
     cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
   }
 
@@ -170,74 +167,27 @@ OverRows {
   // come and go, never moved: a row finds its place by its name.
   readonly property var names: choices.map(function(c) { return c.name })
   ListModel { id: rowsModel }
-  function syncRows() {
-    var names = root.choices.map(function(c) { return c.name })
-    var have = []
-    for (var i = rowsModel.count - 1; i >= 0; i--) {
-      var name = rowsModel.get(i).name
-      if (names.indexOf(name) < 0) rowsModel.remove(i)
-      else have.push(name)
-    }
-    names.forEach(function(name) { if (have.indexOf(name) < 0) rowsModel.append({ name: name }) })
-  }
-  Component.onCompleted: syncRows()
+  Component.onCompleted: Rows.syncModel(rowsModel, "name", names)
 
   // A list dragged by its row, as a stock's row is in your own order
   // (Watchlist): lifted under the pointer, the others making room, and
   // dropped in the place it is over. All stays first.
-  property string dragName: ""
-  property real dragY: 0
-  property int dragTarget: -1
-  property real dragOffset: 0
-  // So a lifted list stays under the pointer as the wheel scrolls.
-  property real dragPointer: 0
+  readonly property ReorderDrag reorder: ReorderDrag {
+    keys: root.names
+    pitch: root.itemHeight
+    contentY: scroll.contentY
+    first: 1
+    onDropped: function(from, to) {
+      if (from !== to) root.moveRequested(root.reorder.lifted, to - from)
+      root.cursor = to
+    }
+    onLanded: root.showCursor()
+  }
 
   function beginDrag(name, y) {
-    var from = names.indexOf(name)
-    if (from < 1) return
-    dropAnim.stop()
+    if (!reorder.begin(name, y)) return
     confirming = false
-    cursor = from
-    dragOffset = y - from * itemHeight
-    dragPointer = y - scroll.contentY
-    dragY = from * itemHeight
-    dragTarget = from
-    dragName = name
-  }
-
-  function dragTo(y) {
-    if (dragName === "") return
-    dragPointer = y - scroll.contentY
-    dragY = Math.max(itemHeight, Math.min((choices.length - 1) * itemHeight, y - dragOffset))
-    dragTarget = Math.max(1, Rows.dragSlot(dragY / itemHeight, dragTarget, choices.length))
-  }
-
-  function endDrag() {
-    var from = names.indexOf(dragName)
-    var to = dragTarget
-    if (from < 1 || to < 1) { cancelDrag(); return }
-    if (from !== to) moveRequested(dragName, to - from)
-    cursor = to
-    dropAnim.to = to * itemHeight
-    dropAnim.start()
-  }
-
-  function cancelDrag() {
-    dropAnim.stop()
-    dragName = ""
-  }
-
-  NumberAnimation {
-    id: dropAnim
-    target: root
-    property: "dragY"
-    duration: Motion.duration(Style, 160)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
-    onFinished: {
-      root.cancelDrag()
-      root.showCursor()
-    }
+    cursor = reorder.slot
   }
 
   function askDelete(index) {
@@ -336,7 +286,6 @@ OverRows {
     interactive: contentHeight > height && !root.renaming
     // `moving` stays false for a key's scroll.
     onContentYChanged: {
-      if (root.dragName !== "" && !dropAnim.running) root.dragTo(root.dragPointer + contentY)
       if (!root.active || !(moving || manageBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
@@ -364,7 +313,7 @@ OverRows {
           readonly property bool editing: isCursor && root.renaming
           readonly property bool asking: isCursor && root.confirming
           readonly property bool showsActions: named && !editing && !asking && isCursor && !lifted
-          readonly property bool lifted: named && name === root.dragName
+          readonly property bool lifted: named && name === root.reorder.lifted
           width: column.width
           height: root.itemHeight * (editing && root.problem !== "" ? 2 : 1)
           visible: index >= 0
@@ -372,8 +321,8 @@ OverRows {
           // Where the list sits while another is dragged (`Rows.slotOf`), and
           // below a rename's problem, a row lower. It slides from one place
           // to the next, as a stock's row does (WatchlistRow).
-          readonly property int place: Rows.slotOf(root.names, name, root.dragName, root.dragTarget)
-          y: lifted ? root.dragY : place * root.itemHeight + shift
+          readonly property int place: root.reorder.slotOf(name)
+          y: lifted ? root.reorder.liftedY : place * root.itemHeight + shift
             + (root.renaming && root.problem !== "" && place > root.cursor ? root.itemHeight : 0)
           property int lastPlace: -1
           property real shift: 0
@@ -433,10 +382,10 @@ OverRows {
                 dragged = true
                 root.beginDrag(entry.name, entry.mapToItem(column, event.x, pressY).y)
               }
-              root.dragTo(entry.mapToItem(column, event.x, event.y).y)
+              root.reorder.moveTo(entry.mapToItem(column, event.x, event.y).y)
             }
-            onReleased: if (dragged) root.endDrag()
-            onCanceled: if (dragged) root.cancelDrag()
+            onReleased: if (dragged) root.reorder.end()
+            onCanceled: if (dragged) root.reorder.cancel()
           }
 
           Text {

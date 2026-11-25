@@ -1064,6 +1064,27 @@ test("a dragged row takes the next slot only 0.6 of a row past its own, and a po
   expect(places("", -1)).toEqual([0, 1, 2, 3, 4])
 })
 
+test("the rows keep one row per key as keys come and go, never moving or rebuilding a row that stays, so it slides to its new place", () => {
+  // A ListModel's calls, over a plain array of rows.
+  const model = { rows: [], get count() { return this.rows.length }, get(i) { return this.rows[i] },
+    remove(i) { this.rows.splice(i, 1) }, append(row) { this.rows.push(row) } }
+  const names = () => model.rows.map(row => row.name)
+  M.syncModel(model, "name", ["", "Tech", "Wins"])
+  expect(names()).toEqual(["", "Tech", "Wins"])
+  const all = model.rows[0], tech = model.rows[1]
+  // Wins moved above Tech, and Losses made: the rows stay as they were.
+  M.syncModel(model, "name", ["", "Wins", "Losses", "Tech"])
+  expect(names()).toEqual(["", "Tech", "Wins", "Losses"])
+  expect(model.rows[0]).toBe(all)
+  expect(model.rows[1]).toBe(tech)
+  // Wins deleted, and Tech renamed Growth: their rows go, and Growth's comes.
+  M.syncModel(model, "name", ["", "Losses", "Growth"])
+  expect(names()).toEqual(["", "Losses", "Growth"])
+  expect(model.rows[0]).toBe(all)
+  M.syncModel(model, "name", [])
+  expect(model.rows).toEqual([])
+})
+
 test("sorting ranks the rows as a view over the manual list", () => {
   const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
   // Names that sort unlike the symbols, so each order is its own.
