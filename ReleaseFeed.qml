@@ -32,7 +32,14 @@ Item {
   onNowChanged: sendWaiting()
   onReadyChanged: sendWaiting()
 
+  // Yahoo answering again, heard while an ask is out, holds until that ask
+  // ends: if it got no answer either, it goes again then, not a day later.
+  property bool againOwed: false
   function askAgain() {
+    if (fetchRun.out) {
+      root.againOwed = true
+      return
+    }
     if (!unanswered) return
     root.askedAt = 0
     sendWaiting()
@@ -41,8 +48,11 @@ Item {
   function receive(got) {
     root.unanswered = got.length > 0 && got.every(function(a) { return a.kind === "none" })
     var named = got.length && got[0].kind === "ok" ? Release.manifestVersion(got[0].body) : ""
-    if (named === "") return
-    root.version = named
+    if (named !== "") root.version = named
+    if (root.againOwed) {
+      root.againOwed = false
+      root.askAgain()
+    }
   }
 
   FetchRun {

@@ -77,6 +77,9 @@ Harness {
   Binding { target: plugin.service.feeds.quotes; property: "retryAfter"; value: 200 }
   Binding { target: plugin.service.feeds.preview; property: "retryAfter"; value: 200 }
   readonly property var app: plugin.windowHost.app
+  // The newest version's check, on the walk's clock: a step turns it on,
+  // and says when Yahoo answers again, as the service does.
+  Stonks.ReleaseFeed { id: release; clock: plugin.service }
 
   QtObject { id: workspaceHere }
   QtObject { id: workspaceThere }
@@ -827,6 +830,20 @@ Harness {
       harness.check("Robinhood gone as its daily check falls due: once it answers again, the \"!\" goes at the next try",
         goneMarked && backClearedAt > 0 && backClearedAt - backAt <= 5 * 60 + 60,
         [goneMarked, backClearedAt - backAt].join(" | "))
+
+      // GitHub asked as the network comes back: Yahoo answering again while
+      // that ask is out, which then gets no answer either, has GitHub asked
+      // again at once, not a day later.
+      var manifests = function() { return requests().filter(function(line) { return line.indexOf("manifest manifest ") === 0 }).length }
+      var manifestsBefore = manifests()
+      touch("GITHUB.offline")
+      release.ready = true
+      var githubOut = within(3000, function() { return release.askedAt > 0 })
+      release.askAgain()
+      var askedAgain = within(5000, function() { return manifests() === manifestsBefore + 2 })
+      remove("GITHUB.offline")
+      harness.check("Yahoo answering again while GitHub's ask is out, which gets no answer, has GitHub asked again at once",
+        githubOut && askedAgain, [githubOut, manifests() - manifestsBefore, JSON.stringify(requests().slice(-2))].join(" | "))
 
       harness.finish()
     }
