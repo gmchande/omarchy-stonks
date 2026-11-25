@@ -466,6 +466,19 @@ Harness {
       harness.check("in search, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
         undoneSearch === undoWanted && !b.adding, undoneSearch + " | adding " + b.adding)
 
+      // Asked for a stock it lists while search previews another, as
+      // `omarchy-shell grvc.stonks openWindow '{"symbol":...}'` asks, the
+      // window shows that stock, and search closes.
+      press("a")
+      var previewTyped = typing("searchField")
+      type("shop")
+      var previewing = within(5000, function() { return b.previewing })
+      var asked = service.symbols.filter(function(sym) { return sym !== service.featuredSymbol && sym !== b.previewSymbol })[0]
+      app.open(JSON.stringify({ symbol: asked }))
+      var askedShown = within(2000, function() { return !b.adding && !b.previewing && service.featuredSymbol === asked })
+      harness.check("the window asked for a stock it lists while search previews another shows that stock, and search closes",
+        previewTyped && previewing && askedShown, [previewTyped, previewing, asked, service.featuredSymbol, b.adding, b.previewSymbol].join(" | "))
+
       // Yahoo's search down: the words say so beside RETRY, and Enter asks
       // again, once. Words that name none of the list's own, which Enter
       // would take at once.
