@@ -3501,7 +3501,7 @@ test("at the open the chart holds the last session, with the new one's first tra
   // from Monday's 3,921. Yahoo had caught up by the first bars Stonks saw.
   // A shell started at 08:20 leaves the move out, and one started at 08:30,
   // its trades 14 minutes past the first, shows it.
-  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents, nyOn3(time))
+  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
   const nyOn3 = time => at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2))
   const opening = (place, symbol, times, mode = "pct", cals = calendars) => {
     let held = null
@@ -3558,6 +3558,15 @@ test("at the open the chart holds the last session, with the new one's first tra
   expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
     "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,048.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
+  // An answer that came just after Monday's close, while Yahoo's quote,
+  // 15 minutes late, still held a trade of 15:15, holds no close: at 09:15
+  // Wednesday, Yahoo counting from Friday's, the move is left out, never
+  // counted from that trade.
+  const late = structuredClone(fixture("moments/tokyo-2026-11-03-1855/7203.t.json"))
+  Object.assign(late.chart.result[0].meta, { regularMarketTime: M.epochAt(JPX, "2026-11-02", "15:15"), regularMarketPrice: 3060 })
+  const lateMonday = M.parseChart(late, cents, M.epochAt(JPX, "2026-11-02", "15:31"))
+  const lateFile = (M.twoDays(lateMonday, nyOn3("1915"), calendars) ? "2d/" : "") + "7203.t.json"
+  expect(M.rowModel(M.carryClose(lateMonday, answerAt("tokyo", "1915", lateFile), calendars, nyOn3("1915")), 0, "pct").changeText).toBe("\u2014")
   // The 1D chart in those minutes, each answer as Stonks asks for it: the
   // last session as drawn before the open, its dashed line and all, with the
   // new one's first trades joined after it, the dot at the newest, until the
