@@ -111,8 +111,12 @@ function firstTrade(quote, head) {
 // first bars too, so a chart that has them doesn't hold the day again once
 // Yahoo's two-day answer comes. A US stock's (`pre`) count from its
 // pre-market, so a day whose pre-market traded holds nothing at the open.
+// A trade an hour past the open ends the hold however few came before
+// (`HOLD_LIMIT`), as `Day.heldWindow` judges by its reach: a two-day answer
+// comes later too, as a listing's first, or in a batch with one that wants
+// two.
 function heldDay(quote, bars, pre) {
-  if (!quote.before || !firstMinutes(quote, bars, pre)) return null
+  if (!quote.before || reachedHoldLimit(quote, bars) || !firstMinutes(quote, bars, pre)) return null
   var close = quote.prevClose
   var known = Format.isFiniteNumber(close)
   return Object.assign({}, quote, {
@@ -179,6 +183,14 @@ function firstBars(trades, open) {
 // answers, Sydney's three only after it. A listing with fewer an hour after
 // its open trades too seldom to wait for, and is drawn as it trades.
 var HOLD_LIMIT = 60 * 60
+
+// Whether the new day's trades, Yahoo's or Robinhood's, reach an hour past
+// its open.
+function reachedHoldLimit(quote, bars) {
+  var reg = quote.session.regular
+  var newest = function(list) { return list && list.length ? list[list.length - 1].t : -Infinity }
+  return !!reg && Math.max(newest(quote.points), newest(bars)) >= reg.start + HOLD_LIMIT
+}
 
 // The dashed line of the day before `quote`'s, as the quote Stonks held drew
 // it: no field of Yahoo's answers names it at every open, as Tokyo's two-day

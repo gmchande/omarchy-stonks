@@ -3273,7 +3273,7 @@ test("until the next open a listing that trades at night shows the day that clos
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York counted from 04:00, as abroad", () => {
+test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York counted from 04:00, as abroad, or a trade an hour past the open", () => {
   // Friday 09:31, from answers Stonks no longer asks for one day at the
   // open: AAPL's chart is Friday's, the S&P 500's Friday's session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
@@ -3342,6 +3342,23 @@ test("at the open the chart holds the last session, with the new one's first tra
   const LSE = calendars.calendars.LSE
   expect(M.dateStringOf(M.localDate(view.day.session.regular.start, LSE))).toBe(M.dateStringOf(M.localDate(london.marketTime, LSE)))
   expect(view.day.points.every(p => p.t < view.day.session.regular.end + 600)).toBe(true)
+  // A listing with fewer than three bars an hour after its open trades too
+  // seldom to wait for: once a trade comes past that hour, its chart is the
+  // new day, though a two-day answer comes, as one asked in a batch with a
+  // US stock in its pre-market. SHEL.L's of 3 November, thinned to a bar at
+  // 08:00 and one more, at 08:20 or at 09:10.
+  const lse = clock => M.epochAt(LSE, "2026-11-03", clock)
+  const thinTo = clocks => {
+    const answer = structuredClone(fixture("moments/london-2026-11-03-0330/2d/shel.l.json"))
+    const r = answer.chart.result[0], q = r.indicators.quote[0]
+    const keep = r.timestamp.map(t => t < lse("08:00") || t === lse("08:00"))
+    r.timestamp = r.timestamp.filter((_, i) => keep[i]).concat(clocks.map(lse))
+    for (const k of Object.keys(q)) q[k] = q[k].filter((_, i) => keep[i]).concat(clocks.map(() => k === "volume" ? 100 : 3915))
+    r.meta.regularMarketTime = lse(clocks.at(-1))
+    const quote = M.carryClose(null, M.parseChart(answer, cents, lse("10:00")), calendars, lse("10:00"))
+    return M.viewChart("SHEL.L", "1D", { "SHEL.L": quote }, {}, {}, {}, calendars, lse("10:00")).day
+  }
+  expect([!!thinTo(["08:20"]).held, !!thinTo(["09:10"]).held]).toEqual([true, false])
   // Tokyo at Sunday 20:05 New York, Monday 09:05 there: Yahoo's day answer
   // has turned to Monday and holds no bar yet, so a chart of it alone is
   // empty. Asked for two days until Monday has a bar (`twoDays`), the
