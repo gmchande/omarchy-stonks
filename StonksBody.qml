@@ -94,7 +94,6 @@ Item {
   // the surface is closed; and the day's clock, held still while no screen
   // shows the surface.
   property var nights: ({})
-  property var allDay: ({})
   property int dayClock: 0
   property var previewEntries: ({})
   // Each symbol's cap and P/E, and the currency rates P/Es need.
@@ -135,7 +134,6 @@ Item {
   Binding on entries { when: root.reading; value: root.service?.entries; restoreMode: Binding.RestoreNone }
   Binding on newestTrades { when: root.reading; value: root.service?.newestTrades; restoreMode: Binding.RestoreNone }
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
-  Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
   Binding on nightFailed { when: root.reading; value: root.service?.nightFailed; restoreMode: Binding.RestoreNone }
   Binding on dayClock { when: root.showing; value: root.service?.viewDayClock ?? 0; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
@@ -306,9 +304,9 @@ Item {
   readonly property int animalSleep: {
     if (scrubT) return 3
     if (!featuredQuote) return 0
-    var allDay = !!chart && chart.allDay
-    var asleep = Overnight.marketAsleep(featuredQuote, allDay, now, calendars)
-    var before = Overnight.marketAsleep(featuredQuote, allDay, now - bellWindow, calendars)
+    var atNight = !!chart && chart.tradesAtNight
+    var asleep = Overnight.marketAsleep(featuredQuote, atNight, now, calendars)
+    var before = Overnight.marketAsleep(featuredQuote, atNight, now - bellWindow, calendars)
     return asleep ? (before ? 1 : 2) : (before ? 4 : 0)
   }
   readonly property var animal: ({ kind: animalKind, chart: animalChart,
@@ -333,11 +331,11 @@ Item {
   // place, and those done.
   property var rowLinesWork: null
   readonly property int rowLinesBudget: 1
-  readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, allDay, calendars, dayClock] : null
+  readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, calendars, dayClock] : null
   onRowLinesAskChanged: {
     var done = rowLinesWork ? Object.assign({}, rowLinesWork.done, rowLinesWork.from) : {}
     if (!rowLinesAsk) rowLines = null
-    rowLinesWork = rowLinesAsk ? { symbols: view.rows, quotes: quotes, nights: nights, allDay: allDay, calendars: calendars,
+    rowLinesWork = rowLinesAsk ? { symbols: view.rows, quotes: quotes, nights: nights, calendars: calendars,
       dayClock: dayClock, next: 0, from: {}, lines: {}, done: done } : null
   }
   function workOnRowLines() {
@@ -347,15 +345,13 @@ Item {
       var symbol = work.symbols[work.next++]
       var quote = work.quotes[symbol]
       if (!quote) continue
-      // Either may be null, as in a harness that stubs the service
-      // (`Chart.dayDrawn`).
+      // Null in a harness that stubs the service (`Chart.dayDrawn`).
       var night = work.nights ? work.nights[symbol] : null
-      var trades = work.allDay ? work.allDay[symbol] : null
       var had = work.done[symbol] || rowLinesFrom[symbol]
-      var line = had && had.quote === quote && had.night === night && had.trades === trades
+      var line = had && had.quote === quote && had.night === night
         && had.calendars === work.calendars && had.dayClock === work.dayClock ? had
-        : { quote: quote, night: night, trades: trades, calendars: work.calendars, dayClock: work.dayClock,
-          line: Chart.lineDay(symbol, quote, work.nights, work.allDay, work.calendars, work.dayClock) }
+        : { quote: quote, night: night, calendars: work.calendars, dayClock: work.dayClock,
+          line: Chart.lineDay(symbol, quote, work.nights, work.calendars, work.dayClock) }
       work.from[symbol] = line
       if (line.line) work.lines[symbol] = line.line
     }
@@ -385,7 +381,7 @@ Item {
   readonly property bool offersRetry: headerText === unavailableText
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)) : []
+    Overnight.nightTrades(featuredQuote, !!chart && chart.tradesAtNight, now, calendars)) : []
   // The panel says Yahoo's pause short; the window has room for a sentence.
   readonly property var troubleForms: {
     if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
@@ -1304,7 +1300,6 @@ Item {
     quotes: root.quotes
     newestTrades: root.newestTrades
     nights: root.nights
-    allDay: root.allDay
     dayClock: root.dayClock
     entries: root.entries
     featuredSymbol: root.featuredSymbol

@@ -146,7 +146,7 @@ Harness {
       var rows = b.watchlist.displayedSymbols
       service.feature(rows[rows.length - 1])
       // As a person waits for the chart before moving along it: a row's day
-      // can wait on Robinhood saying whether it trades all day.
+      // can wait on Robinhood's prints for it.
       tryVerify(function() { return !b.chartLoading }, 5000)
       // The second row in sight: an open brings the featured last row into
       // sight, and a cursor of your own is one in sight.

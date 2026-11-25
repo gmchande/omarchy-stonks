@@ -35,6 +35,19 @@ qs_code=0
 qs_session_runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
 qs_runtime=""
 
+# link_runtime FROM TO: a link in TO to every entry of FROM but quickshell,
+# sockets too; fails when FROM is no folder it can read. A glob, not find:
+# an agent's shell can put a find of its own first that skips sockets, and
+# without Wayland's a run that draws through it, such as the anchor states,
+# aborts.
+link_runtime() (
+  [ -d "$1" ] && [ -r "$1" ] && [ -x "$1" ] || exit 1
+  shopt -s nullglob dotglob
+  local entry entries=()
+  for entry in "$1"/*; do [ "${entry##*/}" = quickshell ] || entries+=("$entry"); done
+  [ "${#entries[@]}" -eq 0 ] || ln -s -t "$2" "${entries[@]}"
+)
+
 # quickshell_run SECONDS LOG ARGS…: Quickshell ARGS into LOG, stopped after
 # SECONDS. Sets qs_code: Quickshell's exit code, 124 on a timeout, or 128 and
 # its signal on a death by one. Whatever ends it, its group and every
@@ -65,7 +78,7 @@ quickshell_run() {
   # always has the name of a folder this run made.
   qs_runtime=$(trap '' INT TERM; mktemp -d /tmp/qs.XXXXXX)
   if [ -z "$qs_runtime" ] \
-    || ! find "$qs_session_runtime" -mindepth 1 -maxdepth 1 ! -name quickshell -exec ln -s -t "$qs_runtime" {} +; then
+    || ! link_runtime "$qs_session_runtime" "$qs_runtime"; then
     echo "FAIL the run's runtime folder ${qs_runtime:-in /tmp} could not be made; Quickshell was not started" >> "$log"
     qs_code=1
     quickshell_stop

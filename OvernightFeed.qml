@@ -64,10 +64,7 @@ Item {
         var answer = null
         try { answer = Overnight.overnightAnswer(job.results[job.read], symbol) } catch (e) { answer = null }
         var had = entries[symbol]
-        // An hour can't stand for a day: a listing whose trades went
-        // meanwhile (`Service.forgetLeft`) is left unanswered.
-        var hour = batches[job.batch].span === "hour"
-        var kept = !answer ? null : !hour ? answer : had ? Overnight.joinHour(had, answer) : null
+        var kept = Overnight.keptTrades(had, answer, batches[job.batch].span)
         if (kept) job.listings[symbol] = { bars: had && Overnight.sameBars(had.bars, kept.bars) ? had.bars : kept.bars, through: kept.through }
         // One listing that can't be read makes the whole answer bad.
         else if (!answer) batch.forEach(function(s) { delete job.listings[s] })

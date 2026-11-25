@@ -24,7 +24,7 @@ var SLOT = 5 * 60
 
 var OVERNIGHT_INTERVAL = 5 * 60
 
-var ALL_DAY_INTERVAL = 24 * 60 * 60
+var LIST_DATE_INTERVAL = 24 * 60 * 60
 
 function overnightMarket(calendars) {
   var map = Calendar.calendarMap(calendars)
@@ -67,15 +67,27 @@ function overnightSpan(entry, now) {
   return !!entry && entry.through !== null && entry.through !== undefined && entry.through <= now && now - entry.through <= HOUR_REACH ? "hour" : "day"
 }
 
+// Robinhood answered with no slot at all: a symbol it doesn't carry, such
+// as a preferred share (BAC.PL), whose place in its answer is a
+// placeholder. Each symbol it carries answers every slot, traded or not.
+function uncarried(entry) {
+  return !!entry && entry.status === "ok" && entry.through === null
+}
+
+// One Robinhood doesn't carry goes in a day's request that goes anyway, or
+// one of its own, so it never draws the others into a day's.
 function overnightBatches(symbols, entries, now) {
-  var day = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
-  var hour = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
+  var none = symbols.filter(function(s) { return uncarried(entries[s]) })
+  var carried = symbols.filter(function(s) { return !uncarried(entries[s]) })
+  var day = carried.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
+  var hour = carried.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
   var dayRequests = Math.ceil(day.length / OVERNIGHT_BATCH)
-  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(symbols.length / OVERNIGHT_BATCH)) {
+  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(carried.length / OVERNIGHT_BATCH)) {
     var room = dayRequests * OVERNIGHT_BATCH - day.length
     day = day.concat(hour.slice(0, room))
     hour = hour.slice(room)
   }
+  day = day.concat(none)
   var batches = []
   for (var i = 0; i < day.length; i += OVERNIGHT_BATCH) batches.push({ span: "day", symbols: day.slice(i, i + OVERNIGHT_BATCH) })
   for (var j = 0; j < hour.length; j += HOUR_BATCH) batches.push({ span: "hour", symbols: hour.slice(j, j + HOUR_BATCH) })
@@ -83,35 +95,25 @@ function overnightBatches(symbols, entries, now) {
 }
 
 // Past these, an answer is bad (`Format.fetchedList`). MOST_TRADES also caps
-// the trades kept (`joinHour`): a 1D chart draws at most 336 slots.
+// the trades kept (`joinTrades`): a 1D chart draws at most 336 slots.
 var MOST_RESULTS = 2 * HOUR_BATCH
 var MOST_TRADES = 1000
 
-function allDayUrl(symbols) {
+function listDateUrl(symbols) {
   return INSTRUMENTS_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
 }
 
 // Robinhood's instruments answer 100 results a page, in their own order,
 // and a symbol may answer twice: past 50, symbols on page two would read as
-// not trading all day.
-var ALL_DAY_BATCH = 50
+// never listed.
+var LIST_DATE_BATCH = 50
 
-// Robinhood can answer a symbol twice, in its own order. "tradable" is its
-// 24 Hour Market.
-function parseAllDay(json, symbols) {
+// The day Robinhood says each listed, as "2026-11-19", where it says one;
+// null for an answer that can't be read. Robinhood can answer a symbol
+// twice, in its own order.
+function listDates(json, symbols) {
   var results = Format.fetchedList(json && json.results, 2 * symbols.length)
   if (!results) return null
-  var out = {}
-  for (var i = 0; i < symbols.length; i++) {
-    var wanted = robinhoodSymbol(symbols[i])
-    out[symbols[i]] = results.some(function(r) { return r && r.symbol === wanted && r.all_day_tradability === "tradable" })
-  }
-  return out
-}
-
-// The day Robinhood says each listed, as "2026-11-19", where it says one.
-function listDates(json, symbols) {
-  var results = Format.fetchedList(json && json.results, 2 * symbols.length) || []
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
     var wanted = robinhoodSymbol(symbols[i])
@@ -123,13 +125,11 @@ function listDates(json, symbols) {
   return out
 }
 
-// Robinhood's word on whether `symbol` trades all day, and the day it
-// listed, from a check's answer (`parsed` and `dates`, null when the check
-// failed). A failed check keeps the last answer, or none: `allDay` null,
-// never said either way.
-function allDayEntry(parsed, symbol, had, at, dates) {
-  return parsed ? { status: "ok", allDay: parsed[symbol], listDate: dates && dates[symbol] || null, at: at }
-    : { status: "failed", allDay: had ? had.allDay : null, listDate: had && had.listDate || null, at: at }
+// The day `symbol` listed, from a check's answer (`dates`, null when the
+// check failed). A failed check keeps the last answer's date, or none.
+function listDateEntry(dates, symbol, had, at) {
+  return dates ? { status: "ok", listDate: dates[symbol] || null, at: at }
+    : { status: "failed", listDate: had && had.listDate || null, at: at }
 }
 
 // Robinhood's listing date on each quote it gave one for, so a listing's
@@ -138,11 +138,11 @@ function allDayEntry(parsed, symbol, had, at, dates) {
 // holiday after it, so only a date of the last week, by `now`, can be a
 // quote's listing day, and only those quotes are read. The same object
 // where none changes.
-function withListDates(quotes, allDay, now) {
+function withListDates(quotes, listDates, now) {
   var since = new Date((now - 7 * 86400) * 1000).toISOString().slice(0, 10)
   var out = quotes
-  for (var symbol in allDay) {
-    var date = allDay[symbol] && allDay[symbol].listDate || null
+  for (var symbol in listDates) {
+    var date = listDates[symbol] && listDates[symbol].listDate || null
     if (!date || date < since) continue
     var quote = quotes[symbol]
     if (!quote || quote.listDate === date) continue
@@ -152,9 +152,9 @@ function withListDates(quotes, allDay, now) {
   return out
 }
 
-function allDayDue(entry, now) {
+function listDateDue(entry, now) {
   if (!entry) return true
-  return now - entry.at >= (entry.status === "ok" ? ALL_DAY_INTERVAL : OVERNIGHT_INTERVAL)
+  return now - entry.at >= (entry.status === "ok" ? LIST_DATE_INTERVAL : OVERNIGHT_INTERVAL)
 }
 
 function overnightResults(json) {
@@ -183,14 +183,25 @@ function overnightAnswer(result, symbol) {
   return out
 }
 
-// A bar still forming may be among the hour's slots, so they replace what
+// A bar still forming may be among an answer's slots, so they replace what
 // was kept from their first on.
-function joinHour(had, hour) {
-  if (hour.from === null) return { bars: had.bars, through: had.through }
+function joinTrades(had, answer) {
+  if (answer.from === null) return { bars: had.bars, through: had.through }
   return {
-    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_TRADES),
-    through: had.through === null || hour.through > had.through ? hour.through : had.through
+    bars: had.bars.filter(function(b) { return b.t < answer.from }).concat(answer.bars).slice(-MOST_TRADES),
+    through: had.through === null || answer.through > had.through ? answer.through : had.through
   }
+}
+
+// What a listing keeps of an answer: joined on to the trades in hand, so a
+// day asked again keeps the night before that it no longer reaches, and the
+// listing keeps trading at night (`tradesAtNight`). An hour can't stand for
+// a day: one with none in hand, whose trades went meanwhile
+// (`Service.forgetLeft`), is left unanswered.
+function keptTrades(had, answer, span) {
+  if (!answer) return null
+  if (had) return joinTrades(had, answer)
+  return span === "hour" ? null : { bars: answer.bars, through: answer.through }
 }
 
 function sameBars(a, b) {
@@ -293,30 +304,57 @@ function nightAt(cal, t) {
   return { start: day.start, end: Calendar.epochAt(cal, day.date, cal.overnight.close), open: day.open }
 }
 
-function nightTrades(quote, allDay, t, calendars) {
-  var cal = allDay ? Calendar.calendarFor(calendars, quote) : null
+// The last night the market traded that began by `t`; null past the
+// calendar.
+function lastNight(cal, t) {
+  for (var day = marketDayAt(cal, t), i = 0; i < 14; i++, day = marketDay(cal, Calendar.previousDateString(day.date)))
+    if (day.open && day.start <= t) return day
+  return null
+}
+
+// Whether Robinhood's trades (`night`, its entry) show a US listing
+// trading at night: a night trade in the night its answer reaches, while it
+// reaches one, or in the night before; by day, in the night just gone. So a
+// thin stock that skips a night stays awake through it, one that starts
+// trading in the night wakes at its first trade, and one with no night
+// trades shows the day alone, as Yahoo has it.
+function tradesAtNight(night, cal) {
+  if (!night || night.through === null || !cal || !cal.overnight) return false
+  var last = lastNight(cal, night.through)
+  if (!last) return false
+  var before = night.through < Calendar.epochAt(cal, last.date, cal.overnight.close) ? lastNight(cal, last.start - 1) : null
+  var from = before ? before.start : last.start
+  for (var i = night.bars.length - 1; i >= 0 && night.bars[i].t >= from; i--) if (night.bars[i].s === "overnight") return true
+  return false
+}
+
+// Whether the night trades `quote`'s listing now: one that trades at night
+// (`atNight`, `tradesAtNight`), in an open night.
+function nightTrades(quote, atNight, t, calendars) {
+  var cal = atNight ? Calendar.calendarFor(calendars, quote) : null
   var night = cal && cal.overnight ? nightAt(cal, t) : null
   return !!night && night.open
 }
 
 // The listings whose newest price may be a trade Robinhood failed to send,
-// while the night trades (`open`): those it has never said trade all day or
-// not, its last check failed, and those it trades all day whose trades or
-// quote failed. `allDay`, `nights` and `lastTrades` are Robinhood's entries.
-function nightFailures(allDay, nights, lastTrades, open) {
+// while the night trades (`open`): those whose trades failed, so Stonks
+// can't tell whether they traded, and those that trade at night whose
+// quote failed. A quote is asked only of those (`Asks.lastTradeListings`),
+// so one left from a night a listing traded counts no more once it
+// doesn't. `nights` and `lastTrades` are Robinhood's entries, `cal` the
+// night's calendar.
+function nightFailures(nights, lastTrades, open, cal) {
   var out = {}
   if (!open) return out
-  var failed = function(entry) { return !!entry && entry.status === "failed" }
-  for (var symbol in allDay) {
-    var tradability = allDay[symbol]
-    if (tradability.allDay === null ? tradability.status === "failed" : tradability.allDay && (failed(nights[symbol]) || failed(lastTrades[symbol]))) out[symbol] = true
-  }
+  for (var symbol in nights) if (nights[symbol].status === "failed") out[symbol] = true
+  for (var quoted in lastTrades)
+    if (lastTrades[quoted].status === "failed" && tradesAtNight(nights[quoted], cal)) out[quoted] = true
   return out
 }
 
-function marketAsleep(quote, allDay, t, calendars) {
+function marketAsleep(quote, atNight, t, calendars) {
   if (!quote || quote.crypto) return false
-  return !nightTrades(quote, allDay, t, calendars) && !Market.inRegularSession(quote, t, calendars) && !Market.inExtendedHours(quote, t, calendars)
+  return !nightTrades(quote, atNight, t, calendars) && !Market.inRegularSession(quote, t, calendars) && !Market.inExtendedHours(quote, t, calendars)
 }
 
 function allTrades(quote, bars) {
@@ -384,11 +422,20 @@ var STEADY_SLOTS = 12
 
 // A thin stock's sparse pre-market leaves gaps too, so only one that
 // traded in at least half its slots before the gap, STEADY_SLOTS at least,
-// counts.
+// counts. Before the open, the pre-market is the coming day's, Yahoo's
+// answer still the day that closed (`quote.next`).
 function yahooHole(quote) {
-  var pre = quote.session.pre
+  var last = null
+  var pres = [quote.session.pre, quote.next ? quote.next.pre : null]
+  for (var d = 0; d < pres.length; d++) {
+    var hole = pres[d] ? preHole(quote, pres[d]) : null
+    if (hole !== null) last = hole
+  }
+  return last
+}
+
+function preHole(quote, pre) {
   var pts = quote.points
-  if (!pre) return null
   var last = null
   var steady = 0
   for (var i = 0; i + 1 < pts.length && pts[i].t < pre.end; i++) {

@@ -266,9 +266,9 @@ test("a listing's overnight session is named so, a holiday's evening too, and th
     },
     points: []
   }
-  const night = (date, allDay) => M.nightTrades(nest, allDay, at(date, "21:00"), calendars)
-  // Thanksgiving's evening trades for Friday, for a listing Robinhood trades
-  // all day; the evening before it, nothing.
+  const night = (date, atNight) => M.nightTrades(nest, atNight, at(date, "21:00"), calendars)
+  // Thanksgiving's evening trades for Friday, for a listing that trades at
+  // night; the evening before it, nothing.
   expect([night("2026-11-26", true), night("2026-11-26", false), night("2026-11-25", true)]).toEqual([true, false, false])
   const thursday = at("2026-11-26", "21:00")
   expect(marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
@@ -588,7 +588,7 @@ test("the view's chart can be drawn once its data is in, or its first fetch has 
   const history = { bars: [] }
   const ok = { A: { status: "ok" } }
   // The day: its quote, or its first fetch failed; nothing while it is out.
-  expect(M.viewChart("A", "1D", { A: quote }, {}, {})).toEqual({ symbol: "A", range: "1D", quote, day: quote, latest: null, history: null, failed: false, allDay: false })
+  expect(M.viewChart("A", "1D", { A: quote }, {}, {})).toEqual({ symbol: "A", range: "1D", quote, day: quote, latest: null, history: null, failed: false, tradesAtNight: false })
   expect(M.viewChart("A", "1D", {}, { A: { status: "loading" } }, {})).toBeNull()
   expect(M.viewChart("A", "1D", {}, { A: { status: "failed" } }, {})).toMatchObject({ quote: null, failed: false })
   // A failed first quote is the answer on a range too: no headline from the
@@ -1208,6 +1208,13 @@ test("a run of Robinhood's trades never takes more requests than a day for all w
   expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
   // Three added to it meanwhile: their days, and the rest's hour.
   expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
+  // A stock Robinhood doesn't carry, answered with its placeholder, no slot
+  // at all, among 14 in hand: the 14's hour, and a day of its own, never
+  // the 14 drawn into a day; with a day going anyway, it rides in that.
+  const fourteen = names(14)
+  const uncarried = { ...Object.fromEntries(fourteen.map(s => [s, warm])), P: { status: "ok", bars: [], through: null } }
+  expect(spans(M.overnightBatches(fourteen.concat(["P"]), uncarried, now))).toBe("day 1, hour 14")
+  expect(spans(M.overnightBatches(["N1"].concat(fourteen, ["P"]), uncarried, now))).toBe("day 16")
 })
 
 test("the close the day's move counts from is named by the trading day before, across a weekend and a holiday", () => {
@@ -1416,13 +1423,13 @@ test("a session's one bar says nothing until its day is over", () => {
   try { expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30 EDT") } finally { process.env.TZ = "America/New_York" }
 })
 
-test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
+test("Robinhood's listing date is asked once, again a day on, or five minutes after a failure", () => {
   const t = at("2026-10-07", "01:00")
-  expect(M.allDayDue(null, t)).toBe(true)
-  expect(M.allDayDue({ status: "ok", allDay: true, at: t }, t + 24 * 3600 - 1)).toBe(false)
-  expect(M.allDayDue({ status: "ok", allDay: false, at: t }, t + 24 * 3600)).toBe(true)
-  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60 - 1)).toBe(false)
-  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60)).toBe(true)
+  expect(M.listDateDue(null, t)).toBe(true)
+  expect(M.listDateDue({ status: "ok", listDate: "1990-01-02", at: t }, t + 24 * 3600 - 1)).toBe(false)
+  expect(M.listDateDue({ status: "ok", listDate: null, at: t }, t + 24 * 3600)).toBe(true)
+  expect(M.listDateDue({ status: "failed", listDate: null, at: t }, t + 5 * 60 - 1)).toBe(false)
+  expect(M.listDateDue({ status: "failed", listDate: null, at: t }, t + 5 * 60)).toBe(true)
 })
 
 // What the service and the quote feed ask for, and when (Asks.js), on
@@ -1695,7 +1702,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: true, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
-    allSymbols: ["AAPL", "MSFT", "SHEL.L"], inSight: [], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
+    allSymbols: ["AAPL", "MSFT", "SHEL.L"], inSight: [], preview: "", previewShown: false, previewQuote: null, listDates: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
@@ -1704,63 +1711,75 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   // bar, nothing, by day or at night.
   const noon = at(WED, "14:00")
   expect([asks({ now: noon, pill: false }), asks({ pill: false })]).toEqual([null, null])
-  expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
+  expect(asks({ now: noon })).toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
-  const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
+  const answeredNoon = status => ({ listDates: { AAPL: { status: "ok", listDate: null, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
   expect(asks({ now: noon, ...answeredNoon("ok") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("ok"), featured: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
-    .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
-  // A first check that failed leaves it unknown, and is asked again 5
-  // minutes on, with only the pill by day too.
-  const failedFirst = at => ({ allDay: { AAPL: M.allDayEntry(null, "AAPL", undefined, at) } })
+    .toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
+  // A check of its listing date that failed is asked again 5 minutes on,
+  // with only the pill by day too; its trades that failed with it wait for
+  // the night.
+  const failedFirst = at => ({ listDates: { AAPL: M.listDateEntry(null, "AAPL", undefined, at) },
+    nights: { AAPL: { status: "failed", bars: [], through: null, at } } })
   expect([asks({ now: noon, ...failedFirst(noon - 60) }), asks({ now: noon, ...failedFirst(noon - 5 * 60) })])
-    .toEqual([null, { tradability: ["AAPL"], trades: [] }])
+    .toEqual([null, { listDates: ["AAPL"], trades: [] }])
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
   // surface to open, asked or not.
-  expect(asks({})).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
-  const pillAnsweredAgo = ago => ({ allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } },
+  expect(asks({})).toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
+  const pillAnsweredAgo = ago => ({ listDates: { AAPL: { status: "ok", listDate: null, at: now - 60 } },
     nights: { AAPL: { status: "ok", at: now - ago } } })
   expect(asks(pillAnsweredAgo(60))).toBe(null)
-  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], trades: ["AAPL"] })
+  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ listDates: [], trades: ["AAPL"] })
   // The pill on an index, answered live: with nothing open, by day or while
   // a night trades, Robinhood is never asked about it.
   const index = { featured: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
   // A surface open: the stock on show and the rows in sight, the pill's
   // alone while it has no answer; a row out of sight waits.
-  expect(asks({ open: true, inSight: ["MSFT"] })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
-  const pillAnswered = ago => ({ open: true, inSight: ["MSFT"], allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
-  expect(asks(pillAnswered(60))).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  expect(asks({ open: true, inSight: ["MSFT"] })).toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
+  const pillAnswered = ago => ({ open: true, inSight: ["MSFT"], listDates: { AAPL: { status: "ok", listDate: null, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
+  expect(asks(pillAnswered(60))).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
   expect(asks({ ...pillAnswered(60), inSight: [] })).toBe(null)
   // Trades asked 3 minutes ago go with those due, within half of a night's
   // 5 minutes.
   expect(asks(pillAnswered(180)).trades).toEqual(["AAPL", "MSFT"])
-  // One Robinhood trades only by day never has its trades asked.
-  const byDay = { ...pillAnswered(60), allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 }, MSFT: { status: "ok", allDay: false, at: now - 60 } } }
-  expect(asks(byDay)).toBe(null)
+  // A stock whose trades show no night trade is asked as often, since its
+  // trades say whether it trades tonight.
+  const quiet = { status: "ok", bars: [], through: now - 10 * 60, at: now - 5 * 60 }
+  const listed = { AAPL: { status: "ok", listDate: null, at: now - 60 }, MSFT: { status: "ok", listDate: null, at: now - 60 } }
+  expect(asks({ ...pillAnswered(60), listDates: listed, nights: { ...pillAnswered(60).nights, MSFT: quiet } })).toEqual({ listDates: [], trades: ["MSFT"] })
+  // One Robinhood doesn't carry answers its placeholder, no slot at all: it
+  // is asked again a day on, as its listing date is, and not with each of
+  // the night's 5 minutes.
+  const uncarried = ago => ({ ...pillAnswered(60), listDates: listed, nights: { ...pillAnswered(60).nights, MSFT: { status: "ok", bars: [], through: null, at: now - ago } } })
+  expect([asks(uncarried(5 * 60)), asks(uncarried(DAY - 60)), asks(uncarried(DAY))]).toEqual([null, null, { listDates: [], trades: ["MSFT"] }])
   // A preview outside All on view, a US stock by search's result before its
   // quote, is asked with them, alone first while it has no answer; off
   // view, it waits.
   const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
-  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
-  expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ listDates: ["NVDA"], trades: ["NVDA"] })
+  expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
   // A preview already in All is asked as its row, in sight or not, not
   // first; Toronto's never.
   const inAll = { ...pillAnswered(60), ...nvda, allSymbols: [...base.allSymbols, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
-  expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
-  expect(asks({ ...inAll, inSight: [] })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
+  expect(asks(inAll)).toEqual({ listDates: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
+  expect(asks({ ...inAll, inSight: [] })).toEqual({ listDates: ["NVDA"], trades: ["NVDA"] })
   const toronto = { preview: "SHOP.TO", previewShown: true, previewQuote: { symbol: "SHOP.TO", exchange: "TOR", instrumentType: "EQUITY" } }
-  expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
 })
 
-test("Robinhood's quote is asked each minute while a night trades, for the pill's stock with nothing open and the US stocks on show with a surface open, once it trades them all day, and again whenever their trades are asked after it", () => {
+test("Robinhood's quote is asked each minute while a night trades, for the pill's stock with nothing open and the US stocks on show with a surface open, once their trades show them trading at night, and again whenever their trades are asked after it", () => {
   const now = at(WED, "21:00")
-  const trades = { status: "ok", allDay: true, at: now - 60 }
+  // Trades with one at 20:55, tonight's; and trades with none tonight or
+  // last night.
+  const nightly = { status: "ok", bars: [{ t: now - 300, p: 10, s: "overnight" }], through: now - 300, at: now - 60 }
+  const quiet = { status: "ok", bars: [{ t: now - 3600, p: 10, s: "post" }], through: now - 300, at: now - 60 }
   const base = {
     open: false, pill: true, featured: "AAPL", overnightSymbols: ["AAPL", "MSFT", "NVDA"], allSymbols: ["AAPL", "MSFT", "NVDA", "SHEL.L"], inSight: [],
-    preview: "", previewShown: false, previewQuote: null, allDay: { AAPL: trades, MSFT: trades, NVDA: trades }, nights: {}, lastTrades: {}, interval: 60, now, calendars
+    preview: "", previewShown: false, previewQuote: null, nights: { AAPL: nightly, MSFT: nightly, NVDA: nightly }, lastTrades: {}, interval: 60, now, calendars
   }
   const asks = (changes, alongside = []) => M.lastTradeAsks({ ...base, ...changes }, alongside)
   const askedAgo = (ago, symbols = ["AAPL"]) => Object.fromEntries(symbols.map(s => [s, { status: "ok", trade: null, at: now - ago }]))
@@ -1772,14 +1791,14 @@ test("Robinhood's quote is asked each minute while a night trades, for the pill'
     .toEqual([now + 5, now + 20, 0])
   // By day, and on a Saturday night, nothing.
   expect([asks({ now: at(WED, "14:00") }), asks({ now: at("2026-10-24", "21:00") })]).toEqual([[], []])
-  // A surface open: the stock on show and the rows in sight, one Robinhood
-  // trades only by day or hasn't said left out. It goes once one is a
-  // minute old or the stock on show has none, so a row coming into sight
-  // waits for it; with it go those not yet asked and those due within half
-  // a minute.
+  // A surface open: the stock on show and the rows in sight, one whose
+  // trades show no night trade, or that has no trades yet, left out. It
+  // goes once one is a minute old or the stock on show has none, so a row
+  // coming into sight waits for it; with it go those not yet asked and
+  // those due within half a minute.
   const open = { open: true, inSight: ["MSFT", "NVDA"] }
   expect(asks(open)).toEqual(["AAPL", "MSFT", "NVDA"])
-  expect(asks({ ...open, allDay: { AAPL: trades, MSFT: { ...trades, allDay: false } } })).toEqual(["AAPL"])
+  expect(asks({ ...open, nights: { AAPL: nightly, MSFT: quiet } })).toEqual(["AAPL"])
   expect(asks({ ...open, lastTrades: askedAgo(10) })).toEqual([])
   expect(asks({ ...open, lastTrades: askedAgo(10) }, ["MSFT", "NVDA"])).toEqual([])
   expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(30, ["MSFT"]), ...askedAgo(10, ["NVDA"]) } })).toEqual(["AAPL", "MSFT"])
@@ -1789,7 +1808,7 @@ test("Robinhood's quote is asked each minute while a night trades, for the pill'
   // trades asked since are in, though not a minute old.
   const asked = askedAgo(10, ["AAPL", "MSFT", "NVDA"])
   expect(asks({ ...open, lastTrades: asked }, ["NVDA"])).toEqual(["NVDA"])
-  expect(asks({ ...open, lastTrades: asked, nights: { MSFT: { status: "ok", bars: [], at: now - 5 }, NVDA: { status: "ok", bars: [], at: now - 10 } } }))
+  expect(asks({ ...open, lastTrades: asked, nights: { AAPL: nightly, MSFT: { ...nightly, at: now - 5 }, NVDA: { ...nightly, at: now - 10 } } }))
     .toEqual(["MSFT"])
 })
 
@@ -2162,11 +2181,9 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "a listing's trades posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
     { name: "a listing's trades over budget", call: nest, answer: { results: [result(times(M.MOST_TRADES + 1).map(() => trade))] }, want: 0 },
     { name: "a trade in a session Robinhood never sends", call: nest, answer: { results: [result([{ ...trade, session: "__proto__" }])] }, want: 0 },
-    { name: "instruments, as sent", call: "M.parseAllDay(json, ['NEST'])", answer: { results: [{ symbol: "NEST", all_day_tradability: "tradable" }] }, want: { NEST: true } },
-    { name: "instruments posing", call: "M.parseAllDay(json, ['NEST'])", answer: { results: POSING } },
-    { name: "instruments over budget", call: "M.parseAllDay(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", all_day_tradability: "tradable" })) } },
     { name: "a listing date, as sent", call: "M.listDates(json, ['NEST'])", answer: { results: [{ symbol: "NEST", list_date: "2026-11-19" }] }, want: { NEST: "2026-11-19" } },
-    { name: "listing dates posing", call: "M.listDates(json, ['NEST'])", answer: { results: POSING }, want: {} },
+    { name: "listing dates posing", call: "M.listDates(json, ['NEST'])", answer: { results: POSING } },
+    { name: "listing dates over budget", call: "M.listDates(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", list_date: "2026-11-19" })) } },
     { name: "a listing date posing as a list", call: "M.listDates(json, ['NEST'])", answer: { results: [{ symbol: "NEST", list_date: ["2026-11-19"] }] }, want: {} }
   ]
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
@@ -2267,7 +2284,7 @@ test("a hostile Robinhood's hours keep at most a day's request's trades, and tim
   const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
     ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
   let kept = hour(0)
-  for (let k = 1; k <= 100; k++) kept = M.joinHour(kept, hour(k))
+  for (let k = 1; k <= 100; k++) kept = M.joinTrades(kept, hour(k))
   expect(kept.bars.length).toBe(M.MOST_TRADES)
   expect(kept.bars.slice(-150)).toEqual(hour(100).bars)
   expect(M.overnightSpan(kept, T0)).toBe("day")

@@ -107,7 +107,7 @@ function firstTrade(quote, head) {
 // day's open (`nextOpen`). Its figures are its own: its open, its low and
 // high from its bars, and no volume, which Yahoo gives only the new day's.
 // Each is left out where unknown (`held`). Robinhood's trades of the new
-// session (`bars`, where it trades the stock all day) count toward its
+// session (`bars`, where the stock trades at night) count toward its
 // first bars too, so a chart that has them doesn't hold the day again once
 // Yahoo's two-day answer comes. A US stock's (`pre`) count from its
 // pre-market, so a day whose pre-market traded holds nothing at the open.
