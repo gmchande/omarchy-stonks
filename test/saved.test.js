@@ -381,7 +381,7 @@ test("a bucket stamped at the bell is post-market, unless it holds the closing t
   expect(quotes.PSIX.points.at(-1).t - quotes.PSIX.session.regular.end).toBe(13)
   expect(M.pointSession(quotes.PSIX, quotes.PSIX.points.at(-1))).toBe("reg")
   const tops = newestTrades(["PSIX", "BLDP"], quotes, noNight(["PSIX", "BLDP"]))
-  expect([tops.PSIX || null, pillHover(quotes.BLDP, tops.BLDP, answeredAt(night))]).toEqual([null, "After hours"])
+  expect([tops.PSIX || null, pillHover(quotes.BLDP, tops.BLDP, answeredAt(night))]).toEqual([null, "after hours"])
 })
 
 test("after the close, the session's last trade reads the close at the bell, and the bucket after it reads itself", () => {
@@ -2639,16 +2639,16 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect(pillHover(sunday.quotes.NBIS, nbis, sunday.now)).toBe("tonight \u22123.92% as of 23:30")
   expect([pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now), pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, "pct", false, "saved"),
     pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, "pct", false, "saved"), pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, "pct", false, "failed")])
-    .toEqual(["After hours", "After hours as of Fri 19:00", "After hours as of 23 Oct 19:00", ""])
+    .toEqual(["after hours", "after hours as of Fri 19:00", "after hours as of 23 Oct 19:00", ""])
   // The pill keeps the day until 04:00. Monday 19:55 it shows the day's
   // whole move, after hours in it, as its row; from tonight's first trade,
   // Monday's close and move, with Monday's bear, and tonight's move in its
   // hover; from 04:00 the pre-market's, as its row.
   expect(["watch-2026-10-26-1955", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"]
-    .map(set => topsAt(set).pill("NBIS"))).toEqual(["155.90 \u22121.79% bear | After hours",
+    .map(set => topsAt(set).pill("NBIS"))).toEqual(["155.90 \u22121.79% bear | after hours",
     "153.27 \u22123.45% bear | tonight +2.30% as of 20:00",
     "153.27 \u22123.45% bear | tonight \u22120.16% as of 03:45",
-    "154.04 +0.50% bull | Pre-market"])
+    "154.04 +0.50% bull | pre-market"])
   // Sunday night it keeps Friday's, in each unit and look; since the open,
   // tonight has no open to count from, so the hover says nothing of it.
   expect([sunday.pill("NBIS"), sunday.pill("NBIS", "abs"), sunday.pill("NBIS", "pct", true), sunday.pill("NBIS", "open")]).toEqual([

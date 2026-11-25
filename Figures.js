@@ -452,7 +452,7 @@ function listingNote(quote, row, mode) {
 // The pill's hover past its symbol and move: only what the pill can't
 // show. While it keeps the day (`listRow`), tonight's move, "tonight
 // −3.54%", and nothing since the open, which tonight has no open to count
-// from. Else the session of a price from outside the regular one, "After
+// from. Else the session of a price from outside the regular one, "after
 // hours", unless a warning names it. Either ends "as of 23:12" once its
 // price is late, by the rules the rows and the panel go by: a row's "As
 // of" (`Freshness.freshnessText`) and the panel's dimmed night price
@@ -466,7 +466,7 @@ function pillNote(quote, newest, fresh, mode, calendars, retro) {
   }
   if (Freshness.freshnessWarns(fresh)) return ""
   var late = fresh.state === "aged" || fresh.state === "saved" || newestStale(newest, now)
-  return [newest ? Market.phaseLabel(newest.phase) : "", late ? asOfNote(quote, fresh.asOf, now, calendars) : ""]
+  return [newest ? Market.phaseLabel(newest.phase).toLowerCase() : "", late ? asOfNote(quote, fresh.asOf, now, calendars) : ""]
     .filter(function(part) { return part !== "" }).join(" ")
 }
 

@@ -266,9 +266,9 @@ BarWidget {
     // Only what the pill can't say, on one line: the icon form's symbol and
     // change, that the stacked form's move counts from the open, or on a
     // listing's first day from its IPO price, the pill's note ("tonight
-    // −3.54%", "After hours", "as of 23:12"), and what a "!" means. Its
-    // first word takes a capital: "Tonight −3.54%" alone. None while the
-    // panel is open: the bubble would land on its header.
+    // −3.54%", "after hours", "as of 23:12"), and what a "!" means. Its
+    // first word takes a capital: "Tonight −3.54%", "After hours" alone.
+    // None while the panel is open: the bubble would land on its header.
     readonly property string hoverLine: [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.pillNote, root.warningText]
       .filter(function(part) { return part !== "" }).join(" · ")
     tooltipText: root.opened ? "" : hoverLine.charAt(0).toUpperCase() + hoverLine.slice(1)
