@@ -22,4 +22,13 @@ if [ "${count:-0}" != 2 ]; then
   code=1
 fi
 sed -i "\\|$lost|d" "$work/log"
+# The sound the walk can't write warns once: one that didn't land isn't
+# tried again until it's wanted.
+chime='WARN scene: QML FileView at @plugin/OwnerOnly.qml.*Write of .*chime-smooth-0\.wav failed'
+count=$(rg -c "$chime" "$work/log" || true)
+if [ "${count:-0}" != 1 ]; then
+  echo "FAIL expected one warning of a lost sound, got ${count:-0}"
+  code=1
+fi
+sed -i "\\|$chime|d" "$work/log"
 finish "SAVING DONE"

@@ -18,6 +18,8 @@ Harness {
   Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.Camera { id: camera }
+  // Off until its step: the sounds' files, in the cache folder.
+  Stonks.Sounds { id: sounds; files: service.files }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
   // A fresh start on the same file.
   Component { id: restart; Stonks.Service { pluginId: "grvc.stonks" } }
@@ -302,6 +304,22 @@ Harness {
       sh('rm -f "$2/shell.json" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
       harness.check("a first start with no lists file takes the bar's symbols an older Stonks kept in shell.json, and writes them to a new file",
         fromBar && written, [fromBar, written].join(" | "))
+
+      // A sound whose file couldn't be written, here for a folder in its
+      // place, is written once sounds are next on and it can be.
+      var chime = service.files.folder + "/chime-smooth-0.wav"
+      sh('mkdir "$3"', chime)
+      sounds.turnedOn = true
+      var surveyed = within(5000, function() { return sounds.surveyed })
+      // Time to try the first chime ahead, and fail.
+      wait(500)
+      sh('rmdir "$3"', chime)
+      sounds.turnedOn = false
+      sounds.turnedOn = true
+      var chimed = within(3000, function() { return sh('[ -f "$3" ] && echo made', chime) === "made" })
+      sounds.turnedOn = false
+      harness.check("a sound whose file couldn't be written is written once sounds are next on and it can be",
+        surveyed && chimed, [surveyed, chimed].join(" | "))
 
       // Last, a link to a device: Quickshell's watch follows a link to what
       // it names, so it says no more of the file's place, mended or not.
