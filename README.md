@@ -181,7 +181,8 @@ The line beside the list's name counts the rows up, in green, and down, in
 red. Click the order at the right of the header, such as MANUAL, to sort by
 symbol, name or change, and its arrow to reverse it. Sorting by change
 ranks by percent, since amounts in different currencies can't be compared.
-In your own order, drag a row to move it.
+In your own order, drag a row to move it. Hold it at the top or bottom of
+the rows and the list scrolls.
 
 ## The window
 
@@ -257,6 +258,8 @@ clipboard, with a notification that opens it in your screenshot editor.
 | Key | Does |
 | --- | --- |
 | `↑` `↓` | Move the selection |
+| Page Up or Page Down | Move a screenful |
+| Home or End | Go to the first or last row |
 | `⏎` | Show the selected row's chart |
 | `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
@@ -271,7 +274,8 @@ clipboard, with a notification that opens it in your screenshot editor.
 
 Omarchy's panel keys work too. `Esc` closes, and `Ctrl+↑` `Ctrl+↓` move
 the selected row in your own order. In Manage lists, `Ctrl+↑` `Ctrl+↓`
-move the selected list, `⏎` renames it, and Delete or Backspace asks to
+move the selected list, Page Up, Page Down, Home and End move the
+selection as in the rows, `⏎` renames it, and Delete or Backspace asks to
 delete it, which `⏎` confirms. In the panel, `j` `k` move the selection,
 `h` `l` move along the chart, Space shows the selected row's chart, `x`
 removes the selected row, and Tab or `Shift+Tab` switches to the bar's

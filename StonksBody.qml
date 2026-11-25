@@ -766,6 +766,10 @@ Item {
     else if (mods === Qt.ControlModifier && key === Qt.Key_Down) moveSelected(1)
     else if (key === Qt.Key_Up) moveCursor(-1)
     else if (key === Qt.Key_Down) moveCursor(1)
+    else if (key === Qt.Key_PageUp) moveCursor(-watchlist.pageRows())
+    else if (key === Qt.Key_PageDown) moveCursor(watchlist.pageRows())
+    else if (key === Qt.Key_Home) moveCursorTo(0)
+    else if (key === Qt.Key_End) moveCursorTo(watchlist.displayedSymbols.length - 1)
     else if (key === Qt.Key_Left) nudgeScrub(-1)
     else if (key === Qt.Key_Right) nudgeScrub(1)
     else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
@@ -823,6 +827,10 @@ Item {
   function moveCursor(delta) {
     showingHelp = false
     watchlist.moveCursor(delta)
+  }
+  function moveCursorTo(index) {
+    showingHelp = false
+    watchlist.moveCursorTo(index)
   }
 
   // Delete, Backspace and x remove the selected row, but not one hidden

@@ -8,6 +8,8 @@ function sheet() {
     groups: [
       { title: "Rows", rows: [
         { key: "↑ ↓", does: "Move the selection" },
+        { key: "PgUp PgDn", does: "Move a screenful" },
+        { key: "Home End", does: "Go to the first or last row" },
         { key: "⏎", does: "Show the row's chart" },
         { key: "a /", does: "Find or add a symbol" },
         { key: "Del ⌫", does: "Remove the selected row" },

@@ -1125,10 +1125,11 @@ test("sorting ranks the rows as a view over the manual list", () => {
 })
 
 // The keys a sheet or README label names, in one spelling: a capital as
-// Shift and it, ⇧ as Shift, and the sheet's "Del ⌫" as Delete and Backspace.
-const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
+// Shift and it, ⇧ as Shift, the sheet's "Del ⌫" as Delete and Backspace,
+// and its "PgUp PgDn" as the README's "Page Up" and "Page Down".
+const keyTokens = label => label.replace(/`/g, "").replace(/Page (Up|Down)/g, "Page$1").split(/\s+/)
   .filter(t => t !== "" && t !== "or")
-  .map(t => ({ "Del": "Delete", "⌫": "Backspace" })[t] || t.replace(/^⇧/, "Shift+"))
+  .map(t => ({ "Del": "Delete", "⌫": "Backspace", "PgUp": "PageUp", "PgDn": "PageDown" })[t] || t.replace(/^⇧/, "Shift+"))
   .map(t => /^[A-Z]$/.test(t) ? "Shift+" + t : t)
 const sortedKeys = labels => labels.flatMap(keyTokens).sort()
 

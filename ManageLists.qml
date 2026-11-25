@@ -87,6 +87,12 @@ OverRows {
     showCursor()
   }
 
+  // A page key's step: the lists wholly in sight, less one, so the list it
+  // leaves stays in sight.
+  function pageRows() {
+    return Math.max(1, Math.floor(scroll.height / itemHeight) - 1)
+  }
+
   function pointAt(x, y) {
     if (renaming || confirming || reorder.lifted !== "") return
     var at = scroll.mapFromItem(null, x, y)
@@ -169,6 +175,9 @@ OverRows {
     keys: root.names
     pitch: root.itemHeight
     contentY: scroll.contentY
+    sight: scroll.height
+    reach: Math.max(0, scroll.contentHeight - scroll.height)
+    onScrollTo: function(y) { scroll.contentY = y }
     first: 1
     onDropped: function(from, to) {
       if (from !== to) root.moveRequested(root.reorder.lifted, to - from)
@@ -219,6 +228,10 @@ OverRows {
     else if (moving && event.key === Qt.Key_Up) root.move(root.cursor, -1)
     else if (event.key === Qt.Key_Down) root.moveCursor(1)
     else if (event.key === Qt.Key_Up) root.moveCursor(-1)
+    else if (event.key === Qt.Key_PageDown) root.moveCursor(root.pageRows())
+    else if (event.key === Qt.Key_PageUp) root.moveCursor(-root.pageRows())
+    else if (event.key === Qt.Key_End) root.moveCursor(root.choices.length)
+    else if (event.key === Qt.Key_Home) root.moveCursor(-root.choices.length)
     else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
   }
 

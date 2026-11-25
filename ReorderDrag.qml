@@ -12,10 +12,13 @@ import "Rows.js" as Rows
 Item {
   id: root
 
-  // The rows' keys in order, `pitch` apart, scrolled `contentY` down.
+  // The rows' keys in order, `pitch` apart, scrolled `contentY` down, in a
+  // view `sight` high that scrolls as far as `reach`.
   property var keys: []
   property real pitch: 1
   property real contentY: 0
+  property real sight: 0
+  property real reach: 0
   property int first: 0
 
   // The lifted row's key, "" while none is; where it's drawn; and the place
@@ -26,11 +29,32 @@ Item {
   // Where the pointer took the row, and where the pointer is in the view.
   property real offset: 0
   property real pointer: 0
+  // Where the pointer was in the view as the row lifted.
+  property real liftedAt: 0
 
   // Dropped from one place to another, or the same, before it glides.
   signal dropped(int from, int to)
   // It rests at `at`, its place as the glide ended.
   signal landed(int at)
+  // Held at an edge, the row asks the list to scroll to `y`.
+  signal scrollTo(real y)
+
+  // Within a row of the view's top or bottom, or past it, the held row
+  // scrolls the list, faster the deeper it's held, until the list ends. A
+  // row lifted within that row starts the edge where it was lifted, so
+  // only a move toward the edge scrolls.
+  readonly property real topEdge: Math.min(pitch, liftedAt)
+  readonly property real bottomEdge: Math.max(sight - pitch, liftedAt)
+  readonly property real depth: pointer < topEdge ? pointer - topEdge : pointer > bottomEdge ? pointer - bottomEdge : 0
+  readonly property bool edgeHeld: lifted !== "" && !glide.running && (depth < 0 ? contentY > 0 : depth > 0 && contentY < reach)
+  FrameAnimation {
+    running: root.edgeHeld
+    onTriggered: {
+      var rowsPerSecond = 8 * Math.max(-2, Math.min(2, root.depth / root.pitch))
+      var by = rowsPerSecond * root.pitch * Math.min(frameTime, 0.05)
+      root.scrollTo(Math.max(0, Math.min(root.reach, root.contentY + by)))
+    }
+  }
 
   onContentYChanged: if (lifted !== "" && !glide.running) moveTo(pointer + contentY)
   // A turn later: the drag's end can change the keys again, as the rows a
@@ -52,6 +76,7 @@ Item {
     glide.stop()
     offset = y - from * pitch
     pointer = y - contentY
+    liftedAt = pointer
     liftedY = from * pitch
     slot = from
     lifted = key

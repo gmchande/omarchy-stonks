@@ -227,6 +227,19 @@ Flickable {
     select(displayedSymbols[next])
   }
 
+  // Home and End.
+  function moveCursorTo(index) {
+    endClick()
+    if (displayedSymbols.length === 0) return
+    select(displayedSymbols[Math.max(0, Math.min(displayedSymbols.length - 1, index))])
+  }
+
+  // A page key's step: the rows wholly in sight, less one, so the row it
+  // leaves stays in sight.
+  function pageRows() {
+    return Math.max(1, Math.floor((sightHeight + rowGap) / rowPitch) - 1)
+  }
+
   // Not contentHeight, which lags a pitch behind while onRowPitchChanged runs.
   function rowsLength() {
     return Math.max(0, displayedSymbols.length * rowPitch - rowGap)
@@ -458,6 +471,12 @@ Flickable {
     keys: root.displayedSymbols
     pitch: root.rowPitch
     contentY: root.contentY
+    sight: root.sightHeight
+    reach: Math.max(0, root.rowsLength() - root.height)
+    onScrollTo: function(y) {
+      root.takeOver()
+      root.contentY = y
+    }
     onDropped: function(from, to) {
       if (from !== to) root.commitManualOrder(Settings.movedSymbols(root.displayedSymbols, from, to))
     }
