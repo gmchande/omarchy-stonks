@@ -1,18 +1,24 @@
 # Stonks
 
-Stonks puts your stock watchlist in the Omarchy bar and shows each price as
-it traded. A small pill shows how one stock is doing today. Click it for
-the chart and your lists.
+Stonks puts your stocks in the Omarchy bar, day and night. A small pill
+shows how one stock is doing right now. Click it for the chart and your
+lists.
 
 <img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's line chart. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
+```sh
+omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
+```
+
+Made for Omarchy 4.5, and runs back to 4.0.6.
+
+- Pre-market, after-hours and overnight prices for US stocks and ETFs, so
+  a move at 02:00 shows at 02:00.
 - Each price as Yahoo or Robinhood sent it, in the listing's own currency
   and on its exchange's clock. Stonks never converts a price, since a
   converted price is one nobody traded at.
 - A price more than two minutes old while its market trades says "As of"
   and its time. A "!" on the pill means a refresh failed or is late.
-- Pre-market and after-hours prices, and overnight prices for the US
-  stocks and ETFs that trade at night.
 - Each market's hours on its own clock, with the holidays and early closes
   of New York, Toronto, London and Tokyo.
 - Stocks, ETFs, indexes and crypto, in lists of your own.
@@ -30,25 +36,18 @@ Stonks doesn't track your holdings, send price alerts or show news.
 
 Website: [getstonks.app](https://getstonks.app)
 
-[![Omarchy marketplace](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgmchande%2Fstonks-site%2Fmarketplace-status%2Fmarketplace.json)](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
-[![Last verified on the Omarchy marketplace](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgmchande%2Fstonks-site%2Fmarketplace-status%2Fverified.json)](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
-
 ## Install
 
-Stonks is made for Omarchy 4.5. It runs on Omarchy 4 back to 4.0.6,
-without what 4.5 added: moving at the shell's own pace, keeping still when
-you turn animations off, pressing in like the bar's icons, and saving
-screenshots where Omasnap saves yours.
+The command at the top installs Stonks. Omarchy warns that plugins run
+without a sandbox and asks you to confirm, then asks where in the bar to
+put `grvc.stonks`, Stonks' id. The center is the default. To read the code
+before it runs, leave out `--enable`, say no when Omarchy offers to enable
+it, and run `omarchy plugin enable grvc.stonks` when you're ready.
 
-```sh
-omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
-```
-
-Omarchy warns that plugins run without a sandbox and asks you to confirm,
-then asks where in the bar to put `grvc.stonks`, Stonks' id. The center is
-the default. To read the code before it runs, leave out `--enable`, say no
-when Omarchy offers to enable it, and run `omarchy plugin enable
-grvc.stonks` when you're ready.
+On Omarchy 4 before 4.5, back to 4.0.6, Stonks runs without what 4.5
+added: moving at the shell's own pace, keeping still when you turn
+animations off, pressing in like the bar's icons, and saving screenshots
+where Omasnap saves yours.
 
 Stonks starts with NVDA, AAPL, MSFT, SPY and TSLA, so the pill has
 something to show. Add your own and remove the ones you don't follow.

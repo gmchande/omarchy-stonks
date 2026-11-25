@@ -5,7 +5,7 @@
   "version": "1.3.2",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "Your stocks watchlist in the Omarchy bar, each price as it traded: in its own currency, on its exchange's clock, and with its time when it's late. Stonks follows stocks, ETFs, indexes and crypto from New York to London and Tokyo, with pre-market, after-hours and US overnight prices. They come from Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
+  "description": "Your stocks in the bar, day and night. Stonks is a watchlist and ticker for stocks, ETFs, indexes and crypto on any exchange Yahoo Finance lists. US stocks keep their price before the open, after the close and through the night. Each price shows as it traded, in its own currency, with its time when it's late. Free, with no account or API key.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
