@@ -6,13 +6,15 @@ import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The smooth chart, one rule for the day and every range: a dashed baseline at
 // the price the change is measured from, and the line and its wash in the up
-// colour above it and the down colour below, as the retro columns fall. The day
-// adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
-// dot on the newest bright trade. Once tonight has traded, what the number
-// beside the chart doesn't count draws fainter and thinner, with no wash
-// (`geometry.aside`). Three layers, so each paints only when what
-// it draws changes: the baseline, the ink under a clip the draw-in widens, and
-// the scrub.
+// colour above it and the down colour below, as the retro columns fall. The
+// day draws the hours around its session lighter, and adds ticks at the bell
+// and the night's edges, breaks, and the dot on the newest trade of what
+// trades now. Its wash fades from the day's far reach to clear at the dashed
+// line, under every trade. Once tonight has traded, what the number beside
+// the chart doesn't count draws fainter and thinner, with no wash
+// (`geometry.aside`), and the rest keeps a flat wash under the session.
+// Three layers, so each paints only when what it draws changes: the
+// baseline, the ink under a clip the draw-in widens, and the scrub.
 Item {
   id: root
 
@@ -21,8 +23,11 @@ Item {
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   // How strongly what the number beside the chart doesn't count
-  // (`geometry.aside`) draws: fainter than the dim hours' 45%.
+  // (`geometry.aside`) draws: fainter than tonight's dim hours' 45%.
   readonly property real asideAlpha: 0.4
+  // The hours around the session, on a day not set apart (`faint`): lighter
+  // than the session, and still its green or red on a dark ground.
+  readonly property real hoursAlpha: 0.6
   property color hairlineColor: Commons.Color.foreground
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
@@ -70,11 +75,16 @@ Item {
   // (`Tones.washAlpha`), so a down day's reads as strongly as an up day's.
   readonly property real aboveWash: Tones.washAlpha(aboveColor, upColor, ground, 0.16, 1)
   readonly property real belowWash: Tones.washAlpha(belowColor, upColor, ground, 0.16, 1)
+  // The day's fade, at the day's far reach, by the same rule.
+  readonly property real aboveFade: Tones.washAlpha(aboveColor, upColor, ground, 0.34, 1)
+  readonly property real belowFade: Tones.washAlpha(belowColor, upColor, ground, 0.34, 1)
 
   onGeometryChanged: { base.requestPaint(); ink.requestPaint(); marks.requestPaint() }
   onBaselineColorChanged: { base.requestPaint(); ink.requestPaint() }
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
+  onAboveFadeChanged: ink.requestPaint()
+  onBelowFadeChanged: ink.requestPaint()
   onAboveColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
   onHairlineColorChanged: marks.requestPaint()
@@ -176,14 +186,16 @@ Item {
         var pts = geometry.points
         var w = width - pad * 2
         var h = height - pad * 2
-        // The fill is about the day up to its last regular trade. A range has
-        // no extended trades.
+        // A range, or a day set apart (`geometry.aside`), keeps a flat wash
+        // under its session, up to the last regular trade, and none under
+        // the stretch the number beside the chart doesn't count. Any other
+        // day's fades under every trade, so no hour of it takes an edge. A
+        // range has no extended trades.
+        var aside = geometry.aside
+        var even = root.day && !aside
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
-        var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
-        // The stretch the number beside the chart doesn't count
-        // (`geometry.aside`) takes no wash.
-        var aside = geometry.aside
+        var filled = runs(even ? pts : pts.slice(0, lastRegular + 1), function() { return true })
         var gx0 = !aside || aside.from <= 0 ? 0 : pad + aside.from * w
         var gx1 = !aside ? 0 : aside.to >= 1 ? width : pad + aside.to * w
         var parts = !aside ? [{ from: 0, to: width, aside: false }]
@@ -199,7 +211,7 @@ Item {
             ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
             ctx.clip()
           }
-          ctx.fillStyle = sides(ctx, by, root.aboveWash, root.belowWash)
+          ctx.fillStyle = even ? fade(ctx, pts, by, pad, h) : sides(ctx, by, root.aboveWash, root.belowWash)
           for (var r = 0; r < filled.length; r++) {
             var run = filled[r]
             if (run.length < 2) continue
@@ -219,12 +231,13 @@ Item {
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.lineWidth = 2 * root.weight
-        // The whole series in dim ink, then the bright part over it (`dim`),
-        // so the rest reads as the quieter part of one line. The stretch the
-        // number beside the chart doesn't count keeps the sides' colours,
-        // fainter than the dim ink and half as thick, so it reads apart from
-        // tonight's dim hours on a dark ground, where a fainter shade alone
-        // runs into them.
+        // The whole series in the lighter ink, then the rest over it at full
+        // (`faint`), so the hours around the session read as the quieter
+        // part of one line. The stretch the number beside the chart doesn't
+        // count keeps the sides' colours, fainter than the dim ink and half
+        // as thick, so it reads apart from tonight's dim hours on a dark
+        // ground, where a fainter shade alone runs into them.
+        var lighter = even ? root.hoursAlpha : 0.45
         for (var p = 0; p < parts.length; p++) {
           if (parts[p].to <= parts[p].from) continue
           ctx.save()
@@ -238,10 +251,10 @@ Item {
             ctx.strokeStyle = sides(ctx, by, root.asideAlpha, root.asideAlpha)
             strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
           } else {
-            ctx.strokeStyle = sides(ctx, by, 0.45, 0.45)
+            ctx.strokeStyle = sides(ctx, by, lighter, lighter)
             strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
             ctx.strokeStyle = sides(ctx, by, 1, 1)
-            strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
+            strokeRuns(ctx, runs(pts, function(p) { return !p.faint }), pad, w, h)
           }
           ctx.restore()
         }
@@ -275,6 +288,27 @@ Item {
         var g = ctx.createLinearGradient(0, 0, 0, height)
         g.addColorStop(stop, Qt.rgba(root.aboveColor.r, root.aboveColor.g, root.aboveColor.b, aboveAlpha))
         g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(root.belowColor.r, root.belowColor.g, root.belowColor.b, belowAlpha))
+        return g
+      }
+
+      // The day's wash: strongest at its far reach on each side, clear at
+      // the dashed line, so it shows where the move went. Two stops at one
+      // offset merge, as in `sides`.
+      function fade(ctx, pts, by, pad, h) {
+        var top = by - 1
+        var bottom = by + 1
+        for (var i = 0; i < pts.length; i++) {
+          top = Math.min(top, pad + pts[i].y * h)
+          bottom = Math.max(bottom, pad + pts[i].y * h)
+        }
+        var stop = (by - top) / (bottom - top)
+        var a = root.aboveColor
+        var b = root.belowColor
+        var g = ctx.createLinearGradient(0, top, 0, bottom)
+        g.addColorStop(0, Qt.rgba(a.r, a.g, a.b, root.aboveFade))
+        g.addColorStop(stop, Qt.rgba(a.r, a.g, a.b, 0))
+        g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(b.r, b.g, b.b, 0))
+        g.addColorStop(1, Qt.rgba(b.r, b.g, b.b, root.belowFade))
         return g
       }
 

@@ -9,11 +9,11 @@ import "Chart.js" as Chart
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below, each by its own price's side of the close, as smooth's line is. The
-// day adds dimmer hours, the bell and the night's edges, and the lit last
-// trade. Once tonight has traded, what the number beside the chart doesn't
-// count (`geometry.aside`) draws fainter, its stems every other cell. The
-// unlit cells paint when the size changes, the baseline and the columns
-// when the data changes; the draw-in widens a clip a whole column at a
+// day draws lighter hours, and adds the bell and the night's edges, and the
+// lit last trade. Once tonight has traded, what the number beside the chart
+// doesn't count (`geometry.aside`) draws fainter, its stems every other
+// cell. The unlit cells paint when the size changes, the baseline and the
+// columns when the data changes; the draw-in widens a clip a whole column at a
 // time, and the ticks and the scrub are cells laid over them.
 Item {
   id: root
@@ -37,6 +37,15 @@ Item {
   // Lights the last regular trade's cap. Off for small copies, and a range
   // has none: its last bar need not be the headline trade.
   property bool glow: false
+  // The panel's and the screenshot's day keep the session full at any hour
+  // and draw the hours around it lighter (`faint`); a row's lights what
+  // trades now (`dim`). Once the closed day is set apart the two agree.
+  property bool fullSession: false
+  readonly property bool even: fullSession && day && !geometry.aside
+  // The hours around the session, on a day not set apart: lighter than the
+  // session, and still its green or red on a dark ground.
+  readonly property real hoursInk: 0.6
+  readonly property real lighterInk: even ? hoursInk : 0.45
   // The cap blinks while the market trades, white, colour, white, as a sprite
   // does: four blinks, about 6 s, as a new price arrives or the surface opens,
   // as the smooth dot ripples, then it rests.
@@ -80,14 +89,14 @@ Item {
   // What is laid over the ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
   // The stems are retro's wash: each side adds the lightness the up colour's
-  // does at 35% (`Tones.washAlpha`), less under a dim cap. `solid` draws each
+  // does at 35% (`Tones.washAlpha`), less under a lighter cap. `solid` draws each
   // stem at its cap's ink, for a chart so small that faint stems leave the
   // caps a dotted line: the pill's, 13 columns at 1x.
   property bool solid: false
   readonly property real aboveStem: solid ? 1 : Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
   readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
-  readonly property real aboveStemDim: solid ? 0.45 : Tones.washAlpha(aboveColor, upColor, ground, 0.35 * 0.45, 0.45)
-  readonly property real belowStemDim: solid ? 0.45 : Tones.washAlpha(belowColor, upColor, ground, 0.35 * 0.45, 0.45)
+  readonly property real aboveStemDim: solid ? lighterInk : Tones.washAlpha(aboveColor, upColor, ground, 0.35 * lighterInk, lighterInk)
+  readonly property real belowStemDim: solid ? lighterInk : Tones.washAlpha(belowColor, upColor, ground, 0.35 * lighterInk, lighterInk)
   readonly property real aboveStemAside: Tones.washAlpha(greyAside ? greyColor : aboveColor, upColor, ground, 0.35 * asideShare, asideShare)
   readonly property real belowStemAside: Tones.washAlpha(greyAside ? greyColor : belowColor, upColor, ground, 0.35 * asideShare, asideShare)
 
@@ -207,7 +216,8 @@ Item {
           var aside = c >= g.asideFrom && c < g.asideTo
           // With no line under it, a column takes the baseline's ink.
           var color = aside && root.greyAside ? root.greyColor : !root.hasBaseline ? root.baselineColor : above ? root.aboveColor : root.belowColor
-          var dim = aside ? asideInk : g.dim[c] ? 0.45 : 1
+          var lighter = root.fullSession ? g.faint[c] : g.dim[c]
+          var dim = aside ? asideInk : lighter ? root.lighterInk : 1
           var x = c * g.pitch
           // The stem fills the rows between the baseline's and the cap's, on
           // both sides alike, so equal moves stand equally long and the
@@ -217,7 +227,7 @@ Item {
           var h = Math.abs(y - baseY) - pixel
           if (h > 0 && !(aside && root.solid)) {
             var stem = aside ? (above ? root.aboveStemAside : root.belowStemAside)
-              : g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
+              : lighter ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
             if (aside) {
               // Every other cell from the one on the dashed line, so the
