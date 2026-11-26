@@ -197,7 +197,7 @@ Harness {
     return !match ? null : {
       tokyo: { symbol: "7203.T", file: "7203-t-day", date: "2026-05-06" },
       london: { symbol: "SHEL.L", file: "shel-l-day", date: "2027-12-27" },
-      hongkong: { symbol: "0700.HK", file: "moments/hongkong-2026-11-25-2135/0700.hk", date: "2026-07-01" },
+      hongkong: { symbol: "0700.HK", file: "moments/hongkong-2026-11-26-0020/0700.hk", date: "2026-07-01" },
       sydney: { symbol: "BHP.AX", file: "moments/sydney-2026-11-03-1830/bhp.ax", date: "2026-06-08" },
       xetra: { symbol: "SAP.DE", file: "moments/frankfurt-2026-11-26-0435/sap.de", date: "2026-12-31" },
       frankfurt: { symbol: "SAP.F", file: "moments/frankfurt-2026-11-26-0435/sap.f", date: "2026-12-31" },
