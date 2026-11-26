@@ -291,9 +291,10 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
-    // The dot comes as the ink reaches it; its burst at the draw-in's end.
-    shown: dot.visible && root.reveal >= 1
-    drawing: function() { return root.reveal < 1 }
+    // The dot comes as the ink reaches it, and rides a bend; its burst comes
+    // as the draw-in or the bend ends, where the new chart's trade is.
+    shown: dot.visible && root.reveal >= 1 && root.morph >= 1
+    drawing: function() { return root.reveal < 1 || root.morph < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice
     burst: ripples

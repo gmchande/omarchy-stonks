@@ -375,9 +375,10 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
-    // The cap comes as the columns reach it; its blinks at the draw-in's end.
-    shown: cap.visible && root.reveal >= 1
-    drawing: function() { return root.reveal < 1 }
+    // The cap comes as the columns reach it; its blinks as the draw-in or
+    // the wave ends.
+    shown: cap.visible && root.reveal >= 1 && root.morph >= 1
+    drawing: function() { return root.reveal < 1 || root.morph < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice
     burst: blinks
