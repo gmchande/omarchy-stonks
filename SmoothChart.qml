@@ -277,11 +277,17 @@ Item {
 
   // Strip canvas around the dashed baseline and its ahead-ticks, translated on
   // the GPU during a morph rather than repainting the full chart height.
+  // During a morph, an odd stroke width paints at `basePad + 0.5` so the line
+  // sits on one crisp pixel row instead of splitting across two.
+  readonly property real baseStripOff: root.weight % 2 === 1 ? 0.5 : 0
+  readonly property real baseY: root.morphing
+    ? root.baselinePx - root.basePad - root.baseStripOff
+    : Math.floor(root.baselinePx - root.basePad)
   Canvas {
     id: base
     visible: root.hasBaseline
     x: 0
-    y: root.morphing ? root.baselinePx - root.basePad : Math.floor(root.baselinePx - root.basePad)
+    y: root.baseY
     width: root.width
     height: root.basePad * 2
     onPaint: {
@@ -289,7 +295,7 @@ Item {
       ctx.clearRect(0, 0, width, height)
       if (!root.hasBaseline) return
       var style = root.paintStyle(root)
-      SmoothPaint.paintBase(ctx, root.shown, style, root.morphing ? root.baselinePx - root.basePad : Math.floor(root.baselinePx - root.basePad))
+      SmoothPaint.paintBase(ctx, root.shown, style, root.baseY)
     }
   }
 

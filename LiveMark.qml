@@ -46,8 +46,17 @@ Item {
     burst.restart()
     root.opening = opening
   }
+  property bool ready: false
+  Component.onCompleted: {
+    ready = true
+    if (surfaceOpen && playedFor === "") {
+      owed = true
+      opening = true
+      play()
+    }
+  }
   onPriceChanged: play()
-  onSurfaceOpenChanged: if (surfaceOpen) { owed = true; opening = true; play() }
+  onSurfaceOpenChanged: if (ready && surfaceOpen) { owed = true; opening = true; play() }
   onLiveChanged: if (live) play(); else burst.stop()
   onStillChanged: if (!still) play()
   onSeenChanged: {

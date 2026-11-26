@@ -40,14 +40,15 @@ Item {
   // Without it, no direction to split by.
   readonly property bool hasBaseline: Chart.hasBaseline(geometry)
 
-  onGeometryChanged: ink.requestPaint()
-  onLineColorChanged: ink.requestPaint()
-  onGreyColorChanged: ink.requestPaint()
-  onSplitChanged: ink.requestPaint()
-  onUpColorChanged: ink.requestPaint()
-  onDownColorChanged: ink.requestPaint()
+  onGeometryChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
+  onLineColorChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
+  onGreyColorChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
+  onSplitChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
+  onUpColorChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
+  onDownColorChanged: { ink.requestPaint(); if (marks) marks.requestPaint() }
   onBaselineColorChanged: ink.requestPaint()
   onLineWidthChanged: ink.requestPaint()
+  onCursorXChanged: if (marks) marks.requestPaint()
 
   readonly property real inkRight: drawable
     ? pad + geometry.points[geometry.points.length - 1].x * (width - pad * 2) + lineWidth * 1.5 + 1 : width
@@ -148,15 +149,32 @@ Item {
     }
   }
 
-  readonly property var cursorYVal: root.drawable && root.cursorX >= 0 ? Chart.yAt(root.geometry.points, root.cursorX) : null
-  Rectangle {
-    visible: root.cursorYVal !== null
-    readonly property real cy: visible ? root.pad + root.cursorYVal * (root.height - root.pad * 2) : 0
-    x: root.pad + root.cursorX * (root.width - root.pad * 2) - 2.5
-    y: cy - 2.5
-    width: 5
-    height: 5
-    radius: 2.5
-    color: visible ? root.inkAt(root.cursorX, cy) : "transparent"
+  // Scrub dot: built only while scrubbing, so at rest a row allocates no
+  // marks canvas, while scrubbed rows match the canvas circle pixel for pixel.
+  readonly property Canvas marks: marksLoader.item as Canvas
+  Loader {
+    id: marksLoader
+    anchors.fill: parent
+    active: root.drawable && root.cursorX >= 0
+    sourceComponent: Canvas {
+      onWidthChanged: requestPaint()
+      onHeightChanged: requestPaint()
+      onPaint: {
+        var ctx = getContext("2d")
+        ctx.clearRect(0, 0, width, height)
+        if (!root.drawable || root.cursorX < 0) return
+        var pts = root.geometry.points
+        var pad = root.pad
+        var w = width - pad * 2
+        var h = height - pad * 2
+        var cy = Chart.yAt(pts, root.cursorX)
+        if (cy !== null) {
+          ctx.fillStyle = root.inkAt(root.cursorX, pad + cy * h)
+          ctx.beginPath()
+          ctx.arc(pad + root.cursorX * w, pad + cy * h, 2.5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+    }
   }
 }
