@@ -70,7 +70,8 @@ Item {
   // The grid and the baseline are always there; the columns fill in from the
   // left to the newest trade's.
   property real reveal: 1
-  // The chart this one takes over from, and how far it has come, 0 to 1.
+  // The chart this one takes over from, and how far in time it has come, 0
+  // to 1: the columns come at an even pace, so every frame takes some.
   property var morphFrom: null
   property real morph: 1
   // A replay's place, 0..1, or -1 without one: the columns fill in behind it.
@@ -365,7 +366,8 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
-    shown: cap.visible
+    // The cap comes as the columns reach it; its blinks at the draw-in's end.
+    shown: cap.visible && root.reveal >= 1
     drawing: function() { return root.reveal < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice

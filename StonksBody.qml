@@ -1233,6 +1233,7 @@ Item {
     replayX: motion.replayX
     morphFrom: motion.morphFrom
     morph: motion.morph
+    beat: motion.beat
     arrival: motion.arrival
     arrivalFrom: root.arrivalFrom
     chartHeight: Layout.chartHeight(root.measured, root.windowHeight())

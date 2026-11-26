@@ -41,9 +41,11 @@ Item {
   // The draw-in's share of the ink, and a replay's place (-1 without one).
   property real reveal: 1
   property real replayX: -1
-  // The chart the one on show bends out of, and how far (`ChartMotion`).
+  // The chart the one on show bends out of, how far on OutCubic, and how
+  // far in time, which retro's wave takes (`ChartMotion`).
   property var morphFrom: null
   property real morph: 1
+  property real beat: 1
   // Another stock's figures arrive on the same beat (`ChartMotion.arrival`),
   // coming up from below for a row further down (`arrivalFrom` 1) and down
   // from above for one higher (-1).
@@ -192,7 +194,7 @@ Item {
         reveal: root.look.retro ? root.reveal : 1
         replayX: root.look.retro ? root.replayX : -1
         morphFrom: root.look.retro ? root.morphFrom : null
-        morph: root.look.retro ? root.morph : 1
+        morph: root.look.retro ? root.beat : 1
       }
 
       RangeMarks {

@@ -90,11 +90,14 @@ Item {
   // The painters sweep the draw-in from the first trade to the newest, so a
   // day partly gone takes its whole time too.
   property real reveal: 1
-  // Another stock's chart bends out of the one before (`morphFrom`), `morph`
-  // of the way, and what else changes with the stock settles with it
-  // (`arrival`), toward where the list moved (`switched`).
+  // Another stock's chart bends out of the one before (`morphFrom`), and
+  // what else changes with the stock arrives with it (`arrival`), toward
+  // where the list moved (`switched`). One clock, even in time (`beat`, 0 to
+  // 1): what travels eases it on OutCubic (`morph`), and retro's wave takes
+  // columns at its even pace, so none of its frames stands still.
   property var morphFrom: null
-  property real morph: 1
+  property real beat: 1
+  readonly property real morph: 1 - Math.pow(1 - beat, 3)
   property bool stockSwitch: false
   readonly property real arrival: stockSwitch ? morph : 1
   signal switched(string from, string to)
@@ -203,13 +206,13 @@ Item {
     morphAnim.stop()
     stockSwitch = true
     morphFrom = from
-    morph = 0
+    beat = 0
     morphAnim.start()
   }
 
   function endBend() {
     morphAnim.stop()
-    morph = 1
+    beat = 1
     morphFrom = null
     stockSwitch = false
   }
@@ -270,7 +273,7 @@ Item {
     dimmed = 0
   }
 
-  // Each travels: OutCubic, as Omarchy's own travel does, so the last
+  // A draw-in travels: OutCubic, as Omarchy's own travel does, so the last
   // frames still move and the live dot comes as the line ends.
   NumberAnimation {
     id: drawInAnim
@@ -285,10 +288,9 @@ Item {
   NumberAnimation {
     id: morphAnim
     target: root
-    property: "morph"
+    property: "beat"
     to: 1
     duration: Motion.duration(Style, Motion.SWITCH_MS)
-    easing.type: Easing.OutCubic
     onFinished: root.endBend()
   }
 

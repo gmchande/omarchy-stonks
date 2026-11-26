@@ -275,7 +275,8 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
-    shown: dot.visible
+    // The dot comes as the ink reaches it; its burst at the draw-in's end.
+    shown: dot.visible && root.reveal >= 1
     drawing: function() { return root.reveal < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice
