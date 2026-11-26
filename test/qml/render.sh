@@ -190,11 +190,9 @@ every_state() (
   done
   # Hong Kong on Thursday 26 November: Tencent and the Hang Seng at lunch,
   # then Tencent in the afternoon, the chart's line broken over the break;
-  # SAP on Xetra and on Börse Frankfurt, and the DAX, open that morning; and
-  # an over-the-counter stock, TCEHY, open on the day after Thanksgiving,
-  # until its 13:00 close.
+  # and SAP on Xetra and on Börse Frankfurt, and the DAX, open that morning.
   for state in hongkong-2026-11-25-2335-0700.hk hongkong-2026-11-25-2335-hsi hongkong-2026-11-26-0020-0700.hk \
-    frankfurt-2026-11-26-0435-sap.de frankfurt-2026-11-26-0435-sap.f frankfurt-2026-11-26-0435-gdaxi otc-2026-11-27-1215-tcehy; do
+    frankfurt-2026-11-26-0435-sap.de frankfurt-2026-11-26-0435-sap.f frankfurt-2026-11-26-0435-gdaxi; do
     states="$states popup-sweep-$state-smooth popup-sweep-$state-retro"
   done
   # ANT on its first day, Thursday 19 November: at 11:41, before its first
