@@ -209,22 +209,19 @@ function quotesLanded(held, requests, got, symbols, calendars, now) {
   }
 }
 
-// The close and late trades settle within this of a market's last trade.
-var SETTLED = 15 * 60
-
 // Asking sooner brings back the same price. An index's periods stay the last
 // session's until its open, and London's pre-market is Yahoo's alone, so the
 // calendar and Yahoo's current period both have a say.
 function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!quote || quote.crypto || !receivedAt) return 0
   var s = quote.session
-  if (!s || !s.regular || receivedAt < (s.post || s.regular).end + SETTLED) return 0
+  if (!s || !s.regular || receivedAt < (s.post || s.regular).end + Quote.SETTLED) return 0
   var c = quote.current
-  if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + SETTLED) return 0
+  if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + Quote.SETTLED) return 0
   var starts = []
   if (cal) {
     var day = dayOf(cal, receivedAt)
-    if (day.to && receivedAt >= day.from && receivedAt < day.to + SETTLED) return 0
+    if (day.to && receivedAt >= day.from && receivedAt < day.to + Quote.SETTLED) return 0
     var open = receivedAt < day.from ? day.from : day.next
     if (open) starts.push(open)
   }

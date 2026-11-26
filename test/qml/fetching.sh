@@ -12,15 +12,16 @@
 # once; a click that stops a run ahead shows its chart from the answers
 # already in; a window closed while a cap is on its way asks nothing more
 # for it; the bell keeps quiet once every screen goes off before it rings;
-# and GitHub, unanswered as Yahoo answers again, is asked again at once.
-# HOME and curl are scratch; the fake curl answers from
-# test/fixtures/moments/fetch-2026-10-07.
+# GitHub, unanswered as Yahoo answers again, is asked again at once; and a
+# holiday asks as a closed day does. HOME and curl are scratch; the fake
+# curl answers from test/fixtures/moments/fetch-2026-10-07, and an
+# over-the-counter stock from Yahoo's answer on Thanksgiving.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetching.qml
 # The pills' panels have their cards in CardWindow.qml, as in keys.sh.
 card_window
 export QT_QPA_PLATFORM=offscreen
 scratch_home fetch-watchlist.json grvc.stonks.json
-echo fetch-2026-10-07 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+echo fetch-2026-10-07 listings-2026-10-07-1455 otc-2026-11-26-1210 > "$STONKS_FAKE_STATE/overnight.set"
 run_qs 300
 finish "FETCHING DONE"

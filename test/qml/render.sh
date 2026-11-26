@@ -188,6 +188,13 @@ every_state() (
   for moment in sydney-2026-11-03-1755 sydney-2026-11-03-1803 sydney-2026-11-03-1820 sydney-2026-11-03-1830; do
     states="$states popup-sweep-$moment-bhp.ax-smooth popup-sweep-$moment-bhp.ax-retro"
   done
+  # Hong Kong on Thursday 26 November: Tencent and the Hang Seng at lunch,
+  # then Tencent in the afternoon, the chart's line broken over the break;
+  # and SAP on Xetra and on Börse Frankfurt, and the DAX, open that morning.
+  for state in hongkong-2026-11-25-2335-0700.hk hongkong-2026-11-25-2335-hsi hongkong-2026-11-26-0020-0700.hk \
+    frankfurt-2026-11-26-0435-sap.de frankfurt-2026-11-26-0435-sap.f frankfurt-2026-11-26-0435-gdaxi; do
+    states="$states popup-sweep-$state-smooth popup-sweep-$state-retro"
+  done
   # ANT on its first day, Thursday 19 November: at 11:41, before its first
   # trade, its IPO price on top, named, and nothing that didn't trade; at
   # 11:52 and 12:43, its move from its IPO price, named; on 1W and All at
@@ -329,7 +336,7 @@ every_state() (
   done
   # The calendars' longest closures, in the panel and the smallest window.
   for place in popup min-window; do
-    for market in tokyo london; do
+    for market in tokyo london hongkong sydney xetra frankfurt otc; do
       states="$states $place-holiday-$market-smooth $place-holiday-$market-retro"
     done
   done
@@ -360,6 +367,7 @@ every_state() (
     done
     states="$states window-sweep-2026-10-07-1455-spy-$look-size-9"
     states="$states min-window-holiday-tokyo-$look-size-20 min-window-holiday-london-$look-size-20"
+    states="$states min-window-holiday-hongkong-$look-size-20 min-window-holiday-otc-$look-size-20"
   done
   for size in 9 16 20; do
     states="$states quiet-lit-popup-sweep-2026-10-07-1455-spy-smooth-size-$size"
