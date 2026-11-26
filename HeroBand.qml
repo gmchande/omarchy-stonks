@@ -97,7 +97,11 @@ Item {
   signal snapToNow()
   signal rangeRequested(string range)
 
-  function settle() { listHeader.settle() }
+  function settle() {
+    listHeader.settle()
+    heroItem.settle()
+    rangeRow.settle()
+  }
   // The market opened: the live dot blooms on the bell's beat.
   function opened() {
     if (!root.seen) return
@@ -140,7 +144,8 @@ Item {
       now: root.now
       baselineText: root.baselineText
       changeCycles: root.changeCycles
-      still: root.still || !root.seen
+      still: root.still
+      seen: root.seen
       arrival: root.arrival
       arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
@@ -288,7 +293,8 @@ Item {
       width: parent.width
       options: root.rangeOptions
       value: root.range
-      still: root.still || !root.seen
+      still: root.still
+      seen: root.seen
       look: root.look
       onSelected: function(value) { root.rangeRequested(value) }
     }

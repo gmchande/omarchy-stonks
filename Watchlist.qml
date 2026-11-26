@@ -43,13 +43,22 @@ Flickable {
   // Closed or closing: a pointer moving over it moves no cursor.
   property bool surfaceOpen: true
   // A screen shows the rows: out of sight, a removed row goes and the
-  // selected fill moves at once.
+  // selected fill moves at once. Hidden while open, or as the shell's
+  // animations turn off, what moves lands; a closing surface holds it
+  // through its fade (`pauseRows`).
   property bool seen: true
-  onSeenChanged: if (!seen) {
+  function landMoves() {
     highlightSlide.stop()
     highlightShift = 0
     var rows = rowItems()
     for (var s in rows) rows[s].endFold()
+  }
+  // Judged a turn later, once a close has said so too.
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && root.surfaceOpen) root.landMoves() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.landMoves() }
   }
   // The rows' view height while they show. The panel's card shrinks to the
   // key sheet or a view, hiding the rows, but sight is still judged by this.

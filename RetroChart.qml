@@ -121,6 +121,19 @@ Item {
   readonly property real belowStemDim: solid ? lighterInk : Tones.washAlpha(belowColor, upColor, ground, 0.35 * lighterInk, lighterInk)
   readonly property real aboveStemAside: Tones.washAlpha(greyAside ? greyColor : aboveColor, upColor, ground, 0.35 * asideShare, asideShare)
   readonly property real belowStemAside: Tones.washAlpha(greyAside ? greyColor : belowColor, upColor, ground, 0.35 * asideShare, asideShare)
+  // The inks with the move's direction known, for a wave's old columns when
+  // the new chart knows none: the same rule in green and red.
+  function knownInks() {
+    var wash = function(color, share, ink) { return Tones.washAlpha(color, upColor, ground, share, ink) }
+    return {
+      above: upColor, below: downColor,
+      aboveStem: solid ? 1 : wash(upColor, 0.35, 1), belowStem: solid ? 1 : wash(downColor, 0.35, 1),
+      aboveStemDim: solid ? lighterInk : wash(upColor, 0.35 * lighterInk, lighterInk),
+      belowStemDim: solid ? lighterInk : wash(downColor, 0.35 * lighterInk, lighterInk),
+      aboveStemAside: wash(greyAside ? greyColor : upColor, 0.35 * asideShare, asideShare),
+      belowStemAside: wash(greyAside ? greyColor : downColor, 0.35 * asideShare, asideShare)
+    }
+  }
 
   onShownGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()
@@ -235,6 +248,11 @@ Item {
         root.lastGrid = g
         var pixel = root.pixel
         var asideInk = root.asideInk
+        // The chart on show's inks; a wave's old columns that have a close
+        // keep their own green and red, whatever the new chart knows.
+        var own = { above: root.aboveColor, below: root.belowColor, aboveStem: root.aboveStem, belowStem: root.belowStem,
+          aboveStemDim: root.aboveStemDim, belowStemDim: root.belowStemDim, aboveStemAside: root.aboveStemAside, belowStemAside: root.belowStemAside }
+        var old = g.olds && !root.directionKnown ? root.knownInks() : own
         for (var c = 0; c < g.columns; c++) {
           if (g.levels[c] === undefined) continue
           var baseRow = g.baseRows ? g.baseRows[c] : g.baseRow
@@ -242,9 +260,10 @@ Item {
           var y = g.levels[c] * pixel
           var above = g.above[c]
           var aside = g.aside ? g.aside[c] : c >= g.asideFrom && c < g.asideTo
+          var ink = g.olds && g.olds[c] ? old : own
           // With no line under it, a column takes the baseline's ink.
           var based = g.baseds ? g.baseds[c] : g.based
-          var color = aside && root.greyAside ? root.greyColor : !based ? root.baselineColor : above ? root.aboveColor : root.belowColor
+          var color = aside && root.greyAside ? root.greyColor : !based ? root.baselineColor : above ? ink.above : ink.below
           var lighter = root.fullSession ? g.faint[c] : g.dim[c]
           var dim = aside ? asideInk : lighter ? root.lighterInk : 1
           var x = c * g.pitch
@@ -255,8 +274,8 @@ Item {
           var top = Math.min(y, baseY) + pixel
           var h = Math.abs(y - baseY) - pixel
           if (h > 0 && !(aside && root.solid)) {
-            var stem = aside ? (above ? root.aboveStemAside : root.belowStemAside)
-              : lighter ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
+            var stem = aside ? (above ? ink.aboveStemAside : ink.belowStemAside)
+              : lighter ? (above ? ink.aboveStemDim : ink.belowStemDim) : (above ? ink.aboveStem : ink.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
             if (aside) {
               // Every other cell from the one on the dashed line, so the

@@ -273,13 +273,14 @@ function frame(p, t) {
 }
 
 // Retro's grid `front` columns into the wave: the new chart's columns left
-// of it and the old one's from it on, each with its own dashed row, or none
-// where its chart has no close (`based`), so every cell stands on the line
-// drawn under it. The old one may be a wave itself, cut short by this one.
+// of it and the old one's from it on (`olds`), each with its own dashed
+// row, or none where its chart has no close (`based`), so every cell stands
+// on the line drawn under it. The old one may be a wave itself, cut short by
+// this one.
 function wave(from, to, front) {
   if (front <= 0) return from
   if (front >= to.columns) return to
-  var g = Object.assign({}, to, { levels: [], above: [], dim: [], faint: [], aside: [], baseRows: [], baseds: [] })
+  var g = Object.assign({}, to, { levels: [], above: [], dim: [], faint: [], aside: [], baseRows: [], baseds: [], olds: [] })
   for (var c = 0; c < to.columns; c++) {
     var src = c < front ? to : from
     g.levels[c] = src.levels[c]
@@ -289,6 +290,7 @@ function wave(from, to, front) {
     g.aside[c] = src.aside ? src.aside[c] : c >= src.asideFrom && c < src.asideTo
     g.baseRows[c] = src.baseRows ? src.baseRows[c] : src.baseRow
     g.baseds[c] = src.baseds ? src.baseds[c] : src.based
+    g.olds[c] = c >= front
   }
   // The lit cap waits for the wave to pass it.
   g.lastLit = to.lastLit < front ? to.lastLit : -1

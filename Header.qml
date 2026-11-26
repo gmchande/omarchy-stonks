@@ -57,6 +57,7 @@ Item {
   function settle() {
     lookIcon.settle()
     slot.settle()
+    if (wordSwap.running) endSwap()
   }
 
 
@@ -262,8 +263,11 @@ Item {
     wordsShown = wordsNow
     wordsIn = 1
   }
-  // Out of sight, nothing moves.
-  onSeenChanged: if (!seen && wordSwap.running) endSwap()
+  // Hidden while open, nothing moves; closing, the words hold through the
+  // fade, and land at the next open (`settle`). Judged a turn later, once
+  // a close has said so too.
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still && wordSwap.running) root.endSwap() })
+  onStillChanged: if (still && wordSwap.running) wordSwap.pause()
 
   Text {
     id: statusWords

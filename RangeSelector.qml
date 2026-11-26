@@ -19,13 +19,18 @@ Item {
   property Look look
   // What is left of a notch between wheel events.
   property real wheelRemainder: 0
-  // Closing, or out of sight: a new range is taken at once.
+  // Closing, the fill holds through the fade and lands at the next open
+  // (`settle`); hidden while open, it lands at once; either way a new range
+  // is taken at once.
   property bool still: false
-  onStillChanged: if (still && slide.running) {
+  property bool seen: true
+  function settle() {
     slide.stop()
     slideX = 0
     slideWidth = 0
   }
+  onStillChanged: if (still && slide.running) slide.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
 
   signal selected(string value)
 
@@ -74,7 +79,7 @@ Item {
     var from = slidFrom
     var to = chosenItem
     slide.stop()
-    if (from && to && from !== to && !still) {
+    if (from && to && from !== to && !still && seen) {
       slideX = from.fillX + slideX - to.fillX
       slideWidth = from.fillWidth + slideWidth - to.fillWidth
       slide.start()

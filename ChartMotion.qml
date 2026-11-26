@@ -233,7 +233,8 @@ Item {
       reveal = 1
     }
   }
-  onOnScreenChanged: if (!onScreen && surfaceOpen) finish()
+  // Judged a turn later, once a close has said so too.
+  onOnScreenChanged: if (!onScreen) Qt.callLater(function() { if (!root.onScreen && root.surfaceOpen) root.finish() })
   Connections {
     target: Style
     ignoreUnknownSignals: true

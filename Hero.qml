@@ -45,12 +45,16 @@ Item {
   property int arrivalFrom: 0
   opacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
   transform: Translate { y: root.arrivalFrom * Style.space(4) * (1 - root.arrival) }
-  // Closing, or out of sight: nothing rolls.
+  // Closing, a roll holds through the fade and lands at the next open
+  // (`settle`); hidden while open, it lands at once; either way none starts.
   property bool still: false
-  onStillChanged: if (still && rollAnim.running) {
+  property bool seen: true
+  function settle() {
     rollAnim.stop()
     roll = 1
   }
+  onStillChanged: if (still && rollAnim.running) rollAnim.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
 
   // When the price on show ticks, its changed digits roll, up on a rise and
   // down on a fall, and the move and its caption with them (`RollingText`).
@@ -67,7 +71,7 @@ Item {
     if (!was || was.text === priceText) return
     rollAnim.stop()
     roll = 1
-    if (still || look.retro || scrubbing || was.scrubbing || was.symbol !== symbol || arrival < 1
+    if (still || !seen || look.retro || scrubbing || was.scrubbing || was.symbol !== symbol || arrival < 1
       || !isFinite(value) || !isFinite(was.value) || value === was.value) return
     rollUp = value > was.value
     rollAnim.start()
