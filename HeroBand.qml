@@ -110,6 +110,11 @@ Item {
     if (smoothChart) smoothChart.settle()
   }
 
+  // Remember the last price each look's live mark played for across lazy
+  // look switches, so switching smooth <-> retro doesn't replay the burst.
+  property string smoothPlayedFor: ""
+  property string retroPlayedFor: ""
+
   // Left-to-right column-pitch wipe on smooth ↔ retro, synced with LookIcon.
   property real lookWipe: 1
   readonly property bool lookWiping: lookWipe < 1
@@ -239,6 +244,8 @@ Item {
             morph: root.morph
             live: root.live && !root.look.retro
             newestPrice: root.newestPrice
+            initialPlayedFor: root.smoothPlayedFor
+            onPlayed: function(price) { root.smoothPlayedFor = price }
             surfaceOpen: !root.still
             seen: root.seen
             still: root.still || root.held
@@ -273,6 +280,8 @@ Item {
             fullSession: true
             live: root.live && root.look.retro
             newestPrice: root.newestPrice
+            initialPlayedFor: root.retroPlayedFor
+            onPlayed: function(price) { root.retroPlayedFor = price }
             surfaceOpen: !root.still
             seen: root.seen
             still: root.still || root.held

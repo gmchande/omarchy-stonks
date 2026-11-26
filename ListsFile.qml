@@ -39,9 +39,9 @@ Item {
   property bool saveFailed: false
   signal saveChecked(bool saved)
   // A change not yet in the file for sure: one waiting for the wheel to
-  // rest, for a read out, or for the file to be made, or a save awaiting its
-  // read-back.
-  readonly property bool saving: settleWrite.running || writeOwed || making || staleTexts !== null
+  // rest, for a read out, for the file to be made, for an async write to
+  // finish, or a save awaiting its read-back.
+  readonly property bool saving: settleWrite.running || writeOwed || making || writing || writeQueued !== "" || staleTexts !== null
 
   // Keys changed by a delayed save (`settles`) still waiting for the timer,
   // so an external read meanwhile keeps every pending key, not only `featured`.
@@ -79,19 +79,18 @@ Item {
     root.writeFile(next)
   }
 
-  // Preference changes (`featured`, `range`, `style`) and the pill's wheel
-  // write the file once motion settles (~350 ms). List and stock changes still
-  // save at once. A read of the file meanwhile keeps every pending key.
+  // The pill's wheel writes the file once it rests. A read of the file
+  // meanwhile keeps every pending key.
   Timer {
     id: settleWrite
-    interval: 350
+    interval: 400
     onTriggered: root.writeSettled()
   }
   function writeSettled() {
     root.settledKeys = ({})
     if (root.ready && !root.unreadable) root.writeFile(root.fileSettings)
   }
-  // Flush any pending delayed save at once (surface close, shell quit, update).
+  // Flush any pending delayed save at once (surface close, update restart).
   function flush() {
     if (!settleWrite.running) return
     settleWrite.stop()
@@ -102,13 +101,26 @@ Item {
     settleWrite.stop()
     root.writeSettled()
   }
-  // The shell is going: any pending delayed change is written now, unless a
-  // read is out. That read can't land any more, and the file it reads may be
-  // one Stonks can't read, or another copy's newer one, so the change goes.
-  Component.onDestruction: root.flush()
+  // The shell is going: any pending delayed or in-flight async change is
+  // written synchronously now, unless a read is out. That read can't land
+  // any more, and the file it reads may be one Stonks can't read, or another
+  // copy's newer one, so the change goes.
+  Component.onDestruction: {
+    var pending = settleWrite.running || root.writing || root.writeQueued !== ""
+    settleWrite.stop()
+    root.settledKeys = ({})
+    root.writeQueued = ""
+    if (!pending || !root.ready || root.unreadable || root.missing || reader.out) return
+    var body = JSON.stringify(root.fileSettings, null, 2) + "\n"
+    if (Commands.fileBytes(body) > root.cap) return
+    syncFile.path = ""
+    syncFile.path = root.path
+    syncFile.setText(body)
+  }
 
   // Says when the file changes, and reads nothing. Coalesces the single
-  // inotify echo of Stonks' own atomic write when its read-back is already out.
+  // inotify echo of Stonks' own atomic write when its write or read-back is
+  // already out.
   property bool skipNextWatch: false
   FileView {
     path: root.path
@@ -116,7 +128,7 @@ Item {
     preload: false
     printErrors: false
     onFileChanged: {
-      if (root.skipNextWatch && reader.out) {
+      if (root.skipNextWatch && (root.writing || reader.out)) {
         root.skipNextWatch = false
         return
       }
@@ -124,21 +136,49 @@ Item {
     }
   }
 
-  // Writes the file.
+  // Writes the file asynchronously off the shell's thread, one write at a
+  // time (`writing` / `writeQueued`) so a quick second change never cancels
+  // an in-flight write (Quickshell 0.3.1's cancelled-write bug).
+  property bool writing: false
+  property string writeQueued: ""
   FileView {
     id: file
     preload: false
     atomicWrites: true
-    // Quickshell 0.3.1's async write, cancelled by the next, compares a
-    // third against the cancelled text: a change back to it is never
-    // written, and the watch reads the second back over it.
-    blockWrites: true
+    blockWrites: false
     printErrors: false
-    onSaved: root.files.keep([root.path])
+    onSaved: {
+      root.writing = false
+      root.files.keep([root.path])
+      if (root.writeQueued !== "") {
+        var next = root.writeQueued
+        root.writeQueued = ""
+        root.writeText(next)
+        return
+      }
+      root.readFile()
+    }
     onSaveFailed: function(error) {
+      root.writing = false
       root.skipNextWatch = false
       console.warn("stonks: failed to write " + root.path + ": " + error)
+      if (root.writeQueued !== "") {
+        var next = root.writeQueued
+        root.writeQueued = ""
+        root.writeText(next)
+        return
+      }
+      root.readFile()
     }
+  }
+  // Blocking writer used only on clean exit (`Component.onDestruction`) to
+  // land any in-flight or queued change before the shell terminates.
+  FileView {
+    id: syncFile
+    preload: false
+    atomicWrites: true
+    blockWrites: true
+    printErrors: false
   }
   // The text the file held at the last read or write.
   property string known: ""
@@ -146,7 +186,13 @@ Item {
   // view reads nothing, so it forgets each write before the next: after a
   // lost save, the same text is written again.
   function writeText(text) {
+    if (root.writing) {
+      root.writeQueued = text
+      return
+    }
+    root.writing = true
     root.known = text
+    root.skipNextWatch = true
     file.path = ""
     file.path = root.path
     file.setText(text)
@@ -339,9 +385,7 @@ Item {
     root.stale(before)
     root.written = body
     if (root.missing) return root.makeFile()
-    root.skipNextWatch = true
     root.writeText(body)
-    root.readFile()
   }
   // Keys never read as numbers, so they keep the order they came in.
   function stale(text) {
@@ -368,7 +412,7 @@ Item {
       var owed = root.makeOwed
       root.makeOwed = false
       if (owed && !made) return root.makeFile()
-      if (owed) root.writeText(root.written)
+      if (owed) return root.writeText(root.written)
       root.readFile()
     })
   }

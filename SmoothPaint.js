@@ -25,10 +25,8 @@ function paintInk(ctx, g, s) {
   var lastRegular = -1
   var minY = Infinity
   var maxY = -Infinity
-  var hasFaint = false
   for (var n = 0; n < pts.length; n++) {
     if (!pts[n].ext) lastRegular = n
-    if (pts[n].faint) hasFaint = true
     var py = pad + pts[n].y * h
     if (py < minY) minY = py
     if (py > maxY) maxY = py
@@ -85,9 +83,6 @@ function paintInk(ctx, g, s) {
     if (parts[q].aside) {
       ctx.lineWidth = s.weight
       ctx.strokeStyle = sides(ctx, by, s, s.asideAlpha, s.asideAlpha, minY, maxY, s.weight + 1)
-      strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
-    } else if (!hasFaint) {
-      ctx.strokeStyle = sides(ctx, by, s, 1, 1, minY, maxY, strokeMargin)
       strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
     } else {
       ctx.strokeStyle = sides(ctx, by, s, lighter, lighter, minY, maxY, strokeMargin)

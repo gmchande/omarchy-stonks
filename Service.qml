@@ -236,18 +236,20 @@ Item {
       if (root.openSurfaces.length === 0) listsFile.flush()
     }
     if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
-    // The open's quote run goes a turn later, once the surface has said
-    // which rows are in sight (`rowsSeen`), so it asks for those first.
-    if (open) {
+    // The open's quote and overnight runs go a turn later, once the surface
+    // has said which rows are in sight (`rowsSeen`), so both ask for the
+    // visible rows together in one pass instead of splitting them.
+    if (open && !root.opening) {
       root.opening = true
       Qt.callLater(function() {
         root.opening = false
         feed.sendWaiting()
+        root.askOvernight()
       })
     }
     root.tick()
     root.showHistory(false)
-    root.askOvernight()
+    if (!open) root.askOvernight()
     root.askDue()
     Qt.callLater(root.releaseOrder)
   }
@@ -315,7 +317,7 @@ Item {
     var s = String(symbol || "").toUpperCase()
     if (root.allSymbols.indexOf(s) < 0) return
     root.featuredTaken = null
-    root.persist({ featured: s }, settles !== false)
+    root.persist({ featured: s }, settles)
   }
 
   // From outside the list, its first or last row.
@@ -338,8 +340,8 @@ Item {
     if (Object.keys(values).length) root.persist(values)
   }
 
-  function setRange(value, settles) {
-    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value }, settles !== false)
+  function setRange(value) {
+    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
   }
 
   function addSymbol(symbol) {
@@ -765,7 +767,7 @@ Item {
   // Robinhood's questions go side by side, so a 1D chart waits for one
   // answer, never two in a row.
   function askOvernight() {
-    if (!root.ready) return
+    if (!root.ready || root.opening) return
     var open = root.openSurfaces.length > 0
     var asking = root.robinhoodAsking()
     var asks = Asks.overnightAsks(asking)

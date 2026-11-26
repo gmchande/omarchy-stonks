@@ -170,32 +170,32 @@ Harness {
         lostSave && waitedForSave && savedThen && waitedForWheel && wheelSaved && restarted,
         [lostSave, waitedForSave, savedThen, waitedForWheel, wheelSaved, restarted].join(" | "))
 
-      // Delayed preference saves (`feature`, `setRange`, `style`) mark the
-      // service saving while pending, flush on surface close and on shell
-      // quit, and keep an update's restart waiting until they land; a list
-      // change still saves at once.
+      // Back-to-back async saves (`feature`, `setRange`, `style`) land in
+      // order immediately off the shell's thread, while delayed wheel saves
+      // (`settles`) report saving and flush on restart, close and quit.
       restartsBefore = restarts()
       service.feature("MSFT")
       service.setRange("1W")
+      service.setRange("1M")
+      service.persist({ style: "retro" })
       var markedSaving = service.saving
       ipc.restartIfSaved()
       var heldRestart = !within(1000, function() { return restarts() > restartsBefore })
-      var flushedByRestart = landed() && within(3000, function() { return !service.saving })
-      var afterRestart = JSON.parse(harness.readFile(harness.file))
-      var prefLanded = afterRestart.featured === "MSFT" && afterRestart.range === "1W"
+      var asyncSaved = landed() && within(3000, function() { return !service.saving })
+      var afterAsync = JSON.parse(harness.readFile(harness.file))
+      var prefLanded = afterAsync.featured === "MSFT" && afterAsync.range === "1M" && afterAsync.style === "retro"
 
-      service.setRange("5Y")
-      service.persist({ style: "retro" }, true)
+      service.persist({ featured: "NVDA", style: "smooth" }, true)
       app.close()
       var flushedOnClose = landed() && within(3000, function() { return !service.saving })
       var afterClose = JSON.parse(harness.readFile(harness.file))
-      var closeLanded = afterClose.range === "5Y" && afterClose.style === "retro"
+      var closeLanded = afterClose.featured === "NVDA" && afterClose.style === "smooth"
       app.open("{}")
       tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
 
       var quitting = restart.createObject(started)
       var quitReady = within(5000, function() { return quitting.ready })
-      quitting.setRange("2Y")
+      quitting.persist({ range: "2Y" }, true)
       var quitPending = quitting.saving
       quitting.destroy()
       var flushedOnQuit = within(3000, function() {
@@ -208,10 +208,10 @@ Harness {
       })
       service.deleteList("Quick")
       landed()
-      harness.check("delayed preference saves report saving, flush on restart, close and quit, and list changes still save at once",
-        markedSaving && heldRestart && flushedByRestart && prefLanded && flushedOnClose && closeLanded
+      harness.check("back-to-back async saves land in order, and delayed saves flush on restart, close and quit",
+        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded
           && quitReady && quitPending && flushedOnQuit && listSaved,
-        [markedSaving, heldRestart, flushedByRestart, prefLanded, flushedOnClose, closeLanded,
+        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded,
           quitReady, quitPending, flushedOnQuit, listSaved].join(" | "))
 
       // Lists a hand edit named oddly: a case twin, All, and none, the last
@@ -250,7 +250,7 @@ Harness {
       sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && cp "$1" "$1.new" && mv "$1.new" "$1"')
       var held = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
       harness.checks = []
-      service.setRange("1M", false)
+      service.setRange("1M")
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
       var through = held && landed() && within(3000, function() { return harness.checks.indexOf(true) >= 0 })
       through = through && !within(500, function() { return harness.checks.indexOf(false) >= 0 })
@@ -266,7 +266,7 @@ Harness {
       var halfObject = "{\n  \"symbols\": [\"AAPL\",\n"
       sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && printf %s "$3" > "$1.new" && mv "$1.new" "$1"', halfObject)
       var heldBroken = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
-      service.setRange("1W", false)
+      service.setRange("1W")
       // No write comes to land while the read is out, nor once it lands.
       var keptBroken = !within(300, function() { return harness.readFile(harness.file) !== halfObject })
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')

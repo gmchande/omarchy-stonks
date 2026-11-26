@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -49,6 +51,8 @@ Item {
   // new price arrives or the surface opens, then it rests.
   property bool live: false
   property string newestPrice: ""
+  property string initialPlayedFor: ""
+  signal played(string price)
   property bool surfaceOpen: true
   property bool seen: true
   // Closing: the live mark stops where it is, and ripples again as the surface
@@ -190,6 +194,7 @@ Item {
     var wasStock = prevStock
     prevGeometry = geometry
     prevStock = stock
+    if (marks) marks.requestPaint()
     if (!geometry || !prev || !surfaceOpen || still || !seen || !visible
       || morph < 1 || reveal < 1 || replayX >= 0
       || Motion.duration(Style, Motion.SWITCH_MS) <= 0) {
@@ -225,6 +230,8 @@ Item {
   onBelowFadeChanged: ink.requestPaint()
   onAboveColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
+  onHairlineColorChanged: if (marks) marks.requestPaint()
+  onScrubXChanged: if (marks) marks.requestPaint()
 
   function fractionAt(x) {
     return (x - pad) / (width - pad * 2)
@@ -318,28 +325,40 @@ Item {
     anchors.fill: parent
   }
 
-  // GPU hairline and dot for scrub/replay: zero Canvas repaints per frame.
-  readonly property bool scrubShown: root.drawable && root.scrubX >= 0
-  readonly property real scrubPx: root.pad + root.scrubX * (root.width - root.pad * 2)
-  readonly property var scrubYVal: scrubShown && root.geometry ? Chart.yAt(root.geometry.points, root.scrubX) : null
-
-  Rectangle {
-    visible: root.scrubShown
-    x: root.scrubPx - root.weight / 2
-    y: 0
-    width: root.weight
-    height: root.height
-    color: root.hairlineColor
-  }
-
-  Rectangle {
-    visible: root.scrubYVal !== null
-    x: root.scrubPx - 5 * root.weight
-    y: visible ? root.pad + root.scrubYVal * (root.height - root.pad * 2) - 5 * root.weight : 0
-    width: 10 * root.weight
-    height: 10 * root.weight
-    radius: 5 * root.weight
-    color: root.hairlineColor
+  // Scrub hairline and dot: built only while actively scrubbing, so at rest
+  // there is no marks canvas allocated, while scrubbed renders match pixel for
+  // pixel.
+  readonly property Canvas marks: marksLoader.item as Canvas
+  Loader {
+    id: marksLoader
+    anchors.fill: parent
+    active: root.drawable && root.scrubX >= 0
+    sourceComponent: Canvas {
+      onWidthChanged: requestPaint()
+      onHeightChanged: requestPaint()
+      onPaint: {
+        var ctx = getContext("2d")
+        ctx.clearRect(0, 0, width, height)
+        if (!root.drawable || root.scrubX < 0) return
+        var pad = root.pad
+        var w = width - pad * 2
+        var h = height - pad * 2
+        var sx = pad + root.scrubX * w
+        ctx.strokeStyle = root.hairlineColor
+        ctx.lineWidth = root.weight
+        ctx.beginPath()
+        ctx.moveTo(sx, 0)
+        ctx.lineTo(sx, height)
+        ctx.stroke()
+        var sy = Chart.yAt(root.geometry.points, root.scrubX)
+        if (sy !== null) {
+          ctx.fillStyle = root.hairlineColor
+          ctx.beginPath()
+          ctx.arc(sx, pad + sy * h, 5 * root.weight, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+    }
   }
 
   // How far the dot has bloomed at the open's bell, 0 to 1 (`bloom`).
@@ -405,6 +424,8 @@ Item {
     live: root.live
     still: root.still
     seen: root.seen
+    playedFor: root.initialPlayedFor
+    onPlayedForChanged: root.played(playedFor)
     // The dot comes as the ink reaches it, and rides a bend; its burst comes
     // as the draw-in or the bend ends, where the new chart's trade is.
     shown: dot.visible && root.reveal >= 1 && root.morph >= 1

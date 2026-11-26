@@ -892,7 +892,7 @@ Item {
   }
   function setStyle(style) {
     showingHelp = false
-    if (service) service.persist({ style: style }, true)
+    if (service) service.persist({ style: style })
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
   // Turned on, the add sound plays once, so you hear how loud they are.

@@ -54,6 +54,8 @@ Item {
   // as the smooth dot ripples, then it rests.
   property bool live: false
   property string newestPrice: ""
+  property string initialPlayedFor: ""
+  signal played(string price)
   property bool surfaceOpen: true
   property bool seen: true
   // Closing: the live mark stops where it is, and blinks again as the surface
@@ -116,7 +118,7 @@ Item {
   // stem at its cap's ink, for a chart so small that faint stems leave the
   // caps a dotted line: the pill's, 13 columns at 1x.
   function stemAlpha(color, share, ink) {
-    return Math.round(Tones.washAlpha(color, upColor, ground, share, ink) * 255) / 255
+    return Tones.washAlpha(color, upColor, ground, share, ink)
   }
   property bool solid: false
   readonly property real aboveStem: solid ? 1 : stemAlpha(aboveColor, 0.35, 1)
@@ -407,6 +409,8 @@ Item {
     live: root.live
     still: root.still
     seen: root.seen
+    playedFor: root.initialPlayedFor
+    onPlayedForChanged: root.played(playedFor)
     // The cap comes as the columns reach it; its blinks as the draw-in or
     // the wave ends.
     shown: cap.visible && root.reveal >= 1 && root.morph >= 1

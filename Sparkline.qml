@@ -61,27 +61,39 @@ Item {
     return aside ? Qt.rgba(c.r, c.g, c.b, asideAlpha) : c
   }
 
-  // While drawing in, the baseline stays whole behind the GPU clip curtain
-  // so the line never repaints per frame. At rest, `ink` holds both in one
-  // canvas.
-  Loader {
-    anchors.fill: parent
-    active: root.revealing && root.drawable && root.hasBaseline
-    sourceComponent: Canvas {
-      onWidthChanged: requestPaint()
-      onHeightChanged: requestPaint()
-      onPaint: {
-        var ctx = getContext("2d")
-        ctx.clearRect(0, 0, width, height)
-        if (!root.hasBaseline) return
-        var pad = root.pad
-        SmoothPaint.strokeBaseline(ctx, pad, width - pad, pad + root.geometry.baselineY * (height - pad * 2), root.baselineColor, 1, [2, 3])
+  // While drawing in, the unrevealed right half of the baseline shows beside
+  // the GPU clip curtain so the line never repaints per frame and the
+  // baseline is never drawn twice under the curtain. At rest, `ink` holds
+  // both in one canvas.
+  Item {
+    visible: root.revealing && root.drawable && root.hasBaseline
+    x: curtain.width
+    width: Math.max(0, root.width - x)
+    height: root.height
+    clip: true
+
+    Loader {
+      x: -parent.x
+      width: root.width
+      height: root.height
+      active: parent.visible
+      sourceComponent: Canvas {
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+          var ctx = getContext("2d")
+          ctx.clearRect(0, 0, width, height)
+          if (!root.hasBaseline) return
+          var pad = root.pad
+          SmoothPaint.strokeBaseline(ctx, pad, width - pad, pad + root.geometry.baselineY * (height - pad * 2), root.baselineColor, 1, [2, 3])
+        }
       }
     }
   }
 
   Item {
-    width: root.revealing ? root.inkRight * Math.max(0, root.reveal) : root.width
+    id: curtain
+    width: root.revealing ? Math.round(root.inkRight * Math.max(0, root.reveal)) : root.width
     height: root.height
     clip: root.revealing
 
