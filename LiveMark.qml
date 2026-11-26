@@ -13,6 +13,7 @@ Item {
 
   property bool live: false
   property bool still: false
+  property bool seen: true
   property bool shown: false
   // Whether the chart is drawing in, asked at a hide: a binding could still
   // hold the value from before the draw-in that hid the mark.
@@ -27,7 +28,7 @@ Item {
   property bool opening: false
 
   function play() {
-    if (!live || !shown || still) return
+    if (!live || !shown || still || !seen) return
     // With the shell's animations off, the mark stays still, and the price
     // counts as played for: animations back on, it never plays for it.
     if (Style.reduceMotion) {
@@ -49,11 +50,25 @@ Item {
   onSurfaceOpenChanged: if (surfaceOpen) { owed = true; opening = true; play() }
   onLiveChanged: if (live) play(); else burst.stop()
   onStillChanged: if (!still) play()
+  onSeenChanged: {
+    if (seen) play()
+    else if (!still && burst) burst.stop()
+  }
   onShownChanged: {
     if (shown) play()
     else {
       if (burst.running && opening && drawing()) owed = true
       burst.stop()
+    }
+  }
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() {
+      if (!Style.reduceMotion) return
+      root.owed = false
+      root.opening = false
+      if (root.burst) root.burst.stop()
     }
   }
   Connections {

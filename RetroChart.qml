@@ -55,6 +55,7 @@ Item {
   property bool live: false
   property string newestPrice: ""
   property bool surfaceOpen: true
+  property bool seen: true
   // Closing: the live mark stops where it is, and blinks again as the surface
   // opens.
   property bool still: false
@@ -405,6 +406,7 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
+    seen: root.seen
     // The cap comes as the columns reach it; its blinks as the draw-in or
     // the wave ends.
     shown: cap.visible && root.reveal >= 1 && root.morph >= 1

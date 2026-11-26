@@ -404,6 +404,7 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
+    seen: root.seen
     // The dot comes as the ink reaches it, and rides a bend; its burst comes
     // as the draw-in or the bend ends, where the new chart's trade is.
     shown: dot.visible && root.reveal >= 1 && root.morph >= 1

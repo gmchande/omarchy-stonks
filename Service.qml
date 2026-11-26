@@ -233,6 +233,7 @@ Item {
     if (!open) {
       root.sights = root.sights.filter(function(s) { return s.surface !== surface })
       root.drawingIn(surface, false)
+      if (root.openSurfaces.length === 0) listsFile.flush()
     }
     if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
     // The open's quote run goes a turn later, once the surface has said
@@ -314,7 +315,7 @@ Item {
     var s = String(symbol || "").toUpperCase()
     if (root.allSymbols.indexOf(s) < 0) return
     root.featuredTaken = null
-    root.persist({ featured: s }, settles)
+    root.persist({ featured: s }, settles !== false)
   }
 
   // From outside the list, its first or last row.
@@ -337,8 +338,8 @@ Item {
     if (Object.keys(values).length) root.persist(values)
   }
 
-  function setRange(value) {
-    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
+  function setRange(value, settles) {
+    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value }, settles !== false)
   }
 
   function addSymbol(symbol) {
@@ -470,6 +471,7 @@ Item {
   signal saveChecked(bool saved)
   function persist(values, settles) { listsFile.persist(values, settles) }
   function save(next) { listsFile.save(next) }
+  function flushSave() { listsFile.flush() }
   function saveAgain() { listsFile.saveAgain() }
 
   // ---- The feeds

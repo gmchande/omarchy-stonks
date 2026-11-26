@@ -454,6 +454,7 @@ OverRows {
             // so, plainly unless chosen.
             Rectangle {
               readonly property bool marked: root.actionFor(resultRow.modelData.symbol) === "ADDED"
+              visible: opacity > 0
               opacity: (resultRow.chosen || marked) && !resultRow.dimmed ? 1 : 0
               Behavior on opacity { enabled: !root.still; NumberAnimation { duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic } }
               anchors.verticalCenter: parent.verticalCenter

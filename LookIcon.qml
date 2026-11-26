@@ -60,10 +60,11 @@ Item {
   onColorChanged: curve.requestPaint()
 
   Item {
+    visible: root.cellColumns < root.points.length
     x: root.cellColumns * (root.pixel + root.gap)
     width: Math.max(0, root.width - x)
     height: root.height
-    clip: true
+    clip: root.cellColumns > 0 && root.cellColumns < root.points.length
 
     Canvas {
       id: curve

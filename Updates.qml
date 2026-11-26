@@ -32,7 +32,6 @@ Item {
 
   function readManifest() {
     manifest.reload()
-    takeManifest(manifest.text())
   }
 
   // Git's write can end while the shell sets its watch up again, sending no
@@ -68,13 +67,16 @@ Item {
 
   Component.onCompleted: takeManifest(manifest.text())
 
-  // `text()` waits for the whole file.
+  // First load blocks so `runningVersion` is known at startup; later checks on
+  // panel/window open reload asynchronously off the GUI thread.
   FileView {
     id: manifest
     path: Qt.resolvedUrl("manifest.json")
-    blockAllReads: true
+    blockLoading: true
     watchChanges: true
     printErrors: false
+    onLoaded: root.takeManifest(manifest.text())
+    onLoadFailed: root.takeManifest("")
     onFileChanged: root.check()
   }
 

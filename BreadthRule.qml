@@ -106,6 +106,7 @@ Item {
 
   Item {
     anchors.fill: parent
+    visible: opacity > 0
     opacity: root.revealed ? 0 : 1
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
 
@@ -160,6 +161,7 @@ Item {
   Text {
     id: countsText
     anchors.centerIn: parent
+    visible: opacity > 0
     opacity: root.revealed ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     textFormat: Text.PlainText

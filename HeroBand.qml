@@ -274,6 +274,7 @@ Item {
             live: root.live && root.look.retro
             newestPrice: root.newestPrice
             surfaceOpen: !root.still
+            seen: root.seen
             still: root.still || root.held
             hairlineColor: root.look.foreground
             ghostColor: root.look.ghost

@@ -233,12 +233,27 @@ Item {
     }
   }
 
+  property bool pendingRestart: false
+  function requestRestart() {
+    if (!root.updates) return
+    if (root.service) root.service.flushSave()
+    if (root.service && root.service.saving) {
+      root.pendingRestart = true
+      return
+    }
+    if (root.footerSays.restartable) root.updates.restart()
+  }
   Connections {
     target: root.service
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
     function onScreensReady() { searchFeed.sendWaiting() }
     function onYahooBack() { if (root.onScreen) search.yahooBack() }
+    function onSavingChanged() {
+      if (!root.pendingRestart || !root.service || root.service.saving) return
+      root.pendingRestart = false
+      if (root.updates && root.footerSays.restartable) root.updates.restart()
+    }
   }
 
   // ---- The stock on show
@@ -877,7 +892,7 @@ Item {
   }
   function setStyle(style) {
     showingHelp = false
-    if (service) service.persist({ style: style })
+    if (service) service.persist({ style: style }, true)
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
   // Turned on, the add sound plays once, so you hear how loud they are.
@@ -1528,11 +1543,14 @@ Item {
     undoOpacity: undoTime.shown
     onUndoClicked: root.undoRemoval()
     updateLabel: root.footerSays.updateOffer !== "" ? "Update to " + root.footerSays.updateOffer : ""
-    onUpdateClicked: root.updates.update(root.footerSays.restartable)
+    onUpdateClicked: {
+      if (root.service) root.service.flushSave()
+      root.updates.update(root.footerSays.restartable)
+    }
     onClicked: {
       if (root.footerSays.unreadable) return
       else if (root.saveFailed) root.saveAgain()
-      else if (root.note === "" && root.footerSays.updatedTo !== "") root.updates.restart()
+      else if (root.note === "" && root.footerSays.updatedTo !== "") root.requestRestart()
       else root.startAdding()
     }
   }

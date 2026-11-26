@@ -75,10 +75,18 @@ Item {
     else fidgetClock.stop()
   }
   // Each open starts with the greeting, running or not.
-  onSeenChanged: if (seen) fidgetAnew()
+  onSeenChanged: {
+    if (seen) fidgetAnew()
+    else Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  }
   onFidgetingChanged: {
     if (seen) fidgetAnew()
     else fidgetClock.stop()
+  }
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
   }
   Timer {
     id: fidgetClock
@@ -107,7 +115,7 @@ Item {
     turn.stop()
     turnBull.to = k === "bull" || k === "plain" ? 1 : 0
     turnBear.to = k === "bear" ? 1 : 0
-    if (fade && !look.retro) turn.start()
+    if (fade && !look.retro && seen && Motion.duration(Style, 160) > 0) turn.start()
     else {
       bull.opacity = turnBull.to
       bear.opacity = turnBear.to
@@ -128,7 +136,7 @@ Item {
     // at once, and a fidget under way stops and rests. A rest runs on: a
     // fidget's first blink comes 340 ms in, after the bell's 320 ms.
     var rung = fade && animal.bell && !afterScrub
-    if (rung && !(asleep && fidget.blink)) {
+    if (rung && !(asleep && fidget.blink) && seen && Motion.duration(Style, 320) > 0) {
       waking = !asleep
       shutting.from = asleep ? 0 : 1
       shutting.to = asleep ? 1 : 0

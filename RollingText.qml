@@ -65,7 +65,7 @@ Item {
     y: root.inkTop
     width: root.place(from, at + 1) - x
     height: root.inkHeight
-    clip: true
+    clip: cell.offset !== 0
     Text {
       y: cell.offset * cell.height - root.inkTop
       textFormat: Text.PlainText

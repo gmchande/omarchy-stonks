@@ -109,6 +109,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.body) root.body.freeze()
+    if (service) service.flushSave()
     // Closing stops Stonks' own ease where it is for the fade.
     edgeEase.stop()
     root.controller.hide()

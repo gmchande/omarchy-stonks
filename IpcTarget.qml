@@ -23,7 +23,11 @@ Item {
   // is in the file for sure, as now, not as when the update was asked for:
   // else the footer says the change isn't saved, or offers the restart.
   function restartIfSaved() {
-    if (!root.service || !root.updates || root.service.saving) return
+    if (!root.service || !root.updates) return
+    if (root.service.saving) {
+      root.service.flushSave()
+      return
+    }
     var says = Release.footerNotice({ unreadable: root.service.listsUnreadable, saveFailed: root.service.saveFailed,
       editsUnsaved: root.service.editsUnsaved }, "")
     if (says.restartable) root.updates.restart()
