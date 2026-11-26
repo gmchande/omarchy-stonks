@@ -9,6 +9,7 @@ import qs.Commons as Commons
 // the list menu does.
 OverRows {
   id: root
+  fades: true
 
   property var lines: []
   property int startLine: -1

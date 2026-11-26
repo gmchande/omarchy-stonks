@@ -514,7 +514,12 @@ Item {
   property bool listMenuOpen: false
   property bool managingLists: false
   property string listsSymbol: ""
+  // Held through the close fade so the overlay doesn't empty before it goes.
+  property string heldListsSymbol: ""
+  onListsSymbolChanged: if (listsSymbol !== "") heldListsSymbol = listsSymbol
   property var rowMenu: null
+  property var heldRowMenu: null
+  onRowMenuChanged: if (rowMenu !== null) heldRowMenu = rowMenu
   readonly property bool listViewOpen: managingLists || listsSymbol !== ""
   readonly property bool rowsShown: !showingHelp && !adding && !listViewOpen
   readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen || rowMenu !== null
@@ -1150,6 +1155,14 @@ Item {
   function resetInteraction() {
     closeViews()
     freeze()
+    search.settle()
+    manageLists.settle()
+    symbolLists.settle()
+    rowMenuView.settle()
+    listMenu.settle()
+    helpSheet.settle()
+    heldRowMenu = null
+    heldListsSymbol = ""
     motion.reset()
     watchlist.reopen()
     watchlist.snapToRow()
@@ -1331,6 +1344,7 @@ Item {
   SymbolSearch {
     id: search
     objectName: "symbolSearch"
+    z: 5
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: heroBand.bottom
@@ -1339,7 +1353,9 @@ Item {
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
-    visible: root.adding
+    open: root.adding
+    seen: root.seen
+    still: !root.surfaceOpen
     feed: searchFeed
     active: root.adding && root.surfaceOpen
     look: root.look
@@ -1358,6 +1374,7 @@ Item {
   ManageLists {
     id: manageLists
     objectName: "manageLists"
+    z: 5
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: heroBand.bottom
@@ -1366,7 +1383,9 @@ Item {
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
-    visible: root.managingLists
+    open: root.managingLists
+    seen: root.seen
+    still: !root.surfaceOpen
     active: root.managingLists && root.surfaceOpen
     choices: root.lists
     look: root.look
@@ -1380,6 +1399,7 @@ Item {
   SymbolLists {
     id: symbolLists
     objectName: "symbolLists"
+    z: 5
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: heroBand.bottom
@@ -1388,11 +1408,15 @@ Item {
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
-    visible: root.listsSymbol !== ""
+    open: root.listsSymbol !== ""
+    seen: root.seen
+    still: !root.surfaceOpen
     active: root.listsSymbol !== "" && root.surfaceOpen
+    readonly property string shownSymbol: root.listsSymbol !== "" ? root.listsSymbol : root.heldListsSymbol
+    onVisibleChanged: if (!visible && root.listsSymbol === "") root.heldListsSymbol = ""
     choices: root.lists
-    symbol: root.listsSymbol
-    symbolName: root.quotes[root.listsSymbol] ? root.quotes[root.listsSymbol].name : ""
+    symbol: shownSymbol
+    symbolName: shownSymbol && root.quotes[shownSymbol] ? root.quotes[shownSymbol].name : ""
     note: root.note
     look: root.look
     gutter: root.gutter
@@ -1460,10 +1484,23 @@ Item {
     }
   }
 
+  // Ground backing while HelpSheet fades out so the hero and rows underneath
+  // emerge cleanly without overlapping words.
+  Rectangle {
+    anchors.fill: helpSheet
+    z: 5
+    visible: helpSheet.visible && !root.showingHelp
+    opacity: helpSheet.opacity
+    color: root.ground
+  }
+
   HelpSheet {
     id: helpSheet
     objectName: "helpSheet"
-    visible: root.showingHelp
+    z: 6
+    shown: root.showingHelp
+    seen: root.seen
+    still: !root.surfaceOpen
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1513,16 +1550,21 @@ Item {
   }
 
   RowMenu {
+    id: rowMenuView
     objectName: "rowMenu"
-    visible: root.rowMenu !== null
+    open: root.rowMenu !== null
+    seen: root.seen
+    still: !root.surfaceOpen
     active: root.rowMenu !== null && root.surfaceOpen
+    readonly property var menu: root.rowMenu || root.heldRowMenu
+    onVisibleChanged: if (!visible && root.rowMenu === null) root.heldRowMenu = null
     z: 10
     maxWidth: root.width - root.margins * 2
-    x: root.rowMenu ? Math.max(root.margins, Math.min(root.rowMenu.x, root.width - root.margins - width)) : 0
-    y: !root.rowMenu ? 0 : root.rowMenu.below + height <= root.edge - root.margins ? root.rowMenu.below
-      : Math.max(root.margins, root.rowMenu.above - height)
-    lines: root.rowMenu ? root.rowMenu.lines.map(function(line) { return line.label }) : []
-    startLine: root.rowMenu ? root.rowMenu.startLine : -1
+    x: menu ? Math.max(root.margins, Math.min(menu.x, root.width - root.margins - width)) : 0
+    y: !menu ? 0 : menu.below + height <= root.edge - root.margins ? menu.below
+      : Math.max(root.margins, menu.above - height)
+    lines: menu ? menu.lines.map(function(line) { return line.label }) : []
+    startLine: menu ? menu.startLine : -1
     look: root.look
     onTaken: function(index) { root.takeRowMenu(index) }
     onDismissed: root.rowMenu = null
@@ -1531,7 +1573,9 @@ Item {
   ListMenu {
     id: listMenu
     objectName: "listMenu"
-    visible: root.listMenuOpen
+    open: root.listMenuOpen
+    seen: root.seen
+    still: !root.surfaceOpen
     active: root.listMenuOpen && root.surfaceOpen
     z: 10
     x: root.margins

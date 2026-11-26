@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "Motion.js" as Motion
 
 // A word that acts as a button, on the shell's resting fill (Style's
 // normal fill) so it reads as one before the pointer finds it. A disabled
@@ -12,6 +13,7 @@ Text {
   // Marked as the shell marks its default button (its Button's `selected`,
   // ConfirmDialog's chosen one).
   property bool enterTakes: false
+  property bool still: false
   readonly property bool hovered: enabled && mouse.containsMouse
 
   signal activated()
@@ -19,6 +21,16 @@ Text {
   textFormat: Text.PlainText
   color: enterTakes ? Style.selectedStateColor(look.foreground, Commons.Color.accent)
     : hovered ? look.foreground : look.dim
+  Behavior on color { enabled: !root.still; ColorAnimation { duration: Motion.duration(Style, 120) } }
+  scale: enabled && mouse.pressed ? 0.97 : 1
+  Behavior on scale {
+    enabled: !root.still
+    NumberAnimation {
+      duration: Motion.duration(Style, 160)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Motion.curve(Style)
+    }
+  }
   font.family: look.fontFamily
   font.pixelSize: Style.font.caption
   font.bold: true
@@ -38,12 +50,14 @@ Text {
       : root.hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
       : root.enterTakes ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
       : Style.normalFillFor(root.look.foreground, Commons.Color.accent)
+    Behavior on color { enabled: !root.still; ColorAnimation { duration: Motion.duration(Style, 120) } }
   }
 
   MouseArea {
     id: mouse
     anchors.fill: parent
     anchors.margins: -Style.space(6)
+    scale: 1 / parent.scale
     hoverEnabled: true
     // One that can't act shows no hand, so it never invites a click.
     cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor

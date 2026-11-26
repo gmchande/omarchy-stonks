@@ -1067,6 +1067,7 @@ Harness {
         // -own-retry-down-: ↓ past the last of them, by search's own key
         // handler, onto the failed line.
         if (root.stateName.indexOf("-own-retry-down-") > 0) root.beforeGrab = function() {
+          body.search.still = true
           for (var d = 0; d < body.search.ownCount + 1; d++) body.search.handleKey({ key: Qt.Key_Down, accepted: false })
         }
       }
@@ -1298,6 +1299,8 @@ Harness {
         root.beforeGrab = function() {
           var row = body.watchlist.rowItem(held)
           body.openRowMenu(held, named ? row.mapToItem(null, Style.space(60), row.height / 2) : null)
+          child("rowMenu").settle()
+          row.settle()
         }
       } else if (/-(manage|rename|confirm|lift)-/.test(root.stateName)) {
         body.openManageLists()

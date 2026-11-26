@@ -317,11 +317,15 @@ Harness {
       rest()
 
       click("listControl")
+      var chevron = at("listLabel").parent.children.filter(function(c) { return c.text === "󰅀" })[0]
+      var listMenu = at("listMenu")
       var choices = function() { return harness.findAll(body, "listChoice") }
-      var listed = within(1500, function() { return body.listMenuOpen && choices().length === 2 && harness.inPlace(choices()) })
+      var listed = within(1500, function() { return body.listMenuOpen && choices().length === 2 && harness.inPlace(choices()) && !!chevron && Math.round(chevron.rotation) === 180 })
       click(choices()[1])
-      harness.check("a click on the list's name opens the menu, and a list's line shows that list",
-        listed && within(1500, function() { return service.listName === "Tech" && !body.listMenuOpen }), listed + " " + service.listName)
+      var droppedInput = within(500, function() { return !body.listMenuOpen && !listMenu.enabled })
+      var closedClean = within(1500, function() { return service.listName === "Tech" && !listMenu.visible && !!chevron && Math.round(chevron.rotation) === 0 })
+      harness.check("a click on the list's name opens the menu and turns its chevron, and choosing a list switches at once while the menu drops input and closes",
+        listed && droppedInput && closedClean, [listed, droppedInput, closedClean, service.listName, chevron ? chevron.rotation : "none", listMenu.visible, listMenu.enabled].join(" "))
       service.switchList("")
       quiet()
 

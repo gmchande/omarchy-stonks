@@ -11,32 +11,87 @@ import "Rows.js" as Rows
 // lists. All comes first and can't change.
 OverRows {
   id: root
+  fades: true
 
   property var choices: []
   property Look look
   // Why a typed name was refused, said under the field and brought into
   // view; as its line goes, the list rests within its rows at once.
   property string problem: ""
-  onProblemChanged: if (problem !== "") Qt.callLater(showProblem); else settle()
+  onProblemChanged: if (problem !== "") Qt.callLater(showProblem); else clampScroll()
   // The column lays out a turn after the problem's line appears.
   function showProblem() {
     var bottom = (cursor + 2) * itemHeight
-    if (bottom > scroll.contentY + scroll.height)
-      scroll.contentY = Math.min(bottom - scroll.height, Math.max(0, rowsHeight - scroll.height))
+    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
+    if (bottom > base + scroll.height)
+      glideScroll(Math.min(bottom - scroll.height, Math.max(0, rowsHeight - scroll.height)))
   }
   // `rowsHeight` may not have updated yet.
-  function settle() {
+  function clampScroll() {
+    scrollGlide.stop()
     scroll.contentY = Math.min(scroll.contentY, Math.max(0, choices.length * itemHeight - scroll.height))
   }
+
+  function glideScroll(to) {
+    scroll.cancelFlick()
+    if (!active || !seen || still || Motion.duration(Style, 160) <= 0 || Math.abs(to - scroll.contentY) < 0.5) {
+      scrollGlide.stop()
+      scroll.contentY = to
+      return
+    }
+    scrollGlide.to = to
+    scrollGlide.restart()
+  }
+  NumberAnimation { id: scrollGlide; target: scroll; property: "contentY"; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
 
   property int cursor: 1
   property bool renaming: false
   property bool confirming: false
   // By name: the other surface can reorder, rename or delete it meanwhile.
   property string pendingName: ""
+  // Deleted lists kept in `rowsModel` for 120 ms while their row folds shut.
+  property var lastChoices: ({})
+  property var foldChoices: ({})
+  property var foldingNames: []
+  signal foldsCleared()
+  function recordChoices() {
+    var map = {}
+    for (var i = 0; i < choices.length; i++) map[choices[i].name] = choices[i]
+    lastChoices = map
+  }
+  function finishFold(name) {
+    if (foldingNames.indexOf(name) < 0) return
+    var nextFold = Object.assign({}, foldChoices)
+    delete nextFold[name]
+    foldChoices = nextFold
+    foldingNames = foldingNames.filter(function(n) { return n !== name })
+    Rows.syncModel(rowsModel, "name", names.concat(foldingNames))
+  }
+  function endFolds() {
+    if (foldingNames.length === 0) return
+    foldingNames = []
+    foldChoices = ({})
+    foldsCleared()
+    Rows.syncModel(rowsModel, "name", names)
+  }
   onChoicesChanged: {
     var listed = choices.map(function(c) { return c.name })
-    Rows.syncModel(rowsModel, "name", listed)
+    var nextFolding = foldingNames.filter(function(n) { return listed.indexOf(n) < 0 })
+    var nextFoldChoices = {}
+    for (var f = 0; f < nextFolding.length; f++) nextFoldChoices[nextFolding[f]] = foldChoices[nextFolding[f]]
+    if (active && seen && !still && Motion.duration(Style, 120) > 0) {
+      var prevNames = Object.keys(lastChoices)
+      for (var p = 0; p < prevNames.length; p++) {
+        var gone = prevNames[p]
+        if (gone === "" || gone === reorder.lifted || listed.indexOf(gone) >= 0 || nextFolding.indexOf(gone) >= 0) continue
+        nextFolding.push(gone)
+        nextFoldChoices[gone] = lastChoices[gone]
+      }
+    }
+    foldChoices = nextFoldChoices
+    foldingNames = nextFolding
+    Rows.syncModel(rowsModel, "name", listed.concat(foldingNames))
+    recordChoices()
     if (!renaming && !confirming) return
     var at = listed.indexOf(pendingName)
     if (at < 0) { stopEditing(); return }
@@ -69,8 +124,22 @@ OverRows {
   // drops where it was.
   onClosed: {
     newName.release()
+    scrollGlide.stop()
     scroll.cancelFlick()
     reorder.cancel()
+    endFolds()
+  }
+  onSettled: {
+    scrollGlide.stop()
+    endFolds()
+    clampScroll()
+  }
+  onStillChanged: if (still && scrollGlide.running) scrollGlide.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) { scrollGlide.stop(); root.endFolds() } })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) { scrollGlide.stop(); root.endFolds() } }
   }
 
   function reset() {
@@ -78,6 +147,8 @@ OverRows {
     confirming = false
     problem = ""
     cursor = choices.length > 1 ? 1 : 0
+    scrollGlide.stop()
+    endFolds()
     scroll.contentY = 0
   }
 
@@ -104,7 +175,8 @@ OverRows {
 
   function showCursor() {
     scroll.cancelFlick()
-    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
+    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
+    glideScroll(Rows.topShowing(cursor, rowSize(), base, scroll.height))
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
@@ -166,7 +238,10 @@ OverRows {
   // come and go, never moved: a row finds its place by its name.
   readonly property var names: choices.map(function(c) { return c.name })
   ListModel { id: rowsModel }
-  Component.onCompleted: Rows.syncModel(rowsModel, "name", names)
+  Component.onCompleted: {
+    recordChoices()
+    Rows.syncModel(rowsModel, "name", names)
+  }
 
   // A list dragged by its row, as a stock's row is in your own order
   // (Watchlist): lifted under the pointer, the others making room, and
@@ -177,7 +252,7 @@ OverRows {
     contentY: scroll.contentY
     sight: scroll.height
     reach: Math.max(0, scroll.contentHeight - scroll.height)
-    onScrollTo: function(y) { scroll.contentY = y }
+    onScrollTo: function(y) { scrollGlide.stop(); scroll.contentY = y }
     first: 1
     onDropped: function(from, to) {
       if (from !== to) root.moveRequested(root.reorder.lifted, to - from)
@@ -233,6 +308,14 @@ OverRows {
     else if (event.key === Qt.Key_End) root.moveCursor(root.choices.length)
     else if (event.key === Qt.Key_Home) root.moveCursor(-root.choices.length)
     else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
+  }
+
+  // Opaque ground while fading out over the rows underneath.
+  Rectangle {
+    z: -1
+    anchors.fill: parent
+    color: root.look.ground
+    visible: !root.open
   }
 
   MouseArea {
@@ -291,12 +374,22 @@ OverRows {
     // renaming, so a click on it reaches the click-away that keeps the name.
     interactive: contentHeight > height && !root.renaming
     // `moving` stays false for a key's scroll.
+    onMovementStarted: scrollGlide.stop()
     onContentYChanged: {
+      if (scrollGlide.running && Math.abs(contentY - scrollGlide.to) < 0.5) {
+        scrollGlide.stop()
+        contentY = scrollGlide.to
+        return
+      }
       if (!root.active || !(moving || manageBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    Controls.ScrollBar.vertical: ViewScrollBar { id: manageBar; scrolls: scroll.interactive }
+    Controls.ScrollBar.vertical: ViewScrollBar {
+      id: manageBar
+      scrolls: scroll.interactive
+      onPressedChanged: if (pressed) scrollGlide.stop()
+    }
 
     // The rows, one per list by name, so a list that moves slides to its
     // place as a stock's row does.
@@ -313,35 +406,95 @@ OverRows {
           objectName: "manageRow"
           required property string name
           readonly property int index: root.names.indexOf(name)
-          readonly property var choice: root.choices[index] || ({ name: name, label: "", count: 0 })
+          readonly property var choice: root.choices[index] || root.foldChoices[name] || ({ name: name, label: "", count: 0 })
           readonly property bool named: name !== ""
-          readonly property bool isCursor: index === root.cursor
+          readonly property bool isCursor: !folding && index === root.cursor
           readonly property bool editing: isCursor && root.renaming
           readonly property bool asking: isCursor && root.confirming
-          readonly property bool showsActions: named && !editing && !asking && isCursor && !lifted
+          readonly property bool showsActions: named && !editing && !asking && isCursor && !lifted && !folding
           readonly property bool lifted: named && name === root.reorder.lifted
           width: column.width
           height: root.itemHeight
-          visible: index >= 0
+          visible: index >= 0 || folding
 
           // Where the list sits while another is dragged (`Rows.slotOf`), and
           // below a rename's problem, a row lower. It slides from one place
           // to the next, as a stock's row does (WatchlistRow).
           readonly property int place: root.reorder.slotOf(name)
-          y: lifted ? root.reorder.liftedY : place * root.itemHeight + shift
-            + (root.renaming && root.problem !== "" && place > root.cursor ? root.itemHeight : 0)
+          readonly property real errorTarget: root.renaming && root.problem !== "" && place > root.cursor ? root.itemHeight : 0
+          property real errorOffset: 0
+          onErrorTargetChanged: {
+            if (!root.active || !root.seen || root.still || Motion.duration(Style, 160) <= 0 || Math.abs(errorTarget - errorOffset) < 0.5) {
+              errorSlide.stop()
+              errorOffset = errorTarget
+              return
+            }
+            errorSlide.to = errorTarget
+            errorSlide.restart()
+          }
+          NumberAnimation { id: errorSlide; target: entry; property: "errorOffset"; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
+          onErrorOffsetChanged: if (errorSlide.running && Math.abs(errorOffset - errorTarget) < 0.5) {
+            errorSlide.stop()
+            errorOffset = errorTarget
+          }
+          y: lifted ? root.reorder.liftedY : folding ? foldY : place * root.itemHeight + shift + errorOffset
           property int lastPlace: -1
           property real shift: 0
           onPlaceChanged: {
             var from = lastPlace
             lastPlace = place
+            if (folding && place < 0) return
             if (lifted || from < 0 || place < 0) { slide.stop(); shift = 0; return }
             shift += (from - place) * root.itemHeight
+            if (Math.abs(shift) < 0.5 || Motion.duration(Style, 160) <= 0) { slide.stop(); shift = 0; return }
             slide.restart()
           }
-          Component.onCompleted: lastPlace = place
-          NumberAnimation { id: slide; target: entry; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-          z: lifted ? root.choices.length + 2 : slide.running ? 1 : 0
+          Component.onCompleted: { lastPlace = place; errorOffset = errorTarget }
+          NumberAnimation { id: slide; target: entry; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
+          onShiftChanged: if (slide.running && Math.abs(shift) < 0.5) {
+            slide.stop()
+            shift = 0
+          }
+
+          // Folding: shut from the bottom up and faded over 120 ms, matching WatchlistRow.
+          readonly property bool shouldFold: root.foldingNames.indexOf(name) >= 0
+          property bool folding: false
+          property real foldY: 0
+          property real folded: 1
+          transform: Scale { yScale: entry.folded }
+          onShouldFoldChanged: {
+            if (shouldFold) fold()
+            else if (folding) endFold()
+          }
+          function fold() {
+            if (folding || lifted) return
+            foldY = y
+            slide.stop()
+            errorSlide.stop()
+            folding = true
+            foldAnim.restart()
+          }
+          function endFold() {
+            if (!folding) return
+            foldAnim.stop()
+            folding = false
+            folded = 1
+            opacity = 1
+          }
+          ParallelAnimation {
+            id: foldAnim
+            NumberAnimation { target: entry; property: "folded"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
+            NumberAnimation { target: entry; property: "opacity"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
+            onFinished: {
+              entry.endFold()
+              root.finishFold(entry.name)
+            }
+          }
+          Connections {
+            target: root
+            function onFoldsCleared() { entry.endFold() }
+          }
+          z: lifted ? root.choices.length + 2 : folding ? -1 : slide.running ? 1 : 0
 
           // Lifted or sliding, the row lays the card's ground under its fill,
           // so the rows it passes never show through.
@@ -372,7 +525,7 @@ OverRows {
           MouseArea {
             width: parent.width
             height: root.itemHeight
-            enabled: entry.named && !root.renaming && !root.confirming
+            enabled: entry.named && !entry.folding && !root.renaming && !root.confirming
             preventStealing: true
             cursorShape: entry.lifted ? Qt.ClosedHandCursor : Qt.ArrowCursor
             property real pressY: -1
@@ -397,7 +550,7 @@ OverRows {
           Text {
             visible: !entry.editing && !entry.asking
             x: root.inset
-            width: (entry.showsActions ? actions.x : count.x) - x - Style.space(12)
+            width: (actions.visible ? actions.x : count.x) - x - Style.space(12)
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
@@ -409,7 +562,9 @@ OverRows {
           }
 
           Text {
-            visible: !entry.named && entry.isCursor
+            visible: (!entry.named && entry.isCursor) || opacity > 0
+            opacity: !entry.named && entry.isCursor ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 100); easing.type: Easing.OutCubic } }
             anchors.right: count.left
             anchors.rightMargin: Style.space(16)
             height: root.itemHeight
@@ -425,7 +580,10 @@ OverRows {
 
           Row {
             id: actions
-            visible: entry.showsActions
+            visible: (entry.showsActions || opacity > 0) && !entry.editing && !entry.asking
+            opacity: entry.showsActions ? 1 : 0
+            enabled: entry.showsActions
+            Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 100); easing.type: Easing.OutCubic } }
             anchors.right: count.left
             anchors.rightMargin: Style.space(16)
             height: root.itemHeight
@@ -464,9 +622,28 @@ OverRows {
             font.bold: true
           }
 
-          // Delete asks in the row: Stonks has no dialogs.
+          // Delete asks in the row: Stonks has no dialogs. Fades in over 100 ms
+          // and clears immediately on cancel so it never overlaps the list name.
+          property real askingOpacity: 0
+          onAskingChanged: {
+            if (asking) {
+              if (root.active && root.seen && !root.still && Motion.duration(Style, 100) > 0) {
+                askingOpacity = 0
+                askingFade.restart()
+              } else {
+                askingFade.stop()
+                askingOpacity = 1
+              }
+            } else {
+              askingFade.stop()
+              askingOpacity = 0
+            }
+          }
+          NumberAnimation { id: askingFade; target: entry; property: "askingOpacity"; to: 1; duration: Motion.duration(Style, 100); easing.type: Easing.OutCubic }
+
           Text {
             visible: entry.asking
+            opacity: entry.askingOpacity
             x: root.inset
             width: confirm.x - x - Style.space(12)
             height: root.itemHeight
@@ -485,6 +662,7 @@ OverRows {
           Row {
             id: confirm
             visible: entry.asking
+            opacity: entry.askingOpacity
             anchors.right: parent.right
             anchors.rightMargin: root.inset
             height: root.itemHeight

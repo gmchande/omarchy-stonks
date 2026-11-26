@@ -57,18 +57,66 @@ Item {
   function settle() {
     lookIcon.settle()
     slot.settle()
+    soundAnim.stop()
+    soundStep = soundsOn ? 1 : 0
+    lensAnim.stop()
+    lensBloom = cameraLit ? 1 : 0
     if (wordSwap.running) endSwap()
   }
 
+  // Speaker arcs emerge outward on unmute and cross to × on mute; camera
+  // lens blooms when a screenshot lands.
+  property real soundStep: soundsOn ? 1 : 0
+  onSoundsOnChanged: {
+    var target = soundsOn ? 1 : 0
+    if (seen && !still && Motion.duration(Style, 160) > 0) {
+      soundAnim.to = target
+      soundAnim.restart()
+    } else {
+      soundAnim.stop()
+      soundStep = target
+    }
+  }
+  NumberAnimation { id: soundAnim; target: root; property: "soundStep"; duration: Motion.duration(Style, 160); easing.type: Easing.Linear }
+
+  property real lensBloom: cameraLit ? 1 : 0
+  onCameraLitChanged: {
+    if (cameraLit && seen && !still && Motion.duration(Style, 160) > 0) {
+      lensAnim.stop()
+      lensBloom = 0
+      lensAnim.start()
+    } else {
+      lensAnim.stop()
+      lensBloom = cameraLit ? 1 : 0
+    }
+  }
+  NumberAnimation { id: lensAnim; target: root; property: "lensBloom"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
+  onLensBloomChanged: if (lensAnim.running && lensBloom > 0.985) {
+    lensAnim.stop()
+    lensBloom = 1
+  }
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() {
+      if (!Style.reduceMotion) return
+      soundAnim.stop()
+      root.soundStep = root.soundsOn ? 1 : 0
+      lensAnim.stop()
+      root.lensBloom = root.cameraLit ? 1 : 0
+    }
+  }
 
   Component.onCompleted: settle()
 
-  // What makes an icon a button: its fill while pressed, a target as tall as
-  // the header's two lines, and its tip 3 px under the target, centred, but
-  // never past the header's right edge. Under the icon it is put in.
+  // What makes an icon a button: its fill on hover, press or selection, a
+  // target as tall as the header's two lines, and its tip 3 px under the
+  // target, centred, but never past the header's right edge. Under the icon
+  // it is put in.
   component HeaderPress: Item {
     id: press
     property string tip: ""
+    property bool selected: false
     // The fill's height past the icon's, and the target's least width.
     property real fillPad: Style.space(6)
     property real leastWidth: 0
@@ -83,7 +131,10 @@ Item {
       width: parent.width + Style.space(12)
       height: parent.height + press.fillPad
       radius: root.look.retro ? 0 : Style.cornerRadius
-      color: area.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+      color: area.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+        : press.selected ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+        : area.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+      Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
     }
 
     MouseArea {
@@ -265,8 +316,17 @@ Item {
   // Hidden while open, nothing moves; closing, the words hold through the
   // fade, and land at the next open (`settle`). Judged a turn later, once
   // a close has said so too.
-  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still && wordSwap.running) root.endSwap() })
-  onStillChanged: if (still && wordSwap.running) wordSwap.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() {
+    if (root.seen || root.still) return
+    if (wordSwap.running) root.endSwap()
+    if (soundAnim.running) { soundAnim.stop(); root.soundStep = root.soundsOn ? 1 : 0 }
+    if (lensAnim.running) { lensAnim.stop(); root.lensBloom = root.cameraLit ? 1 : 0 }
+  })
+  onStillChanged: if (still) {
+    if (wordSwap.running) wordSwap.pause()
+    if (soundAnim.running) soundAnim.pause()
+    if (lensAnim.running) lensAnim.pause()
+  }
 
   Text {
     id: statusWords
@@ -312,8 +372,9 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
-    shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
+    shape: Cells.soundShape(root.soundStep)
     color: soundPress.containsMouse ? root.look.foreground : root.look.dim
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
 
     HeaderPress {
       id: soundPress
@@ -332,8 +393,9 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
-    shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
+    shape: Cells.cameraShape(root.lensBloom)
     color: lit || cameraPress.containsMouse ? root.look.foreground : root.look.dim
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
 
     HeaderPress {
       id: cameraPress
@@ -356,6 +418,7 @@ Item {
     still: root.still
     pixel: root.cell - 1
     color: lookPress.containsMouse ? root.look.foreground : root.look.dim
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
 
     HeaderPress {
       id: lookPress
@@ -376,13 +439,15 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     textFormat: Text.PlainText
     text: "?"
-    color: helpPress.containsMouse ? root.look.foreground : root.look.dim
+    color: root.helpShown || helpPress.containsMouse ? root.look.foreground : root.look.dim
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     HeaderPress {
       id: helpPress
       objectName: "helpToggle"
+      selected: root.helpShown
       // A narrower fill, as the glyph is shorter than an icon, and a target
       // at least 24 wide.
       fillPad: Style.space(4)
