@@ -526,8 +526,8 @@ Harness {
       harness.check("the header's look, sound, camera and ? each act, and ? again closes the sheet",
         looked && sounded && shot && sheet && within(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
 
-      // In retro, a click on another row changes the price whole: at every
-      // frame of the switch it is the one stock's or the other's.
+      // In retro, a click on another row changes the price whole: every
+      // price the digits take on the way is the one stock's or the other's.
       if (!service.retro) body.setStyle("retro")
       within(1500, function() { return service.retro })
       var digits = harness.find(body, "retroPrice")
@@ -536,17 +536,20 @@ Harness {
       // answers give several stocks one price.
       var other = listed.filter(function(s) { return !!service.quotes[s] && !!body.featured && service.quotes[s].price !== body.featuredQuote.price })[0]
       var fromText = digits.text
-      var mixed = []
+      var taken = []
       var moved = false
+      var takes = function() { taken.push(digits.text) }
+      var moves = function() { if (body.motion.arrival < 1) moved = true }
+      digits.textChanged.connect(takes)
+      body.motion.arrivalChanged.connect(moves)
       click(row(other))
-      // Until the clicked stock's chart has come and its switch has ended.
-      for (var frame = 0; frame < 300 && !(moved && body.motion.arrival >= 1); frame++) {
-        wait(8)
-        moved = moved || (body.chartSymbol === other && body.motion.arrival < 1)
-        if (digits.text !== fromText && digits.text !== body.featured.priceText) mixed.push(digits.text)
-      }
+      var arrived = within(3000, function() { return moved && body.motion.arrival >= 1 && body.chartSymbol === other })
+      digits.textChanged.disconnect(takes)
+      body.motion.arrivalChanged.disconnect(moves)
+      var toText = body.featured.priceText
+      var mixed = taken.filter(function(text) { return text !== fromText && text !== toText })
       harness.check("in retro, a click on another row shows its price whole, never a mix of the two",
-        moved && fromText !== digits.text && mixed.length === 0, [moved, other, service.featuredSymbol, fromText, digits.text, body.featured ? body.featured.priceText : "", mixed.join(" ")].join(" "))
+        arrived && fromText !== toText && digits.text === toText && mixed.length === 0, [arrived, other, fromText, toText, mixed.join(" ")].join(" "))
       body.setStyle(retro ? "retro" : "smooth")
 
       click("animal")
