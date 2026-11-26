@@ -341,8 +341,8 @@ Harness {
       var unlanded = quotesFeed.quotes === watched
       quotesFeed.quotes = held
       settle()
-      harness.check("a second with the window open reads a stock's quote at most 172 times in all",
-        unlanded && reads.n > 0 && reads.n <= 172, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
+      harness.check("a second with the window open reads a stock's quote at most 152 times in all",
+        unlanded && reads.n > 0 && reads.n <= 152, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
 
       // A batch of prices for the rows in sight lands: the whole view is
       // made again, the stock on show's day with it.
@@ -353,18 +353,18 @@ Harness {
       batchReads.on = false
       quotesFeed.quotes = held
       settle()
-      harness.check("a batch of prices for the rows in sight reads a stock's quote at most 1909 times in all",
-        batchReads.n > 0 && batchReads.n <= 1909, batchReads.n + " reads")
+      harness.check("a batch of prices for the rows in sight reads a stock's quote at most 797 times in all",
+        batchReads.n > 0 && batchReads.n <= 797, batchReads.n + " reads")
 
       // One stock's new trade: the service hands the surfaces a new map of
-      // newest trades, and every row reads it again, in sight or not.
+      // newest trades, and only the rows in sight (and breadth) read it.
       var trades = service.newestTrades
       var tradeReads = { on: true, n: 0 }
       service.newestTrades = counted(trades, service.allSymbols, tradeReads)
       tradeReads.on = false
       service.newestTrades = trades
-      harness.check("one stock's new trade reads the newest trades at most 482 times in all",
-        tradeReads.n > 0 && tradeReads.n <= 482, tradeReads.n + " reads")
+      harness.check("one stock's new trade reads the newest trades at most 175 times in all",
+        tradeReads.n > 0 && tradeReads.n <= 175, tradeReads.n + " reads")
 
       app.close()
       harness.finish()
