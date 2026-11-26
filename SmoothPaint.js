@@ -83,6 +83,18 @@ function paintInk(ctx, g, s) {
     ctx.restore()
   }
 
+  // A one-trade chart's dot as it grows out of, or shrinks into, the other
+  // chart's line (`Morph.frame`), to a lone trade's size.
+  var lone = g.lone || []
+  for (var d = 0; d < lone.length; d++) {
+    var dot = lone[d].point
+    var alpha = dot.faint ? lighter : 1
+    ctx.fillStyle = sides(ctx, by, s, alpha, alpha)
+    ctx.beginPath()
+    ctx.arc(pad + dot.x * w, pad + dot.y * h, 3 * s.weight * lone[d].share, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
   if (s.hasBaseline) strokeTicks(ctx, g, s, false)
 }
 

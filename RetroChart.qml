@@ -201,11 +201,13 @@ Item {
       ctx.clearRect(0, 0, width, height)
       var g = root.shownGrid
       var pixel = root.pixel
-      if (!root.hasBaseline) return
       // Every other cell, so it lives on the bars' grid, not as a hairline
-      // across them.
+      // across them, and only under columns whose chart has a close.
       ctx.fillStyle = root.baselineColor
-      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, (g.baseRows ? g.baseRows[bc] : g.baseRow) * pixel, pixel, pixel - root.gap)
+      for (var bc = 0; bc < g.columns; bc += 2) {
+        if (!(g.baseds ? g.baseds[bc] : g.based)) continue
+        ctx.fillRect(bc * g.pitch, (g.baseRows ? g.baseRows[bc] : g.baseRow) * pixel, pixel, pixel - root.gap)
+      }
     }
   }
 
@@ -241,7 +243,8 @@ Item {
           var above = g.above[c]
           var aside = g.aside ? g.aside[c] : c >= g.asideFrom && c < g.asideTo
           // With no line under it, a column takes the baseline's ink.
-          var color = aside && root.greyAside ? root.greyColor : !root.hasBaseline ? root.baselineColor : above ? root.aboveColor : root.belowColor
+          var based = g.baseds ? g.baseds[c] : g.based
+          var color = aside && root.greyAside ? root.greyColor : !based ? root.baselineColor : above ? root.aboveColor : root.belowColor
           var lighter = root.fullSession ? g.faint[c] : g.dim[c]
           var dim = aside ? asideInk : lighter ? root.lighterInk : 1
           var x = c * g.pitch

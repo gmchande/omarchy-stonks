@@ -45,20 +45,24 @@ Item {
   property int arrivalFrom: 0
   opacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
   transform: Translate { y: root.arrivalFrom * Style.space(4) * (1 - root.arrival) }
-  // Closing: nothing rolls.
+  // Closing, or out of sight: nothing rolls.
   property bool still: false
+  onStillChanged: if (still && rollAnim.running) {
+    rollAnim.stop()
+    roll = 1
+  }
 
   // When the price on show ticks, its changed digits roll, up on a rise and
   // down on a fall, and the move and its caption with them (`RollingText`).
-  // Never in retro, whose cells change in place, nor as a scrub, another
-  // stock or a new open brings another price.
+  // Never in retro, whose cells change in place, nor as the first price
+  // comes, a scrub, another stock or a new open brings another.
   property real roll: 1
   property bool rollUp: true
   property var lastPrice: null
   onPriceTextChanged: Qt.callLater(takePrice)
   function takePrice() {
     var was = lastPrice
-    var value = Number(String(priceText).replace(/[^0-9.\-]/g, ""))
+    var value = Format.shownNumber(priceText)
     lastPrice = { symbol: symbol, text: priceText, value: value, scrubbing: scrubbing }
     if (!was || was.text === priceText) return
     rollAnim.stop()

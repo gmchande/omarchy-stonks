@@ -1216,6 +1216,7 @@ Item {
     scrubbing: root.scrubT !== 0
     live: root.heroLive
     still: !root.surfaceOpen
+    seen: root.seen
     held: root.chartLoading
     dimmed: motion.dimmed
     // While the header says no prices come, the empty chart says why.
@@ -1301,6 +1302,7 @@ Item {
     rowGap: root.rowGap
     gutter: root.gutter
     surfaceOpen: root.surfaceOpen
+    seen: root.seen
     sourceDown: root.yahooDown
     // A turn later: the change that arranged the rows is still being told.
     onArranged: Qt.callLater(root.land)
@@ -1548,6 +1550,7 @@ Item {
     id: motion
     view: root.view
     surfaceOpen: root.surfaceOpen
+    onScreen: root.seen
     retro: root.retro
     calendars: root.calendars
     // Made from the chart as drawn in the look on screen.

@@ -19,8 +19,13 @@ Item {
   property Look look
   // What is left of a notch between wheel events.
   property real wheelRemainder: 0
-  // Closing: a new range is taken at once.
+  // Closing, or out of sight: a new range is taken at once.
   property bool still: false
+  onStillChanged: if (still && slide.running) {
+    slide.stop()
+    slideX = 0
+    slideWidth = 0
+  }
 
   signal selected(string value)
 

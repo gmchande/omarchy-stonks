@@ -2874,3 +2874,42 @@ test("a tick rolls only the digits it changed, and a price that grows a digit ro
   expect(M.rolledGlyphs("215.38", "216.12").leaving.map(g => g.glyph).join("")).toBe("538")
   expect(rolled("999.99", "1,000.01")).toBe("1,000.01")
 })
+
+test("a chart without a known close bends and waves into another with no close line it never had", () => {
+  const Morph = load("Morph.js")
+  const Chart = load("Chart.js")
+  const pt = (x, y) => ({ x, y, ext: false, dim: false, faint: false, brk: false, untraded: false })
+  const closed = { day: true, baselineY: 0.4, aside: null, ticks: [], points: [0, 1, 2, 3].map(i => pt(0.1 + i * 0.2, 0.3 + 0.1 * i)) }
+  const unknown = { day: true, baselineY: null, aside: null, ticks: [], points: [0, 1, 2, 3].map(i => pt(0.1 + i * 0.2, 0.6 - 0.1 * i)) }
+  for (const [from, to] of [[unknown, closed], [closed, unknown]]) {
+    const plan = Morph.plan(from, to)
+    for (let t = 0.1; t < 1; t += 0.2) expect(Chart.hasBaseline(Morph.frame(plan, t))).toBe(false)
+  }
+  const grid = g => Chart.retroGrid(g, 300, 120, 5, 1)
+  const g = Morph.wave(grid(unknown), grid(closed), 20)
+  expect(g.baseds.slice(0, 20).every(b => b === true)).toBe(true)
+  expect(g.baseds.slice(20).every(b => b === false)).toBe(true)
+})
+
+test("a price on screen reads as its number, so a rise between prices below zero is a rise and a first price is none", () => {
+  expect(M.shownNumber("\u221210.03") < M.shownNumber("\u22129.93")).toBe(true)
+  expect(M.shownNumber("1,017.26")).toBe(1017.26)
+  expect(Number.isNaN(M.shownNumber("…"))).toBe(true)
+  expect(Number.isNaN(M.shownNumber("—"))).toBe(true)
+})
+
+test("a chart of one trade grows out of the other's line into its own dot, and shrinks back into a line", () => {
+  const Morph = load("Morph.js")
+  const pt = (x, y) => ({ x, y, ext: false, dim: false, faint: false, brk: false, untraded: false })
+  const day = { day: true, baselineY: 0.5, aside: null, ticks: [], points: Array.from({ length: 30 }, (_, i) => pt(0.05 + i * 0.02, 0.5 + 0.3 * Math.sin(i))) }
+  const one = { day: true, baselineY: 0.5, aside: null, ticks: [], points: [pt(0.1, 0.3)] }
+  const into = Morph.plan(day, one)
+  expect(Morph.frame(into, 1)).toBe(one)
+  const end = Morph.frame(into, 1 - 1e-9)
+  expect(end.points.every(p => Math.abs(p.x - 0.1) < 1e-6 && Math.abs(p.y - 0.3) < 1e-6)).toBe(true)
+  expect(end.lone[0].share).toBeCloseTo(1, 6)
+  const out = Morph.plan(one, day)
+  expect(Morph.frame(out, 0)).toBe(one)
+  expect(Morph.frame(out, 1e-9).lone[0].share).toBeCloseTo(1, 6)
+  expect(Morph.frame(out, 1 - 1e-9).lone[0].share).toBeCloseTo(0, 6)
+})

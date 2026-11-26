@@ -13,13 +13,18 @@
 // where it is, never all at once. Every frame is a chart the smooth painter
 // draws as it draws any (`SmoothPaint.paintInk`), against one dashed line.
 
-// A morph needs two trades on a span in each chart; else the new one shows
-// at once.
+// A morph needs a trade in each chart. A chart of one trade bends as a line
+// of no length at it, the old line shrinking into its dot as the dot grows
+// (`lone`), or growing out of it.
 function span(g) {
-  if (!g || !g.points || g.points.length < 2) return null
+  if (!g || !g.points || g.points.length < 1) return null
   var a = g.points[0].x
   var b = g.points[g.points.length - 1].x
-  return b > a ? { a: a, b: b } : null
+  return b > a || g.points.length === 1 ? { a: a, b: b } : null
+}
+
+function along(s, x) {
+  return s.b > s.a ? (x - s.a) / (s.b - s.a) : 0
 }
 
 function lerp(a, b, t) {
@@ -34,8 +39,9 @@ function lerp(a, b, t) {
 // breaks, open between the trades either side, and `holds` its stretches
 // with no trade, from the trade before to the one after it.
 function read(g, s) {
-  var pts = g.points
-  var us = pts.map(function(p) { return (p.x - s.a) / (s.b - s.a) })
+  var lone = g.points.length === 1
+  var pts = lone ? [g.points[0], g.points[0]] : g.points
+  var us = lone ? [0, 1] : pts.map(function(p) { return along(s, p.x) })
   var flags = {}
   ;["faint", "dim", "ext"].forEach(function(key) { flags[key] = stretches(pts, us, key) })
   var gaps = []
@@ -44,7 +50,7 @@ function read(g, s) {
     if (pts[i].brk) gaps.push([us[i - 1], us[i]])
     else if (pts[i].untraded) holds.push([us[i - 1], us[i]])
   }
-  return { g: g, s: s, us: us, flags: flags, gaps: gaps, holds: holds }
+  return { g: Object.assign({}, g, { points: pts }), real: g, lone: lone, s: s, us: us, flags: flags, gaps: gaps, holds: holds }
 }
 
 function stretches(pts, us, key) {
@@ -101,7 +107,7 @@ function places(a, b) {
 function asideAlong(chart, aside, other) {
   var x = aside || (other.from <= 0 ? { from: other.from, to: other.from } : { from: other.to, to: other.to })
   var s = chart.s
-  return { from: (x.from - s.a) / (s.b - s.a), to: (x.to - s.a) / (s.b - s.a), edge: x.to >= 1 }
+  return { from: along(s, x.from), to: along(s, x.to), edge: x.to >= 1 }
 }
 
 // Null when either chart can't bend; `from` and `to` are geometries the
@@ -179,8 +185,8 @@ function evenness(g) {
 // The chart `t` of the way from `plan`'s old one to its new one, a frame of
 // the eased motion.
 function frame(p, t) {
-  if (t <= 0) return p.a.g
-  if (t >= 1) return p.b.g
+  if (t <= 0) return p.a.real
+  if (t >= 1) return p.b.real
   var a = p.a, b = p.b
   var gaps = joined(shrunk(a.gaps, 1 - t).concat(shrunk(b.gaps, t)))
   var holds = toEnd(a.holds, 1 - t).concat(toEnd(b.holds, t))
@@ -246,27 +252,34 @@ function frame(p, t) {
     var to = p.aside.a.edge && p.aside.b.edge ? 1 : xAt(lerp(p.aside.a.to, p.aside.b.to, t))
     aside = { from: from, to: to }
   }
+  // A close line only while both charts have one: a chart with none stays
+  // in the line's own ink until the other is on screen whole.
   var baselined = isFinite(a.g.baselineY) && a.g.baselineY !== null && isFinite(b.g.baselineY) && b.g.baselineY !== null
+  // A one-trade chart's dot, the size it has come to (`share`).
+  var lone = []
+  if (a.lone) lone.push({ point: points[0], share: 1 - t })
+  if (b.lone) lone.push({ point: points[points.length - 1], share: t })
   return {
     points: points,
-    baselineY: baselined ? lerp(a.g.baselineY, b.g.baselineY, t) : b.g.baselineY,
+    baselineY: baselined ? lerp(a.g.baselineY, b.g.baselineY, t) : null,
     aside: aside,
     even: lerp(evenness(a.g), evenness(b.g), t),
     ticks: ticks,
     tickAlpha: tickAlpha,
+    lone: lone,
     lo: b.g.lo, hi: b.g.hi, start: b.g.start, end: b.g.end,
     day: b.g.day
   }
 }
 
 // Retro's grid `front` columns into the wave: the new chart's columns left
-// of it and the old one's from it on, each with its own dashed row, so
-// every cell stands on the line drawn under it. The old one may be a wave
-// itself, cut short by this one.
+// of it and the old one's from it on, each with its own dashed row, or none
+// where its chart has no close (`based`), so every cell stands on the line
+// drawn under it. The old one may be a wave itself, cut short by this one.
 function wave(from, to, front) {
   if (front <= 0) return from
   if (front >= to.columns) return to
-  var g = Object.assign({}, to, { levels: [], above: [], dim: [], faint: [], aside: [], baseRows: [] })
+  var g = Object.assign({}, to, { levels: [], above: [], dim: [], faint: [], aside: [], baseRows: [], baseds: [] })
   for (var c = 0; c < to.columns; c++) {
     var src = c < front ? to : from
     g.levels[c] = src.levels[c]
@@ -275,6 +288,7 @@ function wave(from, to, front) {
     g.faint[c] = src.faint[c]
     g.aside[c] = src.aside ? src.aside[c] : c >= src.asideFrom && c < src.asideTo
     g.baseRows[c] = src.baseRows ? src.baseRows[c] : src.baseRow
+    g.baseds[c] = src.baseds ? src.baseds[c] : src.based
   }
   // The lit cap waits for the wave to pass it.
   g.lastLit = to.lastLit < front ? to.lastLit : -1

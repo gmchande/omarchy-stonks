@@ -42,6 +42,15 @@ Flickable {
   property int gutter: Style.space(8)
   // Closed or closing: a pointer moving over it moves no cursor.
   property bool surfaceOpen: true
+  // A screen shows the rows: out of sight, a removed row goes and the
+  // selected fill moves at once.
+  property bool seen: true
+  onSeenChanged: if (!seen) {
+    highlightSlide.stop()
+    highlightShift = 0
+    var rows = rowItems()
+    for (var s in rows) rows[s].endFold()
+  }
   // The rows' view height while they show. The panel's card shrinks to the
   // key sheet or a view, hiding the rows, but sight is still judged by this.
   property real sightHeight: height
@@ -374,9 +383,9 @@ Flickable {
   function display(next, animate) {
     var before = displayedSymbols
     var scrolled = contentY
-    var rows = animate && visible && surfaceOpen ? rowItems() : null
+    var rows = animate && visible ? rowItems() : null
     // A row that leaves folds away where it stood.
-    for (var f = 0; rows && f < before.length; f++) {
+    for (var f = 0; rows && seen && f < before.length; f++) {
       if (next.indexOf(before[f]) < 0 && rows[before[f]]) rows[before[f]].fold()
     }
     displayedSymbols = next
@@ -556,7 +565,7 @@ Flickable {
     var reordered = view.order !== before.order || view.reversed !== before.reversed
     if (before.allSymbols.join() !== view.allSymbols.join()) {
       // A lifted row goes at once: the drag it was in ends with it.
-      var leaving = !switched && !reordered && visible && surfaceOpen
+      var leaving = !switched && !reordered && visible && seen
         ? displayedSymbols.filter(function(s) { return view.allSymbols.indexOf(s) < 0 && foldKept.indexOf(s) < 0 && s !== reorder.lifted }) : []
       foldKept = foldKept.filter(function(s) { return view.allSymbols.indexOf(s) < 0 }).concat(leaving)
       syncRows()
@@ -644,7 +653,7 @@ Flickable {
     highlightedSymbol = featuredSymbol
     highlightSlide.stop()
     highlightShift = 0
-    if (!surfaceOpen || !from || !to || from === to || !from.visible || !to.visible || to.moving) return
+    if (!seen || !from || !to || from === to || !from.visible || !to.visible || to.moving) return
     highlightShift = was - to.y
     highlightSlide.start()
   }

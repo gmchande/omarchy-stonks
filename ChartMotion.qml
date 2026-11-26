@@ -3,6 +3,7 @@ import qs.Commons
 import "Chart.js" as Chart
 import "History.js" as History
 import "Quote.js" as Quote
+import "Morph.js" as Morph
 import "Motion.js" as Motion
 // The chart a surface shows, the moment it shows (the scrub, and the replay
 // that drives it), and how a change of chart moves: another stock's or
@@ -137,9 +138,11 @@ Item {
     var stock = moved && !!last && !!next && last.symbol !== next.symbol
     if (stock) switched(last.symbol, next.symbol)
     if (moved && !!last && !!next && (stock || last.range !== next.range)) {
-      if (surfaceOpen) bend(geometryOf(last), stock)
+      if (shows) bend(geometryOf(last), stock)
+      else finish()
     } else if (moved) {
-      if (surfaceOpen) drawIn()
+      if (shows) drawIn()
+      else finish()
     } else if (asked) {
       drawInAnim.stop()
       reveal = 1
@@ -180,6 +183,8 @@ Item {
   // A step on a range is one drawn point, the start among them.
   function nudgeScrub(steps) {
     if (loading) return
+    // A scrub reads the chart it lands on.
+    if (morphAnim.running) endBend()
     if (historyActive) {
       var drawn = historyShown ? History.drawnBars(history).length : 0
       if (drawn < 2) return
@@ -203,15 +208,36 @@ Item {
   }
 
   // `stock`: another stock, whose figures arrive with it; another range
-  // keeps the price still.
+  // keeps the price still. Smooth bends only between charts with a trade
+  // each: else the new one draws in from its first trade, on the same beat.
   function bend(from, stock) {
     drawInAnim.stop()
     reveal = 1
     morphAnim.stop()
     stockSwitch = stock
-    morphFrom = from
+    var bends = retro || (!!Morph.span(from) && !!Morph.span(geometry))
+    morphFrom = bends ? from : null
     beat = 0
     morphAnim.start()
+    if (!bends) drawInAnim.start()
+  }
+
+  // What moves is shown at its end at once: for a surface no screen shows,
+  // and as the shell's animations are turned off.
+  property bool onScreen: true
+  readonly property bool shows: surfaceOpen && onScreen
+  function finish() {
+    if (morphAnim.running) endBend()
+    if (drawInAnim.running) {
+      drawInAnim.stop()
+      reveal = 1
+    }
+  }
+  onOnScreenChanged: if (!onScreen && surfaceOpen) finish()
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.finish() }
   }
 
   function endBend() {

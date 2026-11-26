@@ -249,6 +249,13 @@ function rolledGlyphs(from, to) {
   return { arriving: arriving, leaving: leaving }
 }
 
+// The number a figure on screen shows, its minus sign and grouping read; NaN
+// for one that shows none, as "…" or "—".
+function shownNumber(text) {
+  var plain = String(text).split(MINUS).join("-").replace(/[^0-9.\-]/g, "")
+  return /\d/.test(plain) ? Number(plain) : NaN
+}
+
 function changeText(chg, mode, digits) {
   if (chg.pct === null) return "—"
   if (mode === "abs") return signedMoney(chg.abs, digits)

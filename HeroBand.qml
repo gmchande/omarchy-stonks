@@ -16,6 +16,9 @@ Item {
   property bool live: false
   // Closing: what moves stops where it is.
   property bool still: false
+  // A screen shows the surface: out of sight, a tick, a range or the bell
+  // changes what they change at once.
+  property bool seen: true
   // The chart on show waits for the next: its live mark holds still with it.
   property bool held: false
   // Once the next chart is a while on its way, the held one dims under a line
@@ -97,6 +100,7 @@ Item {
   function settle() { listHeader.settle() }
   // The market opened: the live dot blooms on the bell's beat.
   function opened() {
+    if (!root.seen) return
     if (root.look.retro) retroChart.bloom()
     else smoothChart.bloom()
   }
@@ -136,7 +140,7 @@ Item {
       now: root.now
       baselineText: root.baselineText
       changeCycles: root.changeCycles
-      still: root.still
+      still: root.still || !root.seen
       arrival: root.arrival
       arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
@@ -284,7 +288,7 @@ Item {
       width: parent.width
       options: root.rangeOptions
       value: root.range
-      still: root.still
+      still: root.still || !root.seen
       look: root.look
       onSelected: function(value) { root.rangeRequested(value) }
     }

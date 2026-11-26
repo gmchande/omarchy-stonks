@@ -239,14 +239,16 @@ Item {
     var was = wordsShown
     var now = wordsNow
     var trouble = root.trouble
-    var swap = !still && arrival >= 1 && was.text !== "" && now.text !== was.text
+    var swap = seen && arrival >= 1 && was.text !== "" && now.text !== was.text
       && ((animal.bell && !animal.scrubbed) || trouble !== troubleShown)
     troubleShown = trouble
     if (swap) {
       wordSwap.restart()
       return
     }
-    if (wordSwap.running) return
+    // Any other change shows at once, over a swap under way too, and
+    // another stock's ends the swap, as its words arrive on their own beat.
+    if (wordSwap.running && arrival < 1) endSwap()
     wordsShown = now
   }
   SequentialAnimation {
@@ -255,11 +257,13 @@ Item {
     ScriptAction { script: root.wordsShown = root.wordsNow }
     NumberAnimation { target: root; property: "wordsIn"; to: 1; duration: Motion.duration(Style, 200); easing.type: Easing.OutCubic }
   }
-  onStillChanged: if (still && wordSwap.running) {
+  function endSwap() {
     wordSwap.stop()
     wordsShown = wordsNow
     wordsIn = 1
   }
+  // Out of sight, nothing moves.
+  onSeenChanged: if (!seen && wordSwap.running) endSwap()
 
   Text {
     id: statusWords
