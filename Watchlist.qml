@@ -740,6 +740,7 @@ Flickable {
         // is headed, so a page's step finds them built, and for the rows a
         // glide shows on its way, not those it passes over.
         built: inSight || near(root.headedY, root.sightHeight, root.sightHeight)
+        inView: inSight && root.surfaceOpen && root.seen
         menuCovers: root.menuCovers > 0 ? root.menuCovers - (y - root.contentY) : 0
         // A row out of sight, or hidden by a list, keeps the quote and day it
         // showed, so answers repaint and work out only rows in sight; it takes
