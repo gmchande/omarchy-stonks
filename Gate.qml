@@ -27,6 +27,9 @@ Item {
   // Moves on as each pause begins: a run notes it as it is sent.
   readonly property int pauses: gate.pauses
 
+  // Next second a budget-held request can try again (0 when not budget-limited).
+  property int budgetDueAt: 0
+
   signal reopened()
 
   function now() {
@@ -36,6 +39,7 @@ Item {
   function take(count, bulk) {
     var taken = Rules.takenFromGate(gate, limits, count, bulk, now())
     root.gate = taken.gate
+    root.budgetDueAt = taken.refillAt || 0
     if (taken.heldBack > 0) console.warn("stonks: " + host + "'s budget held back " + taken.heldBack + " requests")
     return taken.granted
   }

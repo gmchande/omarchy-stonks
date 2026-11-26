@@ -452,12 +452,15 @@ var STEADY_SLOTS = 12
 // counts. Before the open, the pre-market is the coming day's, Yahoo's
 // answer still the day that closed (`quote.next`).
 function yahooHole(quote) {
+  if (!quote) return null
+  if (quote._yahooHole !== undefined) return quote._yahooHole
   var last = null
   var pres = [quote.session.pre, quote.next ? quote.next.pre : null]
   for (var d = 0; d < pres.length; d++) {
     var hole = pres[d] ? preHole(quote, pres[d]) : null
     if (hole !== null) last = hole
   }
+  try { Object.defineProperty(quote, "_yahooHole", { value: last, enumerable: false }) } catch (e) {}
   return last
 }
 

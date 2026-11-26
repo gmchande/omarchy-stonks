@@ -175,6 +175,7 @@ Item {
     restoreMode: Binding.RestoreNone
   }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
+  readonly property int minuteNow: Math.floor(now / 60) * 60
 
   readonly property var calendars: service ? service.calendars : null
   // Kept as the same array while row membership is unchanged, so switching
@@ -185,7 +186,6 @@ Item {
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
     return true
   }
-  Component.onCompleted: if (!sameRows(stableRows, view.rows)) stableRows = view.rows
   readonly property var symbols: stableRows
   readonly property string listName: view.list
   readonly property string listLabel: listName !== "" ? listName : "All"
@@ -368,7 +368,7 @@ Item {
   // Said under the price: what a scrub's move counts from, the dashed line
   // under the pointer, or since the open the day's open.
   readonly property string baselineText: historyShown ? History.baselineLegend(history, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars, changeMode, featuredNewest) : "")
+    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, featuredToday, calendars, changeMode, featuredNewest) : "")
 
   // The moment shown against the baseline; the pill's reads the day.
   readonly property string animalKind: Figures.headerAnimal(featured)
@@ -481,8 +481,19 @@ Item {
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
 
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
-  readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+  readonly property var marketFormsNow: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.tradesAtNight, now, calendars)) : []
+  property var marketForms: []
+  function sameStrings(a, b) {
+    if (!a || !b || a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+  onMarketFormsNowChanged: if (!sameStrings(marketForms, marketFormsNow)) marketForms = marketFormsNow
+  Component.onCompleted: {
+    if (!sameRows(stableRows, view.rows)) stableRows = view.rows
+    marketForms = marketFormsNow
+  }
   readonly property var headerLine: Figures.headerLine({
     hasService: !!service,
     whenMissing: headerWhenMissing,
@@ -1282,7 +1293,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
-    rowsDay: Figures.rowsDayName(root.rowsShared, root.now)
+    rowsDay: Figures.rowsDayName(root.rowsShared, root.minuteNow)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom

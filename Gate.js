@@ -43,10 +43,13 @@ function takenFromGate(gate, limits, count, bulk, now) {
   }
   var granted = Math.max(0, Math.min(count, Math.floor(filled.left - (bulk ? limits.reserve : 0))))
   var first = granted < count && !filled.warned
+  var need = granted < count ? (bulk ? limits.reserve : 0) + 1 - (filled.left - granted) : 0
+  var refillAt = need > 0 && limits.perMinute > 0 ? now + Math.max(1, Math.ceil(need * 60 / limits.perMinute)) : 0
   return {
     gate: Object.assign({}, filled, { left: filled.left - granted, warned: filled.warned || first }),
     granted: granted,
-    heldBack: first ? count - granted : 0
+    heldBack: first ? count - granted : 0,
+    refillAt: refillAt
   }
 }
 
