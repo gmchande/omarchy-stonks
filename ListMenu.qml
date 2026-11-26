@@ -56,7 +56,19 @@ OverRows {
   onClosed: {
     newRow.release()
     scroll.cancelFlick()
-    settle.stop()
+    scrollGlide.stop()
+    handSettling = false
+  }
+  onSettled: {
+    scrollGlide.stop()
+    handSettling = false
+  }
+  onStillChanged: if (still && scrollGlide.running) scrollGlide.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) { scrollGlide.stop(); root.handSettling = false } })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) { scrollGlide.stop(); root.handSettling = false } }
   }
 
   function reset() {
@@ -65,8 +77,9 @@ OverRows {
     newRow.text = ""
     cursor = 0
     for (var i = 0; i < choices.length; i++) if (choices[i].name === current) cursor = i
-    scroll.contentY = 0
-    showCursor()
+    scrollGlide.stop()
+    handSettling = false
+    scroll.contentY = cursor < newIndex ? Rows.topShowing(cursor, rowSize(), 0, scroll.height) : 0
   }
 
   function moveCursor(delta) {
@@ -75,35 +88,48 @@ OverRows {
   }
 
   // A key stops the wheel's motion, so it can't carry the cursor on from
-  // where the key put it.
+  // where the key put it, and glides to the row over 160 ms OutCubic.
+  property bool handSettling: false
   function showCursor() {
     scroll.cancelFlick()
     var end = Math.max(0, scroll.contentHeight - scroll.height)
-    var landed = settle.running ? settle.to : Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
-    settle.stop()
-    scroll.contentY = landed
-    if (cursor >= newIndex) return
-    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
+    var base = scrollGlide.running ? scrollGlide.to : Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
+    var target = cursor >= newIndex ? base : Rows.topShowing(cursor, rowSize(), base, scroll.height)
+    if (!active || !seen || still || Motion.duration(Style, 160) <= 0 || Math.abs(target - scroll.contentY) < 0.5) {
+      scrollGlide.stop()
+      handSettling = false
+      scroll.contentY = target
+      return
+    }
+    handSettling = false
+    scrollGlide.to = target
+    scrollGlide.restart()
   }
 
   // A scroll by hand comes to rest on a row's edge, so no list shows cut.
   function settleOnRow() {
     var end = Math.max(0, scroll.contentHeight - scroll.height)
     var target = Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
-    if (target === scroll.contentY) return
-    settle.to = target
-    settle.restart()
+    if (Math.abs(target - scroll.contentY) < 0.5) { scroll.contentY = target; return }
+    handSettling = true
+    scrollGlide.to = target
+    scrollGlide.restart()
+  }
+
+  function finishSettle() {
+    var hand = handSettling
+    handSettling = false
+    if (hand && active && pointer.hovered) pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
   }
 
   NumberAnimation {
-    id: settle
+    id: scrollGlide
     target: scroll
     property: "contentY"
     duration: Motion.duration(Style, 160)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
+    easing.type: Easing.OutCubic
     // Settled under a still pointer, the cursor takes the row now under it.
-    onFinished: if (root.active && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
+    onFinished: root.finishSettle()
   }
 
   // After a scroll by hand: the nearest list wholly in sight, else the list
@@ -200,7 +226,17 @@ OverRows {
     // naming, so a click on it reaches the body, which keeps the name.
     interactive: contentHeight > height && !root.naming
     // `moving` stays false for a key's scroll.
+    onMovementStarted: {
+      scrollGlide.stop()
+      root.handSettling = false
+    }
     onContentYChanged: {
+      if (scrollGlide.running && Math.abs(contentY - scrollGlide.to) < 0.5) {
+        scrollGlide.stop()
+        contentY = scrollGlide.to
+        root.finishSettle()
+        return
+      }
       if (!root.active || !(moving || menuBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
@@ -209,7 +245,10 @@ OverRows {
     Controls.ScrollBar.vertical: ViewScrollBar {
       id: menuBar
       scrolls: scroll.interactive
-      onPressedChanged: if (!pressed) root.settleOnRow()
+      onPressedChanged: {
+        if (pressed) { scrollGlide.stop(); root.handSettling = false }
+        else root.settleOnRow()
+      }
     }
 
     Column {

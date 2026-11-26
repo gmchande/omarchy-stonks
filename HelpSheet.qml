@@ -11,15 +11,78 @@ import "Motion.js" as Motion
 Flickable {
   id: root
 
-  onVisibleChanged: if (visible) {
-    opacity = 0
-    appear.restart()
+  property bool shown: false
+  property bool seen: true
+  property bool still: false
+
+  visible: false
+  enabled: shown && !still
+  Component.onCompleted: settle()
+
+  function settle() {
+    appear.stop()
+    disappear.stop()
+    visible = shown
+    opacity = 1
+  }
+
+  onShownChanged: {
+    if (shown) {
+      disappear.stop()
+      visible = true
+      if (seen && !still && Motion.duration(Style, 140) > 0) {
+        appear.stop()
+        opacity = 0
+        appear.start()
+      } else {
+        appear.stop()
+        opacity = 1
+      }
+      return
+    }
+    if (visible && seen && !still && Motion.duration(Style, 100) > 0) {
+      appear.stop()
+      disappear.restart()
+    } else {
+      appear.stop()
+      disappear.stop()
+      visible = false
+      opacity = 1
+    }
+  }
+  onStillChanged: if (still) {
+    if (appear.running) appear.pause()
+    if (disappear.running) disappear.pause()
+  }
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
   }
   NumberAnimation { id: appear; target: root; property: "opacity"; to: 1; duration: Motion.duration(Style, 140); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation {
+    id: disappear
+    target: root
+    property: "opacity"
+    to: 0
+    duration: Motion.duration(Style, 100)
+    easing.type: Easing.OutCubic
+    onFinished: {
+      root.visible = false
+      root.opacity = 1
+    }
+  }
   // Style.easeOut spends its last frames on the last 1%, which no frame shows.
-  onOpacityChanged: if (appear.running && opacity > 0.985) {
-    appear.stop()
-    opacity = 1
+  onOpacityChanged: {
+    if (appear.running && opacity > 0.985) {
+      appear.stop()
+      opacity = 1
+    } else if (disappear.running && opacity < 0.01) {
+      disappear.stop()
+      visible = false
+      opacity = 1
+    }
   }
 
   // KeySheet.sheet: { groups }.

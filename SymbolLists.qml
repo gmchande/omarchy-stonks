@@ -11,6 +11,7 @@ import "Rows.js" as Rows
 // first, and New list…, which makes a list holding the symbol.
 OverRows {
   id: root
+  fades: true
 
   property var choices: []
   property string symbol: ""
@@ -51,12 +52,22 @@ OverRows {
   }
   onClosed: {
     newRow.release()
+    scrollGlide.stop()
     scroll.cancelFlick()
+  }
+  onSettled: scrollGlide.stop()
+  onStillChanged: if (still && scrollGlide.running) scrollGlide.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) scrollGlide.stop() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) scrollGlide.stop() }
   }
 
   function reset() {
     stopNaming()
     cursor = choices.length > 1 ? 1 : newIndex
+    scrollGlide.stop()
     scroll.contentY = 0
   }
 
@@ -107,8 +118,17 @@ OverRows {
 
   function showCursor() {
     scroll.cancelFlick()
-    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
+    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
+    var to = Rows.topShowing(cursor, rowSize(), base, scroll.height)
+    if (!active || !seen || still || Motion.duration(Style, 160) <= 0 || Math.abs(to - scroll.contentY) < 0.5) {
+      scrollGlide.stop()
+      scroll.contentY = to
+      return
+    }
+    scrollGlide.to = to
+    scrollGlide.restart()
   }
+  NumberAnimation { id: scrollGlide; target: scroll; property: "contentY"; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle.
@@ -124,6 +144,14 @@ OverRows {
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.toggle(root.cursor)
     else if (event.key === Qt.Key_Down) root.moveCursor(1)
     else if (event.key === Qt.Key_Up) root.moveCursor(-1)
+  }
+
+  // Opaque ground while fading out over the rows underneath.
+  Rectangle {
+    z: -1
+    anchors.fill: parent
+    color: root.look.ground
+    visible: !root.open
   }
 
   RowPointer {
@@ -217,12 +245,22 @@ OverRows {
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
     // `moving` stays false for a key's scroll.
+    onMovementStarted: scrollGlide.stop()
     onContentYChanged: {
+      if (scrollGlide.running && Math.abs(contentY - scrollGlide.to) < 0.5) {
+        scrollGlide.stop()
+        contentY = scrollGlide.to
+        return
+      }
       if (!root.active || !(moving || listsBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    Controls.ScrollBar.vertical: ViewScrollBar { id: listsBar; scrolls: scroll.interactive }
+    Controls.ScrollBar.vertical: ViewScrollBar {
+      id: listsBar
+      scrolls: scroll.interactive
+      onPressedChanged: if (pressed) scrollGlide.stop()
+    }
 
     Column {
       id: column
@@ -261,15 +299,61 @@ OverRows {
             color: "transparent"
             border.width: 1
             border.color: entry.ticked ? root.look.foreground : root.look.dim
+            Behavior on border.color { ColorAnimation { duration: Motion.duration(Style, 120) } }
 
             Text {
+              id: checkMark
               anchors.centerIn: parent
-              visible: entry.ticked
+              property real check: entry.ticked ? 1 : 0
+              property string forSymbol: root.symbol
+              visible: check > 0
+              opacity: root.look.retro ? (check > 0.35 ? 1 : check / 0.35) : check
+              scale: root.look.retro ? (check >= 0.7 ? 1 : 0.75) : (0.6 + 0.4 * check)
               text: "✓"
               color: root.look.foreground
               font.family: root.look.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
+              function snap() {
+                checkAnim.stop()
+                forSymbol = root.symbol
+                check = entry.ticked ? 1 : 0
+              }
+              Connections {
+                target: entry
+                function onTickedChanged() {
+                  var target = entry.ticked ? 1 : 0
+                  if (checkMark.forSymbol !== root.symbol || !root.active || !root.seen || root.still || Motion.duration(Style, 120) <= 0) {
+                    checkMark.snap()
+                    return
+                  }
+                  checkAnim.to = target
+                  checkAnim.restart()
+                }
+              }
+              Connections {
+                target: root
+                function onOpened() { checkMark.snap() }
+                function onSettled() { checkMark.snap() }
+                function onSymbolChanged() { checkMark.snap() }
+              }
+              Connections {
+                target: Style
+                ignoreUnknownSignals: true
+                function onReduceMotionChanged() { if (Style.reduceMotion) checkMark.snap() }
+              }
+              NumberAnimation {
+                id: checkAnim
+                target: checkMark
+                property: "check"
+                duration: Motion.duration(Style, 120)
+                easing.type: root.look.retro ? Easing.Linear : Easing.OutCubic
+              }
+              onCheckChanged: {
+                if (!checkAnim.running) return
+                if (checkAnim.to >= 1 && check > 0.99) { checkAnim.stop(); check = 1 }
+                else if (checkAnim.to <= 0 && check < 0.01) { checkAnim.stop(); check = 0 }
+              }
             }
           }
 

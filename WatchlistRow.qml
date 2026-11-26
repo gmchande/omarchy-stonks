@@ -122,6 +122,8 @@ Rectangle {
     opacity = 1
     drawIn.stop()
     reveal = 1
+    removeFade.stop()
+    removeShown = removable ? 1 : 0
   }
   function pause() {
     if (slide.running) slide.pause()
@@ -129,7 +131,21 @@ Rectangle {
     if (fadeIn.running) fadeIn.pause()
     if (sortFade.running) sortFade.pause()
     if (drawIn.running) drawIn.pause()
+    if (removeFade.running) removeFade.pause()
   }
+  property real removeShown: 0
+  Component.onCompleted: { hadLine = !!geometry; removeShown = removable ? 1 : 0 }
+  onRemovableChanged: {
+    var target = removable ? 1 : 0
+    if (Motion.duration(Style, 96) <= 0) {
+      removeFade.stop()
+      removeShown = target
+      return
+    }
+    removeFade.to = target
+    removeFade.restart()
+  }
+  NumberAnimation { id: removeFade; target: row; property: "removeShown"; duration: Motion.duration(Style, 96); easing.type: Easing.OutCubic }
   function holdAt(atY) {
     if (place < 0) return
     slide.stop()
@@ -141,7 +157,6 @@ Rectangle {
   // shows at once, and so does a line that arrives out of view.
   property bool inView: false
   property bool hadLine: false
-  Component.onCompleted: hadLine = !!geometry
   function join() {
     sortFade.stop()
     opacity = 0
@@ -364,13 +379,15 @@ Rectangle {
         Item {
           id: removeButton
           objectName: "rowRemove"
-          visible: row.removable && symbolText.visible
+          visible: (row.removable || row.removeShown > 0) && symbolText.visible
+          opacity: row.removeShown
           width: Style.space(22)
           height: width
           x: symbolText.x + symbolText.width + Style.space(4)
           y: symbolText.y + (symbolText.height - height) / 2
           readonly property bool hovered: mouse.containsMouse && mouse.onRemove(mouse.mouseX, mouse.mouseY)
-          readonly property color ink: hovered ? row.look.foreground : row.look.dim
+          property color ink: hovered ? row.look.foreground : row.look.dim
+          Behavior on ink { ColorAnimation { duration: Motion.duration(Style, 60) } }
 
           // The shell's 22 px target, its fill inset to clear the row's top.
           Rectangle {
@@ -452,7 +469,7 @@ Rectangle {
           property bool pressedOnRemove: false
 
           function onRemove(x, y) {
-            return removeButton.visible && x >= removeButton.x && x < removeButton.x + removeButton.width
+            return row.removable && symbolText.visible && x >= removeButton.x && x < removeButton.x + removeButton.width
               && y >= removeButton.y && y < removeButton.y + removeButton.height
           }
 

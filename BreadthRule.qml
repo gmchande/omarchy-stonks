@@ -33,16 +33,18 @@ Item {
   readonly property int cells: Math.max(0, Math.floor((width + 1) / pitch))
   // Both ends round down, by the same rule, so they never overlap and equal
   // counts draw equal lengths; what rounding leaves over stays plain.
-  readonly property int upCells: total ? Math.floor(cells * breadth.up / total) : 0
-  readonly property int downCells: total ? Math.floor(cells * breadth.down / total) : 0
-  // Smooth eases the shares, not the lengths, so a rule resized by the name or
-  // order beside it redraws at once. The ends ease only for the same list's
-  // breadth; another list's is set at once, as a switch draws its rows. While
-  // `still` they stop where they are, and a change waits.
+  readonly property int upCells: Math.min(cells, Math.floor(cells * upShare + 1e-9))
+  readonly property int downCells: Math.min(cells - upCells, Math.floor(cells * downShare + 1e-9))
+  // Smooth and retro both ease the shares, not the lengths, so a rule resized
+  // by the name or order beside it redraws at once. They ease across scrubs,
+  // ticks, adds/removals, and list switches, snapping only on first open,
+  // unseen, reduced motion, or `settle()`. While `still` they stop where they
+  // are, and a change waits.
+  property bool seen: true
   property bool still: false
   property real upShare: 0
   property real downShare: 0
-  // The list the shares were last set for.
+  // The list the shares were last set for (`null` until first open / settle).
   property var sharesList: null
   onBreadthChanged: showBreadth()
   Component.onCompleted: showBreadth()
@@ -54,6 +56,12 @@ Item {
     if (upEase.running) upEase.pause()
     if (downEase.running) downEase.pause()
   }
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
+  }
 
   // Each scrub step and replay frame brings a new breadth, mostly the same, so
   // ends already resting or easing there are left be.
@@ -62,12 +70,12 @@ Item {
     var all = breadth.up + breadth.flat + breadth.down + breadth.none
     var up = all ? breadth.up / all : 0
     var down = all ? breadth.down / all : 0
-    var same = sharesList === breadth.list
+    var had = sharesList !== null
     sharesList = breadth.list
-    if (same && up === (upEase.running ? upEase.to : upShare) && down === (downEase.running ? downEase.to : downShare)) return
+    if (had && up === (upEase.running ? upEase.to : upShare) && down === (downEase.running ? downEase.to : downShare)) return
     upEase.stop()
     downEase.stop()
-    if (same) {
+    if (had && seen && visible && Motion.duration(Style, 200) > 0) {
       upEase.to = up
       downEase.to = down
       upEase.start()
@@ -83,8 +91,16 @@ Item {
     showBreadth()
   }
 
-  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: Motion.duration(Style, 200); easing.type: Easing.OutCubic }
+  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: Motion.duration(Style, 200); easing.type: Easing.OutCubic }
+  onUpShareChanged: if (upEase.running && width > 0 && Math.abs(upShare - upEase.to) * width < 0.5) {
+    upEase.stop()
+    upShare = upEase.to
+  }
+  onDownShareChanged: if (downEase.running && width > 0 && Math.abs(downShare - downEase.to) * width < 0.5) {
+    downEase.stop()
+    downShare = downEase.to
+  }
 
   HoverHandler { id: hover }
 

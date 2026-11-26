@@ -26,6 +26,7 @@ Item {
   property bool reversed: false
   property string changeMode: "pct"
   property Look look
+  property bool seen: true
   // Closing: what moves stops where it is.
   property bool still: false
 
@@ -34,7 +35,97 @@ Item {
   signal orderReverseClicked()
   signal unitClicked()
 
-  function settle() { breadthRule.settle() }
+  property real chevronAngle: 0
+  property real rowsOpacity: 1
+  property string prevMode: changeMode
+  property real unitSwap: 1
+
+  Component.onCompleted: settle()
+  function settle() {
+    breadthRule.settle()
+    chevronAnim.stop()
+    chevronAngle = listMenuOpen ? 180 : 0
+    rowsFade.stop()
+    rowsOpacity = rowsCovered ? 0 : 1
+    unitSwapAnim.stop()
+    prevMode = changeMode
+    unitSwap = 1
+  }
+  onStillChanged: if (still) {
+    if (chevronAnim.running) chevronAnim.pause()
+    if (rowsFade.running) rowsFade.pause()
+    if (unitSwapAnim.running) unitSwapAnim.pause()
+  }
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
+  }
+  onListMenuOpenChanged: {
+    if (still) return
+    var to = listMenuOpen ? 180 : 0
+    if (!seen || !visible || Motion.duration(Style, 140) <= 0) {
+      chevronAnim.stop()
+      chevronAngle = to
+      return
+    }
+    chevronAnim.stop()
+    chevronAnim.to = to
+    chevronAnim.start()
+  }
+  NumberAnimation { id: chevronAnim; target: root; property: "chevronAngle"; duration: Motion.duration(Style, 140); easing.type: Easing.OutCubic }
+  onChevronAngleChanged: if (chevronAnim.running && Math.abs(chevronAngle - chevronAnim.to) < 2) {
+    chevronAnim.stop()
+    chevronAngle = chevronAnim.to
+  }
+  onRowsCoveredChanged: {
+    if (still) return
+    var to = rowsCovered ? 0 : 1
+    if (!seen || !visible || Motion.duration(Style, 140) <= 0) {
+      rowsFade.stop()
+      rowsOpacity = to
+      return
+    }
+    rowsFade.stop()
+    rowsFade.to = to
+    rowsFade.start()
+  }
+  NumberAnimation { id: rowsFade; target: root; property: "rowsOpacity"; duration: Motion.duration(Style, 140); easing.type: Easing.OutCubic }
+  onRowsOpacityChanged: if (rowsFade.running && Math.abs(rowsOpacity - rowsFade.to) < 0.01) {
+    rowsFade.stop()
+    rowsOpacity = rowsFade.to
+  }
+  onChangeModeChanged: {
+    var from = prevMode
+    if (still) {
+      prevMode = changeMode
+      return
+    }
+    if (!from || from === changeMode || !seen || !visible || rowsCovered || Motion.duration(Style, 140) <= 0) {
+      unitSwapAnim.stop()
+      prevMode = changeMode
+      unitSwap = 1
+      return
+    }
+    unitSwapAnim.stop()
+    unitSwap = 0
+    unitSwapAnim.start()
+  }
+  NumberAnimation {
+    id: unitSwapAnim
+    target: root
+    property: "unitSwap"
+    to: 1
+    duration: Motion.duration(Style, 140)
+    easing.type: root.look.retro ? Easing.Linear : Easing.OutCubic
+    onFinished: root.prevMode = root.changeMode
+  }
+  onUnitSwapChanged: if (unitSwapAnim.running && !look.retro && unitSwap > 0.99) {
+    unitSwapAnim.stop()
+    unitSwap = 1
+    prevMode = changeMode
+  }
 
   height: Math.ceil(captionLine.ascent) + Math.ceil(captionLine.descent)
 
@@ -55,7 +146,7 @@ Item {
     color: listMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
       : root.listMenuOpen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
       : listMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
   }
 
   Text {
@@ -77,9 +168,11 @@ Item {
 
   Text {
     id: listChevron
+    objectName: "listChevron"
     anchors.left: listText.right
     anchors.leftMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
+    rotation: root.chevronAngle
     text: "󰅀"
     color: root.look.dim
     font.family: root.look.fontFamily
@@ -102,7 +195,8 @@ Item {
   // The rows and the rule are the day's on every range, and say which.
   Text {
     id: todayText
-    visible: !root.rowsCovered
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
     anchors.left: listChevron.right
     anchors.leftMargin: Style.space(12)
     anchors.verticalCenter: parent.verticalCenter
@@ -119,7 +213,8 @@ Item {
   BreadthRule {
     id: breadthRule
     objectName: "breadthRule"
-    visible: !root.rowsCovered
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
     anchors.left: todayText.right
     anchors.leftMargin: Style.space(10)
     anchors.right: orderText.left
@@ -128,6 +223,7 @@ Item {
     anchors.bottom: parent.bottom
     breadth: root.breadth
     look: root.look
+    seen: root.seen
     still: root.still || root.rowsCovered
   }
 
@@ -135,7 +231,8 @@ Item {
   // sorted order the arrow reverses and the word steps to the next order,
   // each with its own fill; manual has no direction, so both step.
   Rectangle {
-    visible: !root.rowsCovered
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
     anchors.right: orderText.right
     anchors.rightMargin: -Style.space(6)
     anchors.verticalCenter: orderText.verticalCenter
@@ -143,8 +240,8 @@ Item {
       : orderText.implicitWidth + Style.space(12)
     height: parent.height + Style.space(4)
     radius: root.look.retro ? 0 : Style.cornerRadius
-    readonly property bool hovered: wordMouse.containsMouse || !orderText.sorted && arrowMouse.containsMouse
-    readonly property bool pressed: wordMouse.pressed || !orderText.sorted && arrowMouse.pressed
+    readonly property bool hovered: !root.rowsCovered && (wordMouse.containsMouse || !orderText.sorted && arrowMouse.containsMouse)
+    readonly property bool pressed: !root.rowsCovered && (wordMouse.pressed || !orderText.sorted && arrowMouse.pressed)
     color: pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
       : hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
@@ -153,14 +250,15 @@ Item {
   // Padded as the word's fill pads the word, so the two read as two
   // buttons.
   Rectangle {
-    visible: !root.rowsCovered && orderText.sorted
+    visible: (!root.rowsCovered || root.rowsOpacity > 0) && orderText.sorted
+    opacity: root.rowsOpacity
     x: orderText.x - Style.space(6)
     width: Math.round(arrowMetrics.advanceWidth) + Style.space(12)
     anchors.verticalCenter: orderText.verticalCenter
     height: parent.height + Style.space(4)
     radius: root.look.retro ? 0 : Style.cornerRadius
-    color: arrowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-      : arrowMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+    color: !root.rowsCovered && arrowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : !root.rowsCovered && arrowMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
@@ -179,8 +277,9 @@ Item {
   Text {
     id: orderText
     objectName: "orderLabel"
-    visible: !root.rowsCovered
-    anchors.right: unitSign.left
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
+    anchors.right: unitBox.left
     anchors.rightMargin: Style.space(10)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
@@ -192,7 +291,7 @@ Item {
     readonly property real wordStart: Math.round(gapMetrics.advanceWidth)
     readonly property real arrowReach: Math.min(breadthRule.anchors.rightMargin,
       Math.max(Style.space(6), Style.space(22) - wordStart))
-    property real lift: arrowMouse.containsMouse || wordMouse.containsMouse ? 1 : 0
+    property real lift: !root.rowsCovered && (arrowMouse.containsMouse || wordMouse.containsMouse) ? 1 : 0
     Behavior on lift { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     // Brighter only under the pointer: the list's name is the header's one
     // word in full ink.
@@ -205,6 +304,7 @@ Item {
     MouseArea {
       id: arrowMouse
       objectName: "orderArrow"
+      enabled: !root.rowsCovered
       x: -orderText.arrowReach
       y: -Style.space(6)
       width: orderText.arrowReach + orderText.wordStart
@@ -217,6 +317,7 @@ Item {
     // Half the gap before the unit; the unit's target takes the other half.
     MouseArea {
       id: wordMouse
+      enabled: !root.rowsCovered
       x: orderText.wordStart
       y: -Style.space(6)
       width: parent.width - orderText.wordStart + orderText.anchors.rightMargin / 2
@@ -234,34 +335,74 @@ Item {
   // % for a percent, ± for an amount, the market's bell for since the open.
   // The signs are one width, so a step moves nothing.
   Rectangle {
-    visible: !root.rowsCovered
-    anchors.horizontalCenter: unitSign.horizontalCenter
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
+    anchors.horizontalCenter: unitBox.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
-    width: unitSign.width + Style.space(12)
+    width: unitBox.width + Style.space(12)
     height: parent.height + Style.space(4)
     radius: root.look.retro ? 0 : Style.cornerRadius
-    color: unitMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-      : unitMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+    color: !root.rowsCovered && unitMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : !root.rowsCovered && unitMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
-  GridIcon {
-    id: unitSign
-    visible: !root.rowsCovered
+  Item {
+    id: unitBox
+    visible: !root.rowsCovered || root.rowsOpacity > 0
+    opacity: root.rowsOpacity
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    cell: Cells.iconCell(Style.fontScale)
-    shape: Cells.UNIT_SIGNS[root.changeMode]
-    color: unitMouse.containsMouse ? root.look.foreground : root.look.dim
+    width: unitSign.implicitWidth
+    height: unitSign.implicitHeight
+    property color ink: !root.rowsCovered && unitMouse.containsMouse ? root.look.foreground : root.look.dim
+    Behavior on ink { ColorAnimation { duration: Motion.duration(Style, 120) } }
+    readonly property int cell: Cells.iconCell(Style.fontScale)
+    readonly property bool swapping: root.unitSwap < 1
+    readonly property real wipeX: Math.round(root.unitSwap * width)
+
+    // Outgoing unit sign: crossfades out in smooth, wipes right in retro.
+    Item {
+      visible: unitBox.swapping
+      x: root.look.retro ? unitBox.wipeX : 0
+      y: -unitSign.bleed
+      width: root.look.retro ? Math.max(0, unitBox.width - unitBox.wipeX) : unitBox.width
+      height: unitBox.height + unitSign.bleed * 2
+      clip: root.look.retro
+      GridIcon {
+        x: -parent.x
+        y: unitSign.bleed
+        opacity: root.look.retro ? 1 : 1 - root.unitSwap
+        cell: unitBox.cell
+        shape: Cells.UNIT_SIGNS[root.prevMode]
+        color: unitBox.ink
+      }
+    }
+
+    Item {
+      x: 0
+      y: -unitSign.bleed
+      width: unitBox.swapping && root.look.retro ? unitBox.wipeX : unitBox.width
+      height: unitBox.height + unitSign.bleed * 2
+      clip: unitBox.swapping && root.look.retro
+      GridIcon {
+        id: unitSign
+        y: bleed
+        opacity: unitBox.swapping && !root.look.retro ? root.unitSwap : 1
+        cell: unitBox.cell
+        shape: Cells.UNIT_SIGNS[root.changeMode]
+        color: unitBox.ink
+      }
+    }
   }
 
   MouseArea {
     id: unitMouse
     objectName: "unitTarget"
     visible: !root.rowsCovered
-    anchors.left: unitSign.left
+    anchors.left: unitBox.left
     anchors.leftMargin: -orderText.anchors.rightMargin / 2
-    anchors.right: unitSign.right
+    anchors.right: unitBox.right
     anchors.rightMargin: -Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     height: parent.height + Style.space(12)

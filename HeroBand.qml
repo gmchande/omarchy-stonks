@@ -400,6 +400,7 @@ Item {
       reversed: root.reversed
       changeMode: root.changeMode
       look: root.look
+      seen: root.seen
       still: root.still
       onListClicked: root.listClicked()
       onOrderClicked: root.orderClicked()

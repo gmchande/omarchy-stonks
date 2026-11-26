@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
+import "Motion.js" as Motion
 import "Search.js" as Search
 // Search's field and results. Yahoo's lookup is its feed's
 // (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
@@ -149,7 +150,16 @@ OverRows {
   // close fade.
   onClosed: {
     suspend()
+    scrollGlide.stop()
     searchField.focus = false
+  }
+  onSettled: scrollGlide.stop()
+  onStillChanged: if (still && scrollGlide.running) scrollGlide.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) scrollGlide.stop() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) scrollGlide.stop() }
   }
   Keys.onPressed: function(event) { root.handleKey(event) }
 
@@ -158,6 +168,7 @@ OverRows {
 
   function reset() {
     slow = false
+    scrollGlide.stop()
     resultsScroll.contentY = 0
     feed.forget()
     enterFor = ""
@@ -228,6 +239,7 @@ OverRows {
     if (text.trim() === "") {
       suspend()
       slow = false
+      scrollGlide.stop()
       resultsScroll.contentY = 0
       showEmpty()
       return
@@ -255,10 +267,22 @@ OverRows {
     var top = index * rowPitch
     var bottom = top + (index === shown.length - 1 && note !== "" ? rowPitch : 0) + rowHeight
     var limit = Math.max(0, resultsColumn.implicitHeight - resultsScroll.height)
-    if (top < resultsScroll.contentY) resultsScroll.contentY = Math.min(limit, top)
-    else if (bottom > resultsScroll.contentY + resultsScroll.height)
-      resultsScroll.contentY = Math.max(0, Math.min(limit, bottom - resultsScroll.height))
+    var base = scrollGlide.running ? scrollGlide.to : resultsScroll.contentY
+    var target = base
+    if (top < base) target = Math.min(limit, top)
+    else if (bottom > base + resultsScroll.height)
+      target = Math.max(0, Math.min(limit, bottom - resultsScroll.height))
+    if (target === base) return
+    resultsScroll.cancelFlick()
+    if (!active || !seen || still || Motion.duration(Style, 160) <= 0 || Math.abs(target - resultsScroll.contentY) < 0.5) {
+      scrollGlide.stop()
+      resultsScroll.contentY = target
+      return
+    }
+    scrollGlide.to = target
+    scrollGlide.restart()
   }
+  NumberAnimation { id: scrollGlide; target: resultsScroll; property: "contentY"; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
 
   // Yahoo's lookup, which the surface holds.
   property SearchFeed feed
@@ -291,6 +315,7 @@ OverRows {
     // an Enter waited for this answer: it takes Yahoo's first.
     var taken = kept === root.resultsQuery && root.answer !== "failed"
     if (root.ownCount === 0 || taken) {
+      scrollGlide.stop()
       resultsScroll.contentY = 0
       root.choose(found && found.topLeftOut ? -1 : root.ownCount)
     } else if (fromRetry) {
@@ -319,6 +344,14 @@ OverRows {
     onTriggered: if (root.feed.out && root.answer === "") root.slow = true
   }
 
+  // Opaque ground while fading out over the rows underneath.
+  Rectangle {
+    z: -1
+    anchors.fill: parent
+    color: root.look.ground
+    visible: !root.open
+  }
+
   Flickable {
     id: resultsScroll
     anchors.left: parent.left
@@ -332,7 +365,15 @@ OverRows {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
-    Controls.ScrollBar.vertical: ViewScrollBar { scrolls: resultsScroll.interactive }
+    onMovementStarted: scrollGlide.stop()
+    onContentYChanged: if (scrollGlide.running && Math.abs(contentY - scrollGlide.to) < 0.5) {
+      scrollGlide.stop()
+      contentY = scrollGlide.to
+    }
+    Controls.ScrollBar.vertical: ViewScrollBar {
+      scrolls: resultsScroll.interactive
+      onPressedChanged: if (pressed) scrollGlide.stop()
+    }
 
     Column {
       id: resultsColumn
@@ -349,12 +390,14 @@ OverRows {
           readonly property bool chosen: index === root.resultIndex
           readonly property bool dimmed: root.dimmed(index)
           opacity: dimmed ? 0.4 : 1
+          Behavior on opacity { enabled: !root.still; NumberAnimation { duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic } }
           width: parent.width
           height: root.rowHeight
           radius: root.look.retro ? 0 : Style.cornerRadius
           color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
             : chosen ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
             : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+          Behavior on color { enabled: !root.still; ColorAnimation { duration: Motion.duration(Style, 60) } }
           border.width: chosen ? Style.hoverBorderWidth : 0
           border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
 
@@ -412,11 +455,13 @@ OverRows {
             Rectangle {
               readonly property bool marked: root.actionFor(resultRow.modelData.symbol) === "ADDED"
               opacity: (resultRow.chosen || marked) && !resultRow.dimmed ? 1 : 0
+              Behavior on opacity { enabled: !root.still; NumberAnimation { duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic } }
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
               height: addLabel.implicitHeight + Style.space(4)
               radius: root.look.retro ? 0 : Style.cornerRadius
               color: resultRow.chosen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+              Behavior on color { enabled: !root.still; ColorAnimation { duration: Motion.duration(Style, 60) } }
               Text {
                 id: addLabel
                 anchors.centerIn: parent
@@ -433,6 +478,7 @@ OverRows {
       Text {
         visible: root.note !== ""
         opacity: root.stale ? 0.4 : 1
+        Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic } }
         width: parent.width
         height: root.rowHeight
         leftPadding: root.rowPadding
@@ -451,8 +497,29 @@ OverRows {
   // What Yahoo said, or that it is still being asked, under any of the
   // list's own, or on the view's last line (`messagePinned`).
   Item {
-    visible: root.messageShown
-    opacity: root.stale ? 0.4 : 1
+    id: messageBox
+    readonly property string liveText: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
+      : root.answer === "failed" ? "Couldn't search · " + (root.failure === "refused" ? "server busy"
+        : root.failure === "none" ? "check your internet" : root.failure === "missing" ? "try other words" : "try again")
+      : "Searching for “" + root.searchText.trim() + "”…"
+    readonly property bool liveRetry: root.answer === "failed" && root.failure !== "missing"
+    property string heldText: ""
+    property bool heldRetry: false
+    function hold() {
+      if (!root.messageShown) return
+      heldText = liveText
+      heldRetry = liveRetry
+    }
+    onLiveTextChanged: hold()
+    onLiveRetryChanged: hold()
+    Connections {
+      target: root
+      function onMessageShownChanged() { messageBox.hold() }
+    }
+    onVisibleChanged: if (!visible && !root.messageShown) { heldText = ""; heldRetry = false }
+    visible: root.messageShown || opacity > 0
+    opacity: !root.messageShown ? 0 : root.stale ? 0.4 : 1
+    Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic } }
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.rightMargin: root.gutter
@@ -464,17 +531,14 @@ OverRows {
     Text {
       id: searchMessage
       objectName: "searchMessage"
-      visible: root.messageShown
+      visible: messageBox.visible
       anchors.left: parent.left
       width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
       height: parent.height
       leftPadding: root.rowPadding
       verticalAlignment: Text.AlignVCenter
       textFormat: Text.PlainText
-      text: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
-        : root.answer === "failed" ? "Couldn't search · " + (root.failure === "refused" ? "server busy"
-          : root.failure === "none" ? "check your internet" : root.failure === "missing" ? "try other words" : "try again")
-        : "Searching for “" + root.searchText.trim() + "”…"
+      text: root.messageShown ? messageBox.liveText : messageBox.heldText
       color: root.look.dim
       font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
@@ -485,9 +549,10 @@ OverRows {
       id: retrySearch
       objectName: "searchRetry"
       look: root.look
-      visible: root.answer === "failed" && root.failure !== "missing"
+      still: root.still
+      visible: root.messageShown ? messageBox.liveRetry : messageBox.heldRetry
       enterTakes: root.retryChosen
-      enabled: !root.stale
+      enabled: root.messageShown && !root.stale
       anchors.left: searchMessage.right
       anchors.leftMargin: Style.space(16)
       anchors.verticalCenter: searchMessage.verticalCenter

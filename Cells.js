@@ -115,6 +115,35 @@ var CAMERA_BODY = [["M", 0.5, 3], ["L", 4.8, 3], ["L", 6.3, 0.5], ["L", 10.7, 0.
 var CAMERA = { columns: 6, rows: 4, path: CAMERA_BODY }
 var CAMERA_LIT = { columns: 6, rows: 4, path: CAMERA_BODY.concat([["dot", 8.5, 6.6, 1.6]]) }
 
+// Speaker icon mid-transition (`step` 0 = muted, 1 = unmuted): cone stays
+// anchored while arcs step outward on unmute and cross to × on mute.
+function soundShape(step) {
+  if (step >= 1) return SOUND_ON
+  if (step <= 0) return SOUND_OFF
+  var path = SOUND_CONE.slice()
+  if (step > 0.5) {
+    var u = (step - 0.5) * 2
+    var inner = Math.min(1, u * 1.6)
+    var outer = Math.max(0, Math.min(1, (u - 0.35) / 0.65))
+    path.push(["A", 7, 5.5, 2.2 + 1.6 * inner, -50 * inner, 50 * inner], ["stroke"])
+    if (outer > 0.05) path.push(["A", 7, 5.5, 5.4 + 2.0 * outer, -50 * outer, 50 * outer], ["stroke"])
+  } else {
+    var m = 1 - step * 2
+    var s1 = Math.min(1, m * 1.5)
+    var s2 = Math.max(0, Math.min(1, (m - 0.3) / 0.7))
+    if (s1 > 0.05) path.push(["M", 10.5, 3.5], ["L", 10.5 + 4 * s1, 3.5 + 4 * s1], ["stroke"])
+    if (s2 > 0.05) path.push(["M", 14.5, 3.5], ["L", 14.5 - 4 * s2, 3.5 + 4 * s2], ["stroke"])
+  }
+  return { columns: 6, rows: 4, path: path }
+}
+
+// Camera lens dot blooming from 0 to 1 as a screenshot lands.
+function cameraShape(bloom) {
+  if (bloom <= 0) return CAMERA
+  if (bloom >= 1) return CAMERA_LIT
+  return { columns: 6, rows: 4, path: CAMERA_BODY.concat([["dot", 8.5, 6.6, 1.6 * bloom]]) }
+}
+
 var UNIT_SIGNS = {
   pct: { columns: 4, rows: 4,
     path: [["dot", 3, 3, 2.1], ["dot", 9.5, 8.5, 2.1], ["M", 10.5, 0.8], ["L", 2, 10.7], ["stroke"]] },
