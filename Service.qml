@@ -1132,7 +1132,8 @@ Item {
       return
     }
     var visible = root.openSurfaces.length > 0 ? [root.view.featured].concat(root.rowsInSight()) : root.pillInBar ? [root.view.featured] : []
-    clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
+    var nowMs = root.wallClock ? root.wallSecond() * 1000 : Date.now()
+    clock.interval = Asks.clockWait(root.openSurfaces.length > 0, nowMs, root.now,
       [root.dueAt, root.lastTradeDueAt, root.overnightDueAt,
         yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil,
         yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,

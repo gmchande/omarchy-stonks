@@ -118,7 +118,13 @@ Harness {
   }
 
   QtObject {
+    id: barState
+    property bool barHidden: false
+  }
+
+  QtObject {
     id: shellApi
+    property var bar: barState
     function serviceFor() { return plugin }
     function isPluginOpen(id) { return false }
     function hide(id) {}
@@ -674,6 +680,21 @@ Harness {
         unseen.filter(function(l) { return /^(overnight|instruments|lasttrade) /.test(l) }).length === 0 && asksAgain,
         unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
 
+      // With the bar hidden and nothing open, the pill asks for nothing;
+      // showing the bar again asks for its stock at once.
+      var hiddenReqs = countsOver("Thursday, bar hidden and nothing open: nothing is asked for",
+        300, counts([0, 0, 0, 0, 0, 0, 0, 0]), function() {
+          barState.barHidden = true
+          startAt(service.now + 5)()
+        })
+      var unhideFrom = harness.requests().length
+      barState.barHidden = false
+      var unhidAsks = within(2000, function() { return harness.quoteCounts(harness.requests().slice(unhideFrom)).NEST === 1 })
+      settle()
+      harness.check("with the bar hidden, Robinhood is asked nothing either, and unhiding asks for the pill's stock at once",
+        hiddenReqs.filter(function(l) { return /^(overnight|instruments|lasttrade) /.test(l) }).length === 0 && unhidAsks,
+        hiddenReqs.join(", ") + " | unhid: " + harness.requests().slice(unhideFrom).join(", "))
+
       // The panel open on a screen that's off, the other screen on: its rows
       // are asked as with the panel closed, the pill's stock alone. The key
       // that wakes its screen asks for them at once, with the clock still.
@@ -833,6 +854,35 @@ Harness {
       harness.check("Robinhood gone as its daily check falls due: once it answers again, the \"!\" goes at the next try",
         goneMarked && backClearedAt > 0 && backClearedAt - backAt <= 5 * 60 + 60,
         [goneMarked, backClearedAt - backAt].join(" | "))
+
+      // Without a 1 Hz open clock, stepping only to each scheduled Robinhood
+      // deadline re-asks both last-trade quotes (1 min) and overnight bars
+      // (5 min) for all visible overnight rows at their exact second.
+      startAt(at(harness.wed7 + 4 * 86400, 22, 0) + 17)()
+      answerScreens()
+      openWindow()
+      answerScreens()
+      var noOneHz = service.clockInterval === 0 || service.clockInterval > 1000
+      var ltDue = service.lastTradeDueAt
+      var ovDue = service.overnightDueAt
+      var ltFrom = harness.requests().length
+      harness.clockTo(ltDue)
+      answerScreens()
+      settle()
+      var ltAsked = harness.requests().slice(ltFrom).some(function(l) { return /^lasttrade /.test(l) })
+      var ovFrom = harness.requests().length
+      harness.clockTo(ovDue)
+      answerScreens()
+      settle()
+      var ovAsked = harness.requests().slice(ovFrom).some(function(l) {
+        return /^overnight /.test(l) && l.indexOf("NEST") >= 0 && l.indexOf("KILN") >= 0 && l.indexOf("SPY") >= 0
+      })
+      harness.check("without a 1 Hz open clock, overnight and last-trade deadlines re-ask all visible overnight rows on their exact second",
+        noOneHz && ltDue === at(harness.wed7 + 4 * 86400, 22, 1) + 17 && ovDue === at(harness.wed7 + 4 * 86400, 22, 5) + 17
+          && ltAsked && ovAsked,
+        ["interval=" + service.clockInterval, "ltDue=" + ltDue, "ovDue=" + ovDue, "ltAsked=" + ltAsked, "ovAsked=" + ovAsked,
+          "ov=" + harness.requests().slice(ovFrom).join(", ")].join(" | "))
+      closeWindow()
 
       // GitHub asked as the network comes back: Yahoo answering again while
       // that ask is out, which then gets no answer either, has GitHub asked

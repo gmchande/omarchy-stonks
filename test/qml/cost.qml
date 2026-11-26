@@ -341,8 +341,8 @@ Harness {
       var unlanded = quotesFeed.quotes === watched
       quotesFeed.quotes = held
       settle()
-      harness.check("a second with the window open reads a stock's quote at most 152 times in all",
-        unlanded && reads.n > 0 && reads.n <= 152, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the second"))
+      harness.check("a tick with the window open reads a stock's quote at most 22 times in all",
+        unlanded && reads.n > 0 && reads.n <= 22, reads.n + " reads" + (unlanded ? "" : "; a quote run landed during the tick"))
 
       // A batch of prices for the rows in sight lands: the whole view is
       // made again, the stock on show's day with it.
@@ -353,8 +353,8 @@ Harness {
       batchReads.on = false
       quotesFeed.quotes = held
       settle()
-      harness.check("a batch of prices for the rows in sight reads a stock's quote at most 797 times in all",
-        batchReads.n > 0 && batchReads.n <= 797, batchReads.n + " reads")
+      harness.check("a batch of prices for the rows in sight reads a stock's quote at most 643 times in all",
+        batchReads.n > 0 && batchReads.n <= 643, batchReads.n + " reads")
 
       // One stock's new trade: the service hands the surfaces a new map of
       // newest trades, and only the rows in sight (and breadth) read it.
