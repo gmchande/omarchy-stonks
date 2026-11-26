@@ -45,12 +45,31 @@ BarWidget {
   // On a listing's first day, the hover names the IPO price, which the pill
   // has no room to.
   readonly property string listingNote: featured ? Figures.listingNote(featuredQuote, featured, service.changeMode) : ""
+  readonly property bool barHidden: !!bar && !!bar.shell && !!bar.shell.bar && bar.shell.bar.barHidden === true
   // The day the 1D chart draws, once Robinhood has said which. Only the
-  // day's five-minute clock redraws it, never the second.
+  // day's five-minute clock redraws it, never the second; kept as the same
+  // object while quote, night bars and axis bounds haven't moved so a closed
+  // weekend never repaints the pill's canvas every five minutes.
   // Built only for the form that draws it, and handed only to the look on
   // show.
-  readonly property var lineDay: featuredQuote && barStyle === "sparkline"
-    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.calendars, service.dayClock) : null
+  readonly property var lineDayCache: ({ symbol: "", quote: null, bars: null, through: null, start: null, end: null, day: null })
+  readonly property var lineDay: {
+    if (!featuredQuote || barStyle !== "sparkline" || barHidden) return null
+    var next = Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.calendars, service.dayClock)
+    if (!next) return null
+    var night = service.nights ? service.nights[featuredSymbol] : null
+    var bars = night ? night.bars : null
+    var through = night ? night.through : null
+    var start = next.axis ? next.axis.start : null
+    var end = next.axis ? next.axis.end : null
+    var c = lineDayCache
+    if (c.day && c.symbol === featuredSymbol && c.quote === featuredQuote && c.bars === bars
+        && c.through === through && c.start === start && c.end === end)
+      return c.day
+    c.symbol = featuredSymbol; c.quote = featuredQuote; c.bars = bars
+    c.through = through; c.start = start; c.end = end; c.day = next
+    return next
+  }
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars, Overnight.keepsDay(newest)) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a right-click picks another, as the
@@ -124,16 +143,20 @@ BarWidget {
     holdService()
   }
   // The service asks for the stock you last looked at only while a pill
-  // shows it (`Service.pillShown`).
+  // shows it (`Service.pillShown`) and the bar is visible.
   property var heldService: null
+  property bool heldShown: false
   function holdService() {
-    if (heldService === service) return
-    if (heldService) heldService.pillShown(root, false)
+    var want = !!service && !barHidden
+    if (heldService === service && heldShown === want) return
+    if (heldService && heldShown) heldService.pillShown(root, false)
     heldService = service
-    if (service) service.pillShown(root, true)
+    heldShown = want
+    if (service && want) service.pillShown(root, true)
   }
   onServiceChanged: holdService()
-  Component.onDestruction: if (heldService) heldService.pillShown(root, false)
+  onBarHiddenChanged: holdService()
+  Component.onDestruction: if (heldService && heldShown) heldService.pillShown(root, false)
   // On a clear bar over a light wallpaper, the light ground its text was chosen for.
   readonly property color barGround: Tones.barGround(!!bar && bar.transparent === true, bar && bar.barForeground, bar && bar.foreground, Commons.Color.bar.background)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
@@ -211,9 +234,16 @@ BarWidget {
   // close and opened.
   readonly property bool opened: panel ? panel.opened === true : false
 
-  function open() { if (panel) panel.open() }
+  function ensurePanel() {
+    if (!panelLoader.active) {
+      panelLoader.active = true
+      injectPanel()
+    }
+    return panelLoader.item
+  }
+  function open() { var p = ensurePanel(); if (p) p.open() }
   function close() { if (panel) panel.close() }
-  function togglePanel() { if (panel) panel.toggle() }
+  function togglePanel() { var p = ensurePanel(); if (p) p.toggle() }
 
   readonly property real openPanelIndicatorWidth: content.implicitWidth
   readonly property real openPanelIndicatorHeight: Math.max(Style.space(10), Math.round(Style.bar.iconSlot * 0.55))
@@ -243,7 +273,7 @@ BarWidget {
 
   Loader {
     id: panelLoader
-    active: true
+    active: false
     source: Qt.resolvedUrl("Panel.qml")
     visible: false
     onLoaded: {
@@ -296,7 +326,7 @@ BarWidget {
 
       Loader {
         visible: root.barStyle === "sparkline"
-        active: visible
+        active: visible && !root.barHidden
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
         height: Style.space(12)
@@ -340,7 +370,7 @@ BarWidget {
         font.family: button.fontFamily
         font.pixelSize: Style.font.icon
         rotation: root.featured ? -Figures.arrowAngle(root.featured.pct) : 0
-        Behavior on rotation { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
+        Behavior on rotation { enabled: root.barStyle === "arrow" && !root.vertical && !root.barHidden; NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       // The day's animal, the same in both looks, one cell a pixel. Without
@@ -474,7 +504,7 @@ BarWidget {
       anchors.verticalCenterOffset: -root.markRoom / 2
 
       Repeater {
-        model: root.stackedLines
+        model: root.vertical && !root.iconOnly ? root.stackedLines : []
 
         OpticalGlyph {
           required property var modelData

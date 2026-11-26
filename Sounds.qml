@@ -177,6 +177,10 @@ Item {
     chimeWait.stop()
     waiting = -1
     lastChime = Date.now()
+    if (!root.surfaceOpen) {
+      root.chimerUsed = true
+      chimeIdle.restart()
+    }
     var path = written(voice, bar, starting())
     chimer.write(path.slice(folder.length + 1) + "\n")
   }
@@ -371,10 +375,19 @@ Item {
     }
   }
 
-  // One shell while sounds are on (`Commands.chimePlayer`).
+  // One shell while sounds are on and a surface is open (or a chime just
+  // played), rather than keeping an idle shell alive 24/7 (`Commands.chimePlayer`).
+  property bool surfaceOpen: false
+  property bool chimerUsed: false
+  onTurnedOnChanged: if (!turnedOn) { chimerUsed = false; chimeIdle.stop() }
+  Timer {
+    id: chimeIdle
+    interval: 5000
+    onTriggered: root.chimerUsed = false
+  }
   Process {
     id: chimer
-    running: root.turnedOn
+    running: root.turnedOn && (root.surfaceOpen || root.chimerUsed)
     stdinEnabled: true
     command: Commands.chimePlayer(root.chimeNames, root.folder)
   }

@@ -39,9 +39,9 @@ Harness {
   }
   Steps {
     name: "PopupAnchor"
-    when: !!pill.panel
+    when: true
     function test_origins() {
-      var panel = pill.panel
+      var panel = pill.ensurePanel()
       var card = panel.keyboardPanel
       var held = card.anchorItem
       held.barWindow = barWindow

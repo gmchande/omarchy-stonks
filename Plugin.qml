@@ -47,6 +47,7 @@ Item {
   Sounds {
     id: speaker
     turnedOn: dataService.soundsOn
+    surfaceOpen: dataService.openSurfaces.length > 0
     retro: dataService.retro
     files: dataService.files
   }
