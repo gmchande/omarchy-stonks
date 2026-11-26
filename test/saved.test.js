@@ -3501,7 +3501,7 @@ test("at the open the chart holds the last session, with the new one's first tra
   // from Monday's 3,921. Yahoo had caught up by the first bars Stonks saw.
   // A shell started at 08:20 leaves the move out, and one started at 08:30,
   // its trades 14 minutes past the first, shows it.
-  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
+  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents, nyOn3(time))
   const nyOn3 = time => at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2))
   const opening = (place, symbol, times, mode = "pct", cals = calendars) => {
     let held = null
