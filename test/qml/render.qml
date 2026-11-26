@@ -1448,6 +1448,10 @@ Harness {
             var retro = root.find(body, "retroChart")
             if (smooth) smooth.still = true
             if (retro) retro.still = true
+            var period = root.find(body, "periodRule")
+            var year = root.find(body, "yearRule")
+            if (period) period.seen = false
+            if (year) year.seen = false
           }
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup

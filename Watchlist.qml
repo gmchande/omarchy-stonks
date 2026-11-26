@@ -544,7 +544,8 @@ Flickable {
   property bool sorting: false
   function reorderRows() {
     var next = view.shown.slice()
-    if (!seen || !visible || Motion.duration(Style, 220) <= 0) {
+    var same = next.length === displayedSymbols.length && next.every(function(s, i) { return s === displayedSymbols[i] })
+    if (same || !seen || !visible || Motion.duration(Style, 220) <= 0) {
       layOut()
       return
     }

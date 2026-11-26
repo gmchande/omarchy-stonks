@@ -54,7 +54,6 @@ Rectangle {
   property int travel: 0
   property bool sorting: false
   property int slideMs: 160
-  property int fadeMs: 160
   onPlaceChanged: {
     var from = lastPlace
     lastPlace = place
@@ -92,6 +91,7 @@ Rectangle {
     foldY = y
     slide.stop()
     fadeIn.stop()
+    sortFade.stop()
     folding = true
     foldAnim.restart()
   }
@@ -109,7 +109,7 @@ Rectangle {
     NumberAnimation { target: row; property: "opacity"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
     onFinished: row.endFold()
   }
-  readonly property bool resting: !slide.running && !fadeIn.running && !lifted
+  readonly property bool resting: !slide.running && !fadeIn.running && !sortFade.running && !lifted
   signal rested()
   onRestingChanged: if (resting) rested()
   function settle() {
@@ -118,6 +118,7 @@ Rectangle {
     shift = 0
     travel = 0
     fadeIn.stop()
+    sortFade.stop()
     opacity = 1
     drawIn.stop()
     reveal = 1
@@ -126,6 +127,7 @@ Rectangle {
     if (slide.running) slide.pause()
     if (foldAnim.running) foldAnim.pause()
     if (fadeIn.running) fadeIn.pause()
+    if (sortFade.running) sortFade.pause()
     if (drawIn.running) drawIn.pause()
   }
   function holdAt(atY) {
@@ -141,7 +143,7 @@ Rectangle {
   property bool hadLine: false
   Component.onCompleted: hadLine = !!geometry
   function join() {
-    fadeMs = 160
+    sortFade.stop()
     opacity = 0
     fadeIn.restart()
     if (geometry) drawLineIn()
@@ -149,6 +151,7 @@ Rectangle {
   function sortGlide(distance) {
     endFold()
     fadeIn.stop()
+    sortFade.stop()
     opacity = 1
     slide.stop()
     if (Math.abs(distance) < 0.5) {
@@ -165,13 +168,13 @@ Rectangle {
     endFold()
     slide.stop()
     fadeIn.stop()
+    sortFade.stop()
     slideMs = 220
-    fadeMs = 220
     travel = 0
     shift = nudge
     opacity = 0
     slide.restart()
-    fadeIn.restart()
+    sortFade.restart()
   }
   function drawLineIn() {
     reveal = 0
@@ -196,9 +199,10 @@ Rectangle {
     travel = Math.max(travel, Math.round(Math.abs(shift) / pitch))
     slide.restart()
   }
-  NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, row.fadeMs); easing.type: Easing.OutCubic }
-  onOpacityChanged: if (fadeIn.running && opacity > 0.99) {
-    fadeIn.stop()
+  NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: sortFade; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 220); easing.type: Easing.OutCubic }
+  onOpacityChanged: if (sortFade.running && opacity > 0.99) {
+    sortFade.stop()
     opacity = 1
   }
   NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.OutCubic }
