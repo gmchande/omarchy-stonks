@@ -257,7 +257,7 @@ Rectangle {
   readonly property bool warns: Freshness.freshnessWarns(shownFreshness)
   readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   readonly property string detail: quote
-    ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : view.name)
+    ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : (view ? view.name : ""))
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
 
   readonly property int sparkWidth: Style.space(72)

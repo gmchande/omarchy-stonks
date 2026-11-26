@@ -177,7 +177,16 @@ Item {
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var calendars: service ? service.calendars : null
-  readonly property var symbols: view.rows
+  // Kept as the same array while row membership is unchanged, so switching
+  // stock or range never re-runs list-wide breadth, shared-day or scrub work.
+  property var stableRows: []
+  function sameRows(a, b) {
+    if (!a || !b || a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+  Component.onCompleted: if (!sameRows(stableRows, view.rows)) stableRows = view.rows
+  readonly property var symbols: stableRows
   readonly property string listName: view.list
   readonly property string listLabel: listName !== "" ? listName : "All"
   readonly property var shown: view.shown
@@ -292,22 +301,44 @@ Item {
     .concat(listInfo.ranges)
   // Every stock in All as the table holds it: its day's and its 52 weeks'
   // facts and prices, by the shape of their widest, so a refresh that keeps
-  // every shape lays nothing out again.
+  // every shape lays nothing out again. Per-symbol results are cached by quote
+  // and rates reference so a batch only recomputes symbols that changed.
+  readonly property var listInfoCache: ({ by: {}, rates: null })
   readonly property var listInfoNow: {
     var all = lists.length ? lists[0].symbols : []
+    var cache = listInfoCache
+    if (cache.rates !== rates) {
+      cache.by = {}
+      cache.rates = rates
+    }
     var facts = {}
     var ranges = {}
-    var keep = function(list) {
-      facts[list.map(function(f) { return f.label + " " + f.widest }).join("|")] = list
-    }
+    var nextBy = {}
     for (var i = 0; i < all.length; i++) {
-      var q = quotes[all[i]]
+      var sym = all[i]
+      var q = quotes[sym]
       if (!q) continue
-      var day = Figures.dayLine(q, 0, null)
-      var year = Fundamentals.yearLine(q, null, null, rates, [])
-      ;[day.facts, History.rangeFacts(day.range.widest), year.facts, History.rangeFacts(year.range.widest)].forEach(keep)
-      ;[day.range.widest, year.range.widest].forEach(function(w) { if (w) ranges[w] = { widest: w, lowText: "", highText: "" } })
+      var had = cache.by[sym]
+      if (!had || had.quote !== q) {
+        var day = Figures.dayLine(q, 0, null)
+        var year = Fundamentals.yearLine(q, null, null, rates, [])
+        var fList = [day.facts, History.rangeFacts(day.range.widest), year.facts, History.rangeFacts(year.range.widest)]
+        var fKeys = fList.map(function(list) {
+          return list.map(function(f) { return f.label + " " + f.widest }).join("|")
+        })
+        var rKeys = []
+        if (day.range.widest) rKeys.push(day.range.widest)
+        if (year.range.widest) rKeys.push(year.range.widest)
+        had = { quote: q, fList: fList, fKeys: fKeys, rKeys: rKeys }
+      }
+      nextBy[sym] = had
+      for (var j = 0; j < had.fKeys.length; j++) facts[had.fKeys[j]] = had.fList[j]
+      for (var k = 0; k < had.rKeys.length; k++) {
+        var w = had.rKeys[k]
+        if (!ranges[w]) ranges[w] = { widest: w, lowText: "", highText: "" }
+      }
     }
+    cache.by = nextBy
     var factKeys = Object.keys(facts).sort()
     var rangeKeys = Object.keys(ranges).sort()
     return { key: factKeys.join("/") + "#" + rangeKeys.join("/"),
@@ -364,11 +395,11 @@ Item {
   // place, and those done.
   property var rowLinesWork: null
   readonly property int rowLinesBudget: 1
-  readonly property var rowLinesAsk: rowsScrubbed ? [view.rows, quotes, nights, calendars, dayClock] : null
+  readonly property var rowLinesAsk: rowsScrubbed && surfaceOpen ? [stableRows, quotes, nights, calendars, dayClock] : null
   onRowLinesAskChanged: {
     var done = rowLinesWork ? Object.assign({}, rowLinesWork.done, rowLinesWork.from) : {}
     if (!rowLinesAsk) rowLines = null
-    rowLinesWork = rowLinesAsk ? { symbols: view.rows, quotes: quotes, nights: nights, calendars: calendars,
+    rowLinesWork = rowLinesAsk ? { symbols: stableRows, quotes: quotes, nights: nights, calendars: calendars,
       dayClock: dayClock, next: 0, from: {}, lines: {}, done: done } : null
   }
   function workOnRowLines() {
@@ -394,17 +425,36 @@ Item {
     rowLinesWork = null
   }
   FrameAnimation {
-    running: root.rowLinesWork !== null
+    running: root.rowLinesWork !== null && root.surfaceOpen
     onTriggered: root.workOnRowLines()
   }
 
-  // Read from the view: `symbols` may lag a switch.
-  readonly property var breadth: Object.assign({ list: view.list }, rowLinesWork ? { up: 0, flat: 0, down: 0, none: 0 }
-    : Figures.listBreadth(view.rows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades))
+  // Resting breadth and shared day read each symbol's quote and newest trade
+  // once together, never on a stock or range switch, and never during a scrub.
+  readonly property var restingRowsSummary: {
+    var rows = stableRows
+    var qMap = {}
+    var ntMap = {}
+    for (var i = 0; i < rows.length; i++) {
+      var s = rows[i]
+      var q = quotes[s]
+      if (q) qMap[s] = q
+      var nt = newestTrades[s]
+      if (nt) ntMap[s] = nt
+    }
+    return {
+      breadth: Figures.listBreadth(rows, qMap, null, 0, changeMode, ntMap),
+      shared: Figures.rowsSharedDay(rows, qMap, ntMap, calendars)
+    }
+  }
+  readonly property var breadth: Object.assign({ list: listName },
+    rowLinesWork ? { up: 0, flat: 0, down: 0, none: 0 }
+    : watchlistScrubShown ? Figures.listBreadth(stableRows, quotes, rowLines, watchlistScrubShown, changeMode, newestTrades)
+    : restingRowsSummary.breadth)
 
   // The day the rows share, worked out again only as their prices change;
   // the clock reads only its name (`Figures.rowsDayName`).
-  readonly property var rowsShared: Figures.rowsSharedDay(view.rows, quotes, newestTrades, calendars)
+  readonly property var rowsShared: restingRowsSummary.shared
 
   // ---- The header's words
 
@@ -717,7 +767,10 @@ Item {
     listsSymbol = ""
   }
   // Once its symbol leaves All, however, there is nothing to tick.
-  onViewChanged: if (listsSymbol !== "" && view.allSymbols.indexOf(listsSymbol) < 0) listsSymbol = ""
+  onViewChanged: {
+    if (!sameRows(stableRows, view.rows)) stableRows = view.rows
+    if (listsSymbol !== "" && view.allSymbols.indexOf(listsSymbol) < 0) listsSymbol = ""
+  }
 
   function renameList(name, newName) {
     if (!service) return

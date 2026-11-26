@@ -229,9 +229,11 @@ Flickable {
   }
 
   // Its time is the price's the row shows at rest (`Figures.listRow`).
-  function freshnessOf(symbol) {
-    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol],
-      Overnight.restingNewest(newestTrades[symbol] || null), !!nightFailed[symbol])
+  function freshnessOf(symbol, quote, newestTrade) {
+    var q = quote !== undefined ? quote : (quotes[symbol] || null)
+    var nt = newestTrade !== undefined ? newestTrade : (newestTrades[symbol] || null)
+    return Freshness.freshness(entryOf(symbol), q, now, owed[symbol] || 0, !!asking[symbol],
+      Overnight.restingNewest(nt), !!nightFailed[symbol])
   }
 
   function moveCursor(delta) {
@@ -383,23 +385,34 @@ Flickable {
     return Rows.restingTop(index, rowSize(), top, sightHeight, rowsLength())
   }
 
+  function sameList(a, b) {
+    if (!a || !b || a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+
   // With `animate`, a new row fades in at its place and the rest slide. A
   // list that shortens under its scroll is pulled back, its rows held on
   // screen, then sliding down to close the gap.
   function display(next, animate) {
     var before = displayedSymbols
+    if (sameList(before, next)) return
     var scrolled = contentY
     var rows = animate && visible ? rowItems() : null
+    var nextSet = {}
+    for (var n = 0; n < next.length; n++) nextSet[next[n]] = true
+    var beforeSet = {}
+    for (var b = 0; b < before.length; b++) beforeSet[before[b]] = true
     // A row that leaves folds away where it stood.
     for (var f = 0; rows && seen && f < before.length; f++) {
-      if (next.indexOf(before[f]) < 0 && rows[before[f]]) rows[before[f]].fold()
+      if (!nextSet[before[f]] && rows[before[f]]) rows[before[f]].fold()
     }
     displayedSymbols = next
     contentY = clampY(contentY)
     if (glide.running && glide.to > clampY(glide.to)) glideTo(glide.to)
     if (!rows) return
     for (var i = 0; i < next.length; i++) {
-      if (before.indexOf(next[i]) < 0 && rows[next[i]]) rows[next[i]].join()
+      if (!beforeSet[next[i]] && rows[next[i]]) rows[next[i]].join()
     }
     var pulled = scrolled - contentY
     if (pulled <= 0) return
@@ -620,11 +633,15 @@ Flickable {
     // this runs only while open or opening, before reopen().
     var switched = view.listKey !== before.listKey
     var reordered = view.order !== before.order || view.reversed !== before.reversed
-    if (before.allSymbols.join() !== view.allSymbols.join()) {
+    if (!sameList(before.allSymbols, view.allSymbols)) {
+      var allSet = {}
+      for (var a = 0; a < view.allSymbols.length; a++) allSet[view.allSymbols[a]] = true
+      var foldSet = {}
+      for (var fk = 0; fk < foldKept.length; fk++) foldSet[foldKept[fk]] = true
       // A lifted row goes at once: the drag it was in ends with it.
       var leaving = !switched && !reordered && visible && seen
-        ? displayedSymbols.filter(function(s) { return view.allSymbols.indexOf(s) < 0 && foldKept.indexOf(s) < 0 && s !== reorder.lifted }) : []
-      foldKept = foldKept.filter(function(s) { return view.allSymbols.indexOf(s) < 0 }).concat(leaving)
+        ? displayedSymbols.filter(function(s) { return !allSet[s] && !foldSet[s] && s !== reorder.lifted }) : []
+      foldKept = foldKept.filter(function(s) { return !allSet[s] }).concat(leaving)
       syncRows()
     }
     if (switched) {
@@ -638,6 +655,8 @@ Flickable {
     } else if (reordered) {
       reorder.cancel()
       reorderRows()
+    } else if (sameList(before.shown, view.shown) && sameList(before.rows, view.rows)) {
+      // Only featured or range changed: row order and membership are untouched.
     } else if (sortHeld) {
       applyMembership()
     } else {
@@ -679,9 +698,14 @@ Flickable {
     function onRetroChanged() {
       root.lineSweep = 0
       root.lineLook = root.look.retro
-      lineSweeper.restart()
+      if (root.surfaceOpen) lineSweeper.restart()
     }
   }
+  onSurfaceOpenChanged: {
+    if (!surfaceOpen) lineSweeper.stop()
+    else if (lineSweep < rowRepeater.count) lineSweeper.restart()
+  }
+  readonly property bool hasNightsMap: nights !== null
   Timer {
     id: lineSweeper
     interval: 16
@@ -792,30 +816,47 @@ Flickable {
         built: inSight || near(root.headedY, root.sightHeight, root.sightHeight)
         inView: inSight && root.surfaceOpen && root.seen
         menuCovers: root.menuCovers > 0 ? root.menuCovers - (y - root.contentY) : 0
-        // A row out of sight, or hidden by a list, keeps the quote and day it
-        // showed, so answers repaint and work out only rows in sight; it takes
-        // the latest before the frame it comes into sight. A Binding signals
-        // each write, the same value too; `quote` and `day` pass on only a
-        // change.
+        // A row out of sight, or hidden by a list, keeps the quote, night and
+        // day it showed, so answers repaint and work out only rows in sight
+        // whose own inputs changed; it takes the latest before the frame it
+        // comes into sight. Ternaries short-circuit before reading the whole
+        // maps when `when` is false, since Qt 6 still evaluates `value`.
         property var sightQuote: null
         Binding on sightQuote {
-          value: root.quotes[rowDelegate.symbol] || null
+          value: rowDelegate.inSight ? (root.quotes[rowDelegate.symbol] || null) : null
           when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         quote: sightQuote
+        property var sightNight: null
+        Binding on sightNight {
+          value: rowDelegate.inSight && root.nights ? (root.nights[rowDelegate.symbol] || null) : null
+          when: rowDelegate.inSight && !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
         // Out of sight, the day it has, so leaving sight changes nothing.
+        // Bound to per-row `quote` and `sightNight` rather than `root.quotes`
+        // and `root.nights`, so off-screen updates never rebuild visible rows.
         property var sightDay: null
         Binding on sightDay {
-          value: !rowDelegate.inSight ? rowDelegate.day
-            : root.quotes[rowDelegate.symbol] ? Chart.lineDay(rowDelegate.symbol, root.quotes[rowDelegate.symbol], root.nights, root.calendars, root.dayClock)
+          value: !rowDelegate.inSight ? null
+            : rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote,
+                root.hasNightsMap ? (rowDelegate.sightNight ? ({ [rowDelegate.symbol]: rowDelegate.sightNight }) : ({})) : null,
+                root.calendars, root.dayClock)
             : null
           when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         day: sightDay
-        // Read once for both: every row reads it again on each new trade.
-        readonly property var newestTrade: root.newestTrades[symbol] || null
+        // Read once for both, and only while in sight: off-screen rows skip
+        // map reads on every live trade.
+        property var sightNewestTrade: null
+        Binding on sightNewestTrade {
+          value: rowDelegate.inSight ? (root.newestTrades[rowDelegate.symbol] || null) : null
+          when: rowDelegate.inSight && !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
+        readonly property var newestTrade: sightNewestTrade
         keepsDay: Overnight.keepsDay(newestTrade)
         // Only rows in sight follow the scrub, or each step repaints every
         // row; each reads its own line, where its dot sits. At rest a new
@@ -823,20 +864,21 @@ Flickable {
         readonly property int sightScrub: inSight ? root.scrubShown : 0
         // A folding row keeps what it showed: its stock has left the list.
         Binding on view {
-          value: rowDelegate.quote ? Figures.listRow(rowDelegate.quote, root.changeMode, rowDelegate.newestTrade,
+          value: rowDelegate.inSight && rowDelegate.quote ? Figures.listRow(rowDelegate.quote, root.changeMode, rowDelegate.newestTrade,
             rowDelegate.sightScrub ? rowDelegate.day : null, rowDelegate.sightScrub) : null
-          when: !rowDelegate.folding
+          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         Binding on status {
-          value: root.entryOf(rowDelegate.symbol) ? root.entryOf(rowDelegate.symbol).status : "loading"
-          when: !rowDelegate.folding
+          value: rowDelegate.inSight ? (root.entryOf(rowDelegate.symbol) ? root.entryOf(rowDelegate.symbol).status : "loading") : "loading"
+          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
-        // Freshness reads the clock every second: only rows in sight do.
+        // Freshness reads the clock every second: only rows in sight do, using
+        // the row's own quote and newest trade rather than re-indexing the maps.
         Binding on freshness {
-          value: rowDelegate.inSight ? root.freshnessOf(rowDelegate.symbol) : null
-          when: !rowDelegate.folding
+          value: rowDelegate.inSight ? root.freshnessOf(rowDelegate.symbol, rowDelegate.quote, rowDelegate.newestTrade) : null
+          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         sourceDown: root.sourceDown

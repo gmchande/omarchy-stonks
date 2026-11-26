@@ -65,8 +65,22 @@ Item {
     if (lifted !== "" && (keys.indexOf(lifted) < first || slot >= keys.length)) cancel()
   }
 
+  readonly property var keyIndex: {
+    var map = {}
+    for (var i = 0; i < keys.length; i++) map[keys[i]] = i
+    return map
+  }
+  readonly property int liftedIndex: lifted !== "" && keyIndex[lifted] !== undefined ? keyIndex[lifted] : -1
+
   function slotOf(key) {
-    return Rows.slotOf(keys, key, lifted, slot)
+    var i = keyIndex[key]
+    if (i === undefined) return -1
+    if (lifted === "") return i
+    var from = liftedIndex
+    if (from < 0) return i
+    if (from < slot && i > from && i <= slot) return i - 1
+    if (slot < from && i >= slot && i < from) return i + 1
+    return i
   }
 
   // `y` is the pointer's, down the rows. Says whether the row lifted.
