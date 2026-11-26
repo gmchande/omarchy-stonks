@@ -170,6 +170,50 @@ Harness {
         lostSave && waitedForSave && savedThen && waitedForWheel && wheelSaved && restarted,
         [lostSave, waitedForSave, savedThen, waitedForWheel, wheelSaved, restarted].join(" | "))
 
+      // Back-to-back async saves (`feature`, `setRange`, `style`) land in
+      // order immediately off the shell's thread, while delayed wheel saves
+      // (`settles`) report saving and flush on restart, close and quit.
+      restartsBefore = restarts()
+      service.feature("MSFT")
+      service.setRange("1W")
+      service.setRange("1M")
+      service.persist({ style: "retro" })
+      var markedSaving = service.saving
+      ipc.restartIfSaved()
+      var heldRestart = !within(1000, function() { return restarts() > restartsBefore })
+      var asyncSaved = landed() && within(3000, function() { return !service.saving })
+      var afterAsync = JSON.parse(harness.readFile(harness.file))
+      var prefLanded = afterAsync.featured === "MSFT" && afterAsync.range === "1M" && afterAsync.style === "retro"
+
+      service.persist({ featured: "NVDA", style: "smooth" }, true)
+      app.close()
+      var flushedOnClose = landed() && within(3000, function() { return !service.saving })
+      var afterClose = JSON.parse(harness.readFile(harness.file))
+      var closeLanded = afterClose.featured === "NVDA" && afterClose.style === "smooth"
+      app.open("{}")
+      tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
+
+      var quitting = restart.createObject(started)
+      var quitReady = within(5000, function() { return quitting.ready })
+      quitting.persist({ range: "2Y" }, true)
+      var quitPending = quitting.saving
+      quitting.destroy()
+      var flushedOnQuit = within(3000, function() {
+        try { return JSON.parse(harness.readFile(harness.file)).range === "2Y" } catch (e) { return false }
+      })
+      within(3000, function() { return service.range === "2Y" })
+      service.createList("Quick")
+      var listSaved = within(3000, function() {
+        try { return JSON.parse(harness.readFile(harness.file)).lists.some(function(l) { return l.name === "Quick" }) } catch (e) { return false }
+      })
+      service.deleteList("Quick")
+      landed()
+      harness.check("back-to-back async saves land in order, and delayed saves flush on restart, close and quit",
+        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded
+          && quitReady && quitPending && flushedOnQuit && listSaved,
+        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded,
+          quitReady, quitPending, flushedOnQuit, listSaved].join(" | "))
+
       // Lists a hand edit named oddly: a case twin, All, and none, the last
       // holding a symbol no other list or All holds, beside a key Stonks
       // doesn't know.

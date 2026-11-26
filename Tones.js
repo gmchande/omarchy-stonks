@@ -248,17 +248,27 @@ function addedLightness(color, ground, alpha) {
 
 // Never more than half `ink`, the alpha of the line or cap above it, so those
 // stay the most important thing: a pale up colour over Kanagawa's dark red
-// would take the red's stems to solid ink.
+// would take the red's stems to solid ink. Cached by colours and target: every
+// retro row asks six times per look or hover, for a few theme pairs.
+var washAlphas = {}
 function washAlpha(color, reference, ground, alpha, ink) {
+  var key = hexOf(color) + "|" + hexOf(reference) + "|" + hexOf(ground) + "|" + alpha + "|" + ink
+  if (washAlphas[key] !== undefined) return washAlphas[key]
+  var keys = Object.keys(washAlphas)
+  if (keys.length >= 64) delete washAlphas[keys[0]]
   var cap = ink / 2
   var target = addedLightness(reference, ground, alpha)
-  if (addedLightness(color, ground, cap) <= target) return cap
-  var lo = 0
-  var hi = cap
-  for (var i = 0; i < 30; i++) {
-    var mid = (lo + hi) / 2
-    if (addedLightness(color, ground, mid) < target) lo = mid
-    else hi = mid
+  var out = cap
+  if (addedLightness(color, ground, cap) > target) {
+    var lo = 0
+    var hi = cap
+    for (var i = 0; i < 30; i++) {
+      var mid = (lo + hi) / 2
+      if (addedLightness(color, ground, mid) < target) lo = mid
+      else hi = mid
+    }
+    out = (lo + hi) / 2
   }
-  return (lo + hi) / 2
+  washAlphas[key] = out
+  return out
 }

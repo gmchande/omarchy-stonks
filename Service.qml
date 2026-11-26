@@ -233,20 +233,23 @@ Item {
     if (!open) {
       root.sights = root.sights.filter(function(s) { return s.surface !== surface })
       root.drawingIn(surface, false)
+      if (root.openSurfaces.length === 0) listsFile.flush()
     }
     if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
-    // The open's quote run goes a turn later, once the surface has said
-    // which rows are in sight (`rowsSeen`), so it asks for those first.
-    if (open) {
+    // The open's quote and overnight runs go a turn later, once the surface
+    // has said which rows are in sight (`rowsSeen`), so both ask for the
+    // visible rows together in one pass instead of splitting them.
+    if (open && !root.opening) {
       root.opening = true
       Qt.callLater(function() {
         root.opening = false
         feed.sendWaiting()
+        root.askOvernight()
       })
     }
     root.tick()
     root.showHistory(false)
-    root.askOvernight()
+    if (!open) root.askOvernight()
     root.askDue()
     Qt.callLater(root.releaseOrder)
   }
@@ -470,6 +473,7 @@ Item {
   signal saveChecked(bool saved)
   function persist(values, settles) { listsFile.persist(values, settles) }
   function save(next) { listsFile.save(next) }
+  function flushSave() { listsFile.flush() }
   function saveAgain() { listsFile.saveAgain() }
 
   // ---- The feeds
@@ -611,6 +615,7 @@ Item {
     gate: robinhoodGate
     holding: root.drawing.length > 0
     onEntriesChanged: {
+      root.updateOvernightSets()
       root.joinNights()
       Qt.callLater(root.askOvernight)
     }
@@ -636,7 +641,10 @@ Item {
     root.joins = joined.joins
     if (joined.nights !== root.nights) root.nights = joined.nights
   }
-  onCalendarsChanged: joinNights()
+  onCalendarsChanged: {
+    updateOvernightSets()
+    joinNights()
+  }
   // Whether the night trades now, and the listings whose newest price may
   // be a trade Robinhood failed to send meanwhile: their "!".
   readonly property bool nightTrading: {
@@ -648,14 +656,33 @@ Item {
   // The feeds themselves, for whoever waits until no run is out.
   readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed, listDates: listDateFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked each
-  // one's trades, which say whether it trades at night.
-  readonly property var overnightSymbols: allSymbols.filter(function(s) {
-    return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
-  })
-  // Only these draw Robinhood's trades.
-  readonly property var nightSymbols: overnightSymbols.filter(function(s) {
-    return Overnight.tradesAtNight(overnightFeed.entries[s], Overnight.overnightMarket(calendars))
-  })
+  // one's trades, which say whether it trades at night. Kept as the same
+  // arrays while membership is unchanged so a quote batch never wakes
+  // askOvernight() or sayFills() without a real change.
+  property var overnightSymbols: []
+  property var nightSymbols: []
+  function updateOvernightSets() {
+    var quotes = feed.quotes
+    var cals = root.calendars
+    var nextOver = []
+    for (var i = 0; i < root.allSymbols.length; i++) {
+      var s = root.allSymbols[i]
+      if (quotes[s] && Overnight.hasOvernight(quotes[s], cals)) nextOver.push(s)
+    }
+    if (nextOver.length !== root.overnightSymbols.length
+        || nextOver.some(function(s, idx) { return s !== root.overnightSymbols[idx] }))
+      root.overnightSymbols = nextOver
+    var cal = Overnight.overnightMarket(cals)
+    var entries = overnightFeed.entries
+    var nextNight = []
+    for (var j = 0; j < root.overnightSymbols.length; j++) {
+      var ns = root.overnightSymbols[j]
+      if (Overnight.tradesAtNight(entries[ns], cal)) nextNight.push(ns)
+    }
+    if (nextNight.length !== root.nightSymbols.length
+        || nextNight.some(function(s, idx) { return s !== root.nightSymbols[idx] }))
+      root.nightSymbols = nextNight
+  }
   // Where Robinhood's trades fill stretches Yahoo left empty, each logged
   // once. Worked out again for a stock only when its quote or trades change:
   // 150 stocks take about 28 ms of the shell's thread. Neither notifies.
@@ -740,7 +767,7 @@ Item {
   // Robinhood's questions go side by side, so a 1D chart waits for one
   // answer, never two in a row.
   function askOvernight() {
-    if (!root.ready) return
+    if (!root.ready || root.opening) return
     var open = root.openSurfaces.length > 0
     var asking = root.robinhoodAsking()
     var asks = Asks.overnightAsks(asking)
@@ -812,6 +839,7 @@ Item {
   // Written once the turn is over: an undo restores the quote before All
   // takes the symbol back, and a write between them left it out.
   onQuotesChanged: {
+    updateOvernightSets()
     workOutNewest()
     settleArrivals()
     Qt.callLater(quotesCache.flush)
@@ -830,6 +858,7 @@ Item {
     root.askOvernight()
   }
   onAllSymbolsChanged: {
+    updateOvernightSets()
     workOutNewest()
     settleArrivals()
     Qt.callLater(forgetLeft)

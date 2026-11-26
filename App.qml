@@ -50,7 +50,8 @@ Item {
 
   function close() {
     closingFromHost = true
-    root.body.freeze()
+    if (root.body) root.body.freeze()
+    if (service) service.flushSave()
     window.visible = false
     closingFromHost = false
   }

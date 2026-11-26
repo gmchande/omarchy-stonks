@@ -18,6 +18,9 @@ Item {
   property var held: ({})
   property var owed: []
   property var changing: []
+  // Paths already secured with `chmod go=` in this session: subsequent atomic
+  // overwrites keep the mode, so chmod need not fork on every save.
+  readonly property var secured: ({})
   property string creatingPath: ""
   property string creatingText: ""
   readonly property var creatingEnvironment: ({ STONKS_TEXT: root.creatingText })
@@ -43,8 +46,27 @@ Item {
     return !root.failed
   }
 
+  // Async write for large cache files (such as quotes.json) where the caller
+  // does not need a synchronous pass/fail return on the shell's thread.
+  property var heldAsync: ({})
+  function writeAsync(path, data) {
+    if (!root.made) {
+      root.heldAsync[path] = data
+      root.makeFolder()
+      return
+    }
+    asyncFile.path = ""
+    asyncFile.path = path
+    if (typeof data === "string") asyncFile.setText(data)
+    else asyncFile.setData(data)
+  }
+
+  function forget(path) {
+    if (path) delete root.secured[path]
+  }
+
   function keep(paths) {
-    var fresh = paths.filter(function(path) { return !!path && root.owed.indexOf(path) < 0 })
+    var fresh = paths.filter(function(path) { return !!path && !root.secured[path] && root.owed.indexOf(path) < 0 })
     if (fresh.length === 0) return
     root.owed = root.owed.concat(fresh)
     root.next()
@@ -54,6 +76,7 @@ Item {
     if (chmod.running || root.owed.length === 0) return
     root.changing = root.owed
     root.owed = []
+    chmod.code = -1
     chmod.running = true
   }
 
@@ -63,6 +86,7 @@ Item {
   // (`Commands.createPrivately`).
   function create(path, text, done) {
     if (creating.running || root.creatingDone) return done(false)
+    root.forget(path)
     root.creatingPath = path
     root.creatingText = text
     root.creatingDone = done
@@ -76,7 +100,20 @@ Item {
     blockWrites: true
     atomicWrites: true
     onSaved: root.keep([file.path])
-    onSaveFailed: root.failed = true
+    onSaveFailed: {
+      root.forget(file.path)
+      root.failed = true
+    }
+  }
+
+  FileView {
+    id: asyncFile
+    preload: false
+    blockWrites: false
+    atomicWrites: true
+    printErrors: false
+    onSaved: root.keep([asyncFile.path])
+    onSaveFailed: root.forget(asyncFile.path)
   }
 
   // The id comes once: as the service is made, or just after (`Plugin`).
@@ -101,19 +138,30 @@ Item {
       if (running) return
       root.made = make.code === 0
       var waiting = root.held
+      var waitingAsync = root.heldAsync
       root.held = ({})
+      root.heldAsync = ({})
       if (!root.made) {
         console.warn("stonks: can't make " + root.folder + " yours alone; writing nothing there")
         return
       }
       for (var path in waiting) root.write(path, waiting[path])
+      for (var apath in waitingAsync) root.writeAsync(apath, waitingAsync[apath])
     }
   }
 
   Process {
     id: chmod
+    property int code: -1
     command: Commands.bounded(5, ["chmod", "go=", "--"].concat(root.changing))
-    onRunningChanged: if (!running) root.next()
+    onExited: function(code) { chmod.code = code }
+    onRunningChanged: {
+      if (running) return
+      if (chmod.code === 0) {
+        for (var i = 0; i < root.changing.length; i++) root.secured[root.changing[i]] = true
+      }
+      root.next()
+    }
   }
 
   Process {

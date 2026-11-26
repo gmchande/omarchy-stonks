@@ -128,6 +128,6 @@ Item {
       return JSON.stringify(s) + ':{"quote":' + by[s].text + ',"receivedAt":' + JSON.stringify((entries[s] || {}).receivedAt || 0) + "}"
     })
     root.quoteTexts.by = kept
-    root.files.write(root.path, '{"version":1,"quotes":{' + saved.join(",") + "}}\n")
+    root.files.writeAsync(root.path, '{"version":1,"quotes":{' + saved.join(",") + "}}\n")
   }
 }

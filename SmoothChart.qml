@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -49,6 +51,8 @@ Item {
   // new price arrives or the surface opens, then it rests.
   property bool live: false
   property string newestPrice: ""
+  property string initialPlayedFor: ""
+  signal played(string price)
   property bool surfaceOpen: true
   property bool seen: true
   // Closing: the live mark stops where it is, and ripples again as the surface
@@ -160,13 +164,37 @@ Item {
   readonly property real aboveFade: Tones.washAlpha(aboveColor, upColor, ground, 0.34, 1)
   readonly property real belowFade: Tones.washAlpha(belowColor, upColor, ground, 0.34, 1)
 
-  onShownChanged: { base.requestPaint(); ink.requestPaint() }
+  // What `base` draws beyond its vertical position: width, colour, weight,
+  // dashUnit, and any ahead-ticks (those past the last trade). Moving the
+  // dashed line during a morph or live tail only translates `base.y` on the
+  // GPU when this key hasn't changed.
+  readonly property real basePad: Math.ceil(5 * weight + 2)
+  readonly property real baselinePx: hasBaseline ? pad + shown.baselineY * (height - pad * 2) : 0
+  readonly property string aheadTicksKey: {
+    if (!hasBaseline || !shown || !shown.ticks || !shown.ticks.length) return ""
+    var inkLast = shown.points && shown.points.length ? shown.points[shown.points.length - 1].x : 0
+    var out = []
+    for (var k = 0; k < shown.ticks.length; k++) {
+      if (shown.ticks[k] <= inkLast) continue
+      var a = shown.tickAlpha ? Math.round(shown.tickAlpha[k] * 255) : 255
+      out.push(shown.ticks[k].toFixed(4) + ":" + a)
+    }
+    return out.join(",")
+  }
+  readonly property bool morphing: !!plan && morph < 1
+  readonly property string baseKey: hasBaseline
+    ? [Math.round(width), Math.round(height), baselineColor, weight, dashUnit, aheadTicksKey,
+       morphing ? "m" : Math.round((baselinePx - Math.floor(baselinePx - basePad)) * 16)].join("|")
+    : ""
+  onBaseKeyChanged: base.requestPaint()
+
+  onShownChanged: ink.requestPaint()
   onGeometryChanged: {
     var prev = prevGeometry
     var wasStock = prevStock
     prevGeometry = geometry
     prevStock = stock
-    marks.requestPaint()
+    if (marks) marks.requestPaint()
     if (!geometry || !prev || !surfaceOpen || still || !seen || !visible
       || morph < 1 || reveal < 1 || replayX >= 0
       || Motion.duration(Style, Motion.SWITCH_MS) <= 0) {
@@ -195,15 +223,15 @@ Item {
     tailT = 0
     tailAnim.start()
   }
-  onBaselineColorChanged: { base.requestPaint(); ink.requestPaint() }
+  onBaselineColorChanged: ink.requestPaint()
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
   onAboveFadeChanged: ink.requestPaint()
   onBelowFadeChanged: ink.requestPaint()
   onAboveColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
-  onHairlineColorChanged: marks.requestPaint()
-  onScrubXChanged: marks.requestPaint()
+  onHairlineColorChanged: if (marks) marks.requestPaint()
+  onScrubXChanged: if (marks) marks.requestPaint()
 
   function fractionAt(x) {
     return (x - pad) / (width - pad * 2)
@@ -247,16 +275,27 @@ Item {
     }
   }
 
+  // Strip canvas around the dashed baseline and its ahead-ticks, translated on
+  // the GPU during a morph rather than repainting the full chart height.
+  // During a morph, an odd stroke width paints at `basePad + 0.5` so the line
+  // sits on one crisp pixel row instead of splitting across two.
+  readonly property real baseStripOff: root.weight % 2 === 1 ? 0.5 : 0
+  readonly property real baseY: root.morphing
+    ? root.baselinePx - root.basePad - root.baseStripOff
+    : Math.floor(root.baselinePx - root.basePad)
   Canvas {
     id: base
-    anchors.fill: parent
-    onWidthChanged: requestPaint()
-    onHeightChanged: requestPaint()
+    visible: root.hasBaseline
+    x: 0
+    y: root.baseY
+    width: root.width
+    height: root.basePad * 2
     onPaint: {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
       if (!root.hasBaseline) return
-      SmoothPaint.paintBase(ctx, root.shown, root.paintStyle(base))
+      var style = root.paintStyle(root)
+      SmoothPaint.paintBase(ctx, root.shown, style, root.baseY)
     }
   }
 
@@ -265,7 +304,7 @@ Item {
     width: root.replayX >= 0 ? root.width * Math.min(1, root.replayX)
       : root.reveal >= 1 ? root.width : root.inkLeft + (root.inkRight - root.inkLeft) * Math.max(0, root.reveal)
     height: root.height
-    clip: true
+    clip: root.replayX >= 0 || root.reveal < 1
 
     Canvas {
       id: ink
@@ -292,31 +331,38 @@ Item {
     anchors.fill: parent
   }
 
-  Canvas {
-    id: marks
+  // Scrub hairline and dot: built only while actively scrubbing, so at rest
+  // there is no marks canvas allocated, while scrubbed renders match pixel for
+  // pixel.
+  readonly property Canvas marks: marksLoader.item as Canvas
+  Loader {
+    id: marksLoader
     anchors.fill: parent
-    onWidthChanged: requestPaint()
-    onHeightChanged: requestPaint()
-    onPaint: {
-      var ctx = getContext("2d")
-      ctx.clearRect(0, 0, width, height)
-      if (!root.drawable || root.scrubX < 0) return
-      var pad = root.pad
-      var w = width - pad * 2
-      var h = height - pad * 2
-      var sx = pad + root.scrubX * w
-      ctx.strokeStyle = root.hairlineColor
-      ctx.lineWidth = root.weight
-      ctx.beginPath()
-      ctx.moveTo(sx, 0)
-      ctx.lineTo(sx, height)
-      ctx.stroke()
-      var sy = Chart.yAt(root.geometry.points, root.scrubX)
-      if (sy !== null) {
-        ctx.fillStyle = root.hairlineColor
+    active: root.drawable && root.scrubX >= 0
+    sourceComponent: Canvas {
+      onWidthChanged: requestPaint()
+      onHeightChanged: requestPaint()
+      onPaint: {
+        var ctx = getContext("2d")
+        ctx.clearRect(0, 0, width, height)
+        if (!root.drawable || root.scrubX < 0) return
+        var pad = root.pad
+        var w = width - pad * 2
+        var h = height - pad * 2
+        var sx = pad + root.scrubX * w
+        ctx.strokeStyle = root.hairlineColor
+        ctx.lineWidth = root.weight
         ctx.beginPath()
-        ctx.arc(sx, pad + sy * h, 5 * root.weight, 0, Math.PI * 2)
-        ctx.fill()
+        ctx.moveTo(sx, 0)
+        ctx.lineTo(sx, height)
+        ctx.stroke()
+        var sy = Chart.yAt(root.geometry.points, root.scrubX)
+        if (sy !== null) {
+          ctx.fillStyle = root.hairlineColor
+          ctx.beginPath()
+          ctx.arc(sx, pad + sy * h, 5 * root.weight, 0, Math.PI * 2)
+          ctx.fill()
+        }
       }
     }
   }
@@ -383,6 +429,9 @@ Item {
   LiveMark {
     live: root.live
     still: root.still
+    seen: root.seen
+    playedFor: root.initialPlayedFor
+    onPlayedForChanged: root.played(playedFor)
     // The dot comes as the ink reaches it, and rides a bend; its burst comes
     // as the draw-in or the bend ends, where the new chart's trade is.
     shown: dot.visible && root.reveal >= 1 && root.morph >= 1

@@ -39,19 +39,25 @@ Item {
   property bool saveFailed: false
   signal saveChecked(bool saved)
   // A change not yet in the file for sure: one waiting for the wheel to
-  // rest, for a read out, or for the file to be made, or a save awaiting its
-  // read-back.
-  readonly property bool saving: settleWrite.running || writeOwed || making || staleTexts !== null
+  // rest, for a read out, for the file to be made, for an async write to
+  // finish, or a save awaiting its read-back.
+  readonly property bool saving: settleWrite.running || writeOwed || making || writing || writeQueued !== "" || staleTexts !== null
+
+  // Keys changed by a delayed save (`settles`) still waiting for the timer,
+  // so an external read meanwhile keeps every pending key, not only `featured`.
+  property var settledKeys: ({})
 
   function persist(values, settles) {
-    root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles)
+    root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles, values)
   }
 
   function save(next) {
-    if (!Settings.settingsEqual(next, root.fileSettings)) root.store(next)
+    if (!Settings.settingsEqual(next, root.fileSettings)) {
+      root.store(next)
+    }
   }
 
-  function store(next, settles) {
+  function store(next, settles, values) {
     var changed = !Settings.settingsEqual(next, root.fileSettings)
     root.fileSettings = next
     if (!root.ready) return
@@ -60,56 +66,119 @@ Item {
       return
     }
     if (settles) {
-      settleWrite.restart()
+      if (changed || settleWrite.running) {
+        var pending = Object.assign({}, root.settledKeys)
+        if (values) for (var k in values) pending[k] = true
+        root.settledKeys = pending
+        settleWrite.restart()
+      }
       return
     }
+    root.settledKeys = ({})
     settleWrite.stop()
     root.writeFile(next)
   }
 
   // The pill's wheel writes the file once it rests. A read of the file
-  // meanwhile keeps the symbol the wheel left.
+  // meanwhile keeps every pending key.
   Timer {
     id: settleWrite
     interval: 400
     onTriggered: root.writeSettled()
   }
   function writeSettled() {
+    root.settledKeys = ({})
     if (root.ready && !root.unreadable) root.writeFile(root.fileSettings)
+  }
+  // Flush any pending delayed save at once (surface close, update restart).
+  function flush() {
+    if (!settleWrite.running) return
+    settleWrite.stop()
+    root.writeSettled()
   }
   // The footer's try again.
   function saveAgain() {
     settleWrite.stop()
     root.writeSettled()
   }
-  // The shell is going: the wheel's change is written now, unless a read
-  // is out. That read can't land any more, and the file it reads may be one
-  // Stonks can't read, or another copy's newer one, so the change goes.
-  Component.onDestruction: if (settleWrite.running) root.writeSettled()
+  // The shell is going: any pending delayed or in-flight async change is
+  // written synchronously now, unless a read is out. That read can't land
+  // any more, and the file it reads may be one Stonks can't read, or another
+  // copy's newer one, so the change goes.
+  Component.onDestruction: {
+    var pending = settleWrite.running || root.writing || root.writeQueued !== ""
+    settleWrite.stop()
+    root.settledKeys = ({})
+    root.writeQueued = ""
+    if (!pending || !root.ready || root.unreadable || root.missing || reader.out) return
+    var body = JSON.stringify(root.fileSettings, null, 2) + "\n"
+    if (Commands.fileBytes(body) > root.cap) return
+    syncFile.path = ""
+    syncFile.path = root.path
+    syncFile.setText(body)
+  }
 
-  // Says when the file changes, and reads nothing.
+  // Says when the file changes, and reads nothing. Coalesces the single
+  // inotify echo of Stonks' own atomic write when its write or read-back is
+  // already out.
+  property bool skipNextWatch: false
   FileView {
     path: root.path
     watchChanges: true
     preload: false
     printErrors: false
-    onFileChanged: root.readFile()
+    onFileChanged: {
+      if (root.skipNextWatch && (root.writing || reader.out)) {
+        root.skipNextWatch = false
+        return
+      }
+      root.readFile()
+    }
   }
 
-  // Writes the file.
+  // Writes the file asynchronously off the shell's thread, one write at a
+  // time (`writing` / `writeQueued`) so a quick second change never cancels
+  // an in-flight write (Quickshell 0.3.1's cancelled-write bug).
+  property bool writing: false
+  property string writeQueued: ""
   FileView {
     id: file
     preload: false
     atomicWrites: true
-    // Quickshell 0.3.1's async write, cancelled by the next, compares a
-    // third against the cancelled text: a change back to it is never
-    // written, and the watch reads the second back over it.
+    blockWrites: false
+    printErrors: false
+    onSaved: {
+      root.writing = false
+      root.files.keep([root.path])
+      if (root.writeQueued !== "") {
+        var next = root.writeQueued
+        root.writeQueued = ""
+        root.writeText(next)
+        return
+      }
+      root.readFile()
+    }
+    onSaveFailed: function(error) {
+      root.writing = false
+      root.skipNextWatch = false
+      console.warn("stonks: failed to write " + root.path + ": " + error)
+      if (root.writeQueued !== "") {
+        var next = root.writeQueued
+        root.writeQueued = ""
+        root.writeText(next)
+        return
+      }
+      root.readFile()
+    }
+  }
+  // Blocking writer used only on clean exit (`Component.onDestruction`) to
+  // land any in-flight or queued change before the shell terminates.
+  FileView {
+    id: syncFile
+    preload: false
+    atomicWrites: true
     blockWrites: true
     printErrors: false
-    onSaved: root.files.keep([root.path])
-    onSaveFailed: function(error) {
-      console.warn("stonks: failed to write " + root.path + ": " + error)
-    }
   }
   // The text the file held at the last read or write.
   property string known: ""
@@ -117,7 +186,13 @@ Item {
   // view reads nothing, so it forgets each write before the next: after a
   // lost save, the same text is written again.
   function writeText(text) {
+    if (root.writing) {
+      root.writeQueued = text
+      return
+    }
+    root.writing = true
     root.known = text
+    root.skipNextWatch = true
     file.path = ""
     file.path = root.path
     file.setText(text)
@@ -143,11 +218,13 @@ Item {
   // there now is no text of Stonks', so that wait ends, as for a save from
   // elsewhere.
   function take(read) {
+    root.skipNextWatch = false
     var answer = read.lossy ? { refused: true } : read
     var owed = root.writeOwed
     root.writeOwed = false
     if (answer.text !== undefined) {
       root.missing = false
+      if (root.files && answer.text !== root.written) root.files.forget(root.path)
       root.known = answer.text
       // Stonks' own last save, read back while memory holds a change too
       // large to save: the file is readable and the save landed, and the
@@ -174,6 +251,7 @@ Item {
     }
     root.missing = !!answer.missing
     root.known = ""
+    if (root.files) root.files.forget(root.path)
     if (root.missing) {
       var gone = root.takesRead(null)
       if (owed) root.writeFile(root.fileSettings)
@@ -231,7 +309,13 @@ Item {
       return
     }
     root.unreadable = false
-    if (settleWrite.running) parsed = Settings.fileSettings(Settings.copyWith(parsed, { featured: root.fileSettings.featured }))
+    if (settleWrite.running) {
+      var keep = {}
+      var keys = Object.keys(root.settledKeys)
+      if (keys.length === 0) keep.featured = root.fileSettings.featured
+      else for (var i = 0; i < keys.length; i++) keep[keys[i]] = root.fileSettings[keys[i]]
+      parsed = Settings.fileSettings(Settings.copyWith(parsed, keep))
+    }
     if (root.ready && Settings.settingsEqual(parsed, root.fileSettings)) return
     root.adopt(parsed)
   }
@@ -239,6 +323,11 @@ Item {
   function takeUnreadableFile() {
     if (!root.unreadable)
       console.warn("stonks: " + root.path + " can't be read; saving nothing until it can")
+    if (settleWrite.running) {
+      settleWrite.stop()
+      root.settledKeys = ({})
+      root.editsUnsaved = true
+    }
     root.unreadable = true
     if (!root.ready) root.adopt(root.fileSettings)
   }
@@ -297,7 +386,6 @@ Item {
     root.written = body
     if (root.missing) return root.makeFile()
     root.writeText(body)
-    root.readFile()
   }
   // Keys never read as numbers, so they keep the order they came in.
   function stale(text) {
@@ -324,7 +412,7 @@ Item {
       var owed = root.makeOwed
       root.makeOwed = false
       if (owed && !made) return root.makeFile()
-      if (owed) root.writeText(root.written)
+      if (owed) return root.writeText(root.written)
       root.readFile()
     })
   }

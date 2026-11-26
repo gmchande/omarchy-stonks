@@ -34,6 +34,7 @@ Item {
     y: -root.lift
     width: root.width
     height: root.height + root.lift * 2
+    visible: opacity > 0
     opacity: root.chart ? root.chart.marksShown : 0
 
     Repeater {
