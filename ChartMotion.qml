@@ -306,7 +306,8 @@ Item {
   }
 
   // A draw-in travels: OutCubic, as Omarchy's own travel does, so the last
-  // frames still move and the live dot comes as the line ends.
+  // frames still move and the live dot comes as the line ends. Ends once the
+  // sweep is within half a pixel of the far edge, avoiding identical tail frames.
   NumberAnimation {
     id: drawInAnim
     target: root
@@ -315,6 +316,10 @@ Item {
     to: 1
     duration: Motion.duration(Style, 320)
     easing.type: Easing.OutCubic
+  }
+  onRevealChanged: if (drawInAnim.running && 1 - reveal < 0.001) {
+    drawInAnim.stop()
+    reveal = 1
   }
 
   NumberAnimation {

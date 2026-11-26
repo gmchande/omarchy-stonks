@@ -294,34 +294,41 @@ BarWidget {
       spacing: Style.space(6)
       visible: !root.vertical || root.iconOnly
 
-      Sparkline {
-        visible: root.barStyle === "sparkline" && !root.retro
+      Loader {
+        visible: root.barStyle === "sparkline"
+        active: visible
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
         height: Style.space(12)
-        geometry: root.retro ? null : root.lineGeometry
-        lineColor: root.trendColor
-        baselineColor: Util.alpha(button.foreground, 0.25)
-        greyColor: root.dimColor
-        lineWidth: 1.5
+        sourceComponent: root.retro ? pillRetroChart : pillSmoothChart
+      }
+
+      Component {
+        id: pillSmoothChart
+        Sparkline {
+          geometry: root.lineGeometry
+          lineColor: root.trendColor
+          baselineColor: Util.alpha(button.foreground, 0.25)
+          greyColor: root.dimColor
+          lineWidth: 1.5
+        }
       }
 
       // The rows' histogram at pill size, its stems solid: faint ones read as
       // a dotted line here.
-      RetroChart {
-        visible: root.barStyle === "sparkline" && root.retro
-        anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(40)
-        height: Style.space(12)
-        geometry: root.retro ? root.lineGeometry : null
-        upColor: root.trendColor
-        downColor: root.trendColor
-        baselineColor: Util.alpha(button.foreground, 0.25)
-        greyAside: true
-        greyColor: root.dimColor
-        pixel: 2
-        gap: 1
-        solid: true
+      Component {
+        id: pillRetroChart
+        RetroChart {
+          geometry: root.lineGeometry
+          upColor: root.trendColor
+          downColor: root.trendColor
+          baselineColor: Util.alpha(button.foreground, 0.25)
+          greyAside: true
+          greyColor: root.dimColor
+          pixel: 2
+          gap: 1
+          solid: true
+        }
       }
 
       // Its tilt is the size of today's move: flat at zero, 45° past 5%.

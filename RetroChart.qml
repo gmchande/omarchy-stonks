@@ -114,13 +114,16 @@ Item {
   // does at 35% (`Tones.washAlpha`), less under a lighter cap. `solid` draws each
   // stem at its cap's ink, for a chart so small that faint stems leave the
   // caps a dotted line: the pill's, 13 columns at 1x.
+  function stemAlpha(color, share, ink) {
+    return Math.round(Tones.washAlpha(color, upColor, ground, share, ink) * 255) / 255
+  }
   property bool solid: false
-  readonly property real aboveStem: solid ? 1 : Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
-  readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
-  readonly property real aboveStemDim: solid ? lighterInk : Tones.washAlpha(aboveColor, upColor, ground, 0.35 * lighterInk, lighterInk)
-  readonly property real belowStemDim: solid ? lighterInk : Tones.washAlpha(belowColor, upColor, ground, 0.35 * lighterInk, lighterInk)
-  readonly property real aboveStemAside: Tones.washAlpha(greyAside ? greyColor : aboveColor, upColor, ground, 0.35 * asideShare, asideShare)
-  readonly property real belowStemAside: Tones.washAlpha(greyAside ? greyColor : belowColor, upColor, ground, 0.35 * asideShare, asideShare)
+  readonly property real aboveStem: solid ? 1 : stemAlpha(aboveColor, 0.35, 1)
+  readonly property real belowStem: solid ? 1 : stemAlpha(belowColor, 0.35, 1)
+  readonly property real aboveStemDim: solid ? lighterInk : stemAlpha(aboveColor, 0.35 * lighterInk, lighterInk)
+  readonly property real belowStemDim: solid ? lighterInk : stemAlpha(belowColor, 0.35 * lighterInk, lighterInk)
+  readonly property real aboveStemAside: stemAlpha(greyAside ? greyColor : aboveColor, 0.35 * asideShare, asideShare)
+  readonly property real belowStemAside: stemAlpha(greyAside ? greyColor : belowColor, 0.35 * asideShare, asideShare)
   // The inks with the move's direction known, for a wave's old columns when
   // the new chart knows none: the same rule in green and red.
   function knownInks() {
@@ -138,10 +141,11 @@ Item {
   onShownGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()
   // The unlit cells change only with the chart's size, so a new price
-  // repaints none of them.
+  // repaints none of them. Built only when `ghostColor` is visible.
+  readonly property Canvas ghost: ghostLoader.item as Canvas
   readonly property string ghostCells: ghostColor.a > 0 ? [grid.columns, grid.rows, pixel, gap].join(" ") : ""
-  onGhostCellsChanged: ghost.requestPaint()
-  onGhostColorChanged: ghost.requestPaint()
+  onGhostCellsChanged: if (ghost) ghost.requestPaint()
+  onGhostColorChanged: if (ghost) ghost.requestPaint()
   onAboveColorChanged: ink.requestPaint()
   onBelowColorChanged: ink.requestPaint()
   onAboveStemChanged: ink.requestPaint()
@@ -183,26 +187,30 @@ Item {
   }
 
   // One fill, then the seams between the cells cleared: a fill for each
-  // cell is 72,000 of them on a big window.
-  Canvas {
-    id: ghost
+  // cell is 72,000 of them on a big window. Loaded only when visible so rows
+  // and pills with transparent ghost allocate no backing texture.
+  Loader {
+    id: ghostLoader
     anchors.fill: parent
-    onWidthChanged: requestPaint()
-    onHeightChanged: requestPaint()
-    onPaint: {
-      var ctx = getContext("2d")
-      ctx.clearRect(0, 0, width, height)
-      if (root.ghostColor.a <= 0) return
-      var g = root.grid
-      var pixel = root.pixel
-      var gap = root.gap
-      var w = g.columns * g.pitch - gap
-      var h = g.rows * pixel - gap
-      ctx.fillStyle = root.ghostColor
-      ctx.fillRect(0, 0, w, h)
-      if (gap <= 0) return
-      for (var c = 1; c < g.columns; c++) ctx.clearRect(c * g.pitch - gap, 0, gap, h)
-      for (var r = 1; r < g.rows; r++) ctx.clearRect(0, r * pixel - gap, w, gap)
+    active: root.ghostColor.a > 0
+    sourceComponent: Canvas {
+      onWidthChanged: requestPaint()
+      onHeightChanged: requestPaint()
+      onPaint: {
+        var ctx = getContext("2d")
+        ctx.clearRect(0, 0, width, height)
+        if (root.ghostColor.a <= 0) return
+        var g = root.grid
+        var pixel = root.pixel
+        var gap = root.gap
+        var w = g.columns * g.pitch - gap
+        var h = g.rows * pixel - gap
+        ctx.fillStyle = root.ghostColor
+        ctx.fillRect(0, 0, w, h)
+        if (gap <= 0) return
+        for (var c = 1; c < g.columns; c++) ctx.clearRect(c * g.pitch - gap, 0, gap, h)
+        for (var r = 1; r < g.rows; r++) ctx.clearRect(0, r * pixel - gap, w, gap)
+      }
     }
   }
 
@@ -233,7 +241,7 @@ Item {
       : root.reveal >= 1 ? root.grid.columns
       : root.firstColumn + Math.ceil((root.inkColumns - root.firstColumn) * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
-    clip: true
+    clip: root.replayX >= 0 || root.reveal < 1
 
     Canvas {
       id: ink

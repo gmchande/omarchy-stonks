@@ -1,5 +1,8 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
+import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Motion.js" as Motion
 // The hero, the chart, the range row, the info block and the list's header.
@@ -78,12 +81,14 @@ Item {
   // Whether the hero's change is the day's, which a click cycles.
   property bool changeCycles: true
   readonly property alias chartItem: heroChart
+  readonly property var smoothChart: smoothLoader.item
+  readonly property var retroChart: retroLoader.item
   // A replay's sound steps through it in retro, a note a column.
-  readonly property var pixelGrid: retroChart.grid
+  readonly property var pixelGrid: retroChart ? retroChart.grid : Chart.retroGrid(root.geometry, heroChart.width, heroChart.height, 5, 1)
   // The retro column a place on the chart stands in, which a scrub's chime
   // strikes.
   function pixelColumnAt(fraction) {
-    return retroChart.columnAt(fraction)
+    return retroChart ? retroChart.columnAt(fraction) : Chart.retroColumn(pixelGrid, fraction)
   }
 
   // The hero's change or the rows' unit, clicked: the unit steps.
@@ -102,13 +107,13 @@ Item {
     rangeRow.settle()
     infoBlock.settle()
     settleLook()
-    smoothChart.settle()
+    if (smoothChart) smoothChart.settle()
   }
 
   // Left-to-right column-pitch wipe on smooth ↔ retro, synced with LookIcon.
   property real lookWipe: 1
   readonly property bool lookWiping: lookWipe < 1
-  readonly property real wipeX: Math.min(heroChart.width, Math.round(lookWipe * retroChart.grid.columns) * retroChart.grid.pitch)
+  readonly property real wipeX: Math.min(heroChart.width, Math.round(lookWipe * pixelGrid.columns) * pixelGrid.pitch)
   function settleLook() {
     lookWipeAnim.stop()
     lookWipe = 1
@@ -144,8 +149,8 @@ Item {
   // The market opened: the live dot blooms on the bell's beat.
   function opened() {
     if (!root.seen) return
-    if (root.look.retro) retroChart.bloom()
-    else smoothChart.bloom()
+    if (root.look.retro) { if (retroChart) retroChart.bloom() }
+    else if (smoothChart) smoothChart.bloom()
   }
 
   // Between the band's blocks, the body's rhythm (`StonksBody.bandGap`).
@@ -210,33 +215,34 @@ Item {
         height: parent.height + rangeMarks.lift * 2
         clip: root.lookWiping
 
-        SmoothChart {
-          id: smoothChart
-          objectName: "smoothChart"
+        Loader {
+          id: smoothLoader
+          active: !root.look.retro || root.lookWiping
           x: -parent.x
           y: rangeMarks.lift
           width: heroChart.width
           height: heroChart.height
-          // The hidden look draws nothing and follows no scrub until it shows,
-          // so a new chart paints once.
-          geometry: (!root.look.retro || root.lookWiping) ? root.geometry : null
-          stock: root.symbol
-          up: root.view ? root.view.dayUp : true
-          upColor: root.look.upColor
-          downColor: root.look.downColor
-          baselineColor: root.look.dimmer
-          hairlineColor: root.look.foreground
-          ground: root.look.ground
-          scrubX: (!root.look.retro || root.lookWiping) ? root.scrubX : -1
-          reveal: (!root.look.retro || root.lookWiping) ? root.reveal : 1
-          replayX: (!root.look.retro || root.lookWiping) ? root.replayX : -1
-          morphFrom: (!root.look.retro || root.lookWiping) ? root.morphFrom : null
-          morph: (!root.look.retro || root.lookWiping) ? root.morph : 1
-          live: root.live && !root.look.retro
-          newestPrice: root.newestPrice
-          surfaceOpen: !root.still
-          seen: root.seen
-          still: root.still || root.held
+          sourceComponent: SmoothChart {
+            objectName: "smoothChart"
+            geometry: root.geometry
+            stock: root.symbol
+            up: root.view ? root.view.dayUp : true
+            upColor: root.look.upColor
+            downColor: root.look.downColor
+            baselineColor: root.look.dimmer
+            hairlineColor: root.look.foreground
+            ground: root.look.ground
+            scrubX: root.scrubX
+            reveal: root.reveal
+            replayX: root.replayX
+            morphFrom: root.morphFrom
+            morph: root.morph
+            live: root.live && !root.look.retro
+            newestPrice: root.newestPrice
+            surfaceOpen: !root.still
+            seen: root.seen
+            still: root.still || root.held
+          }
         }
       }
 
@@ -249,41 +255,44 @@ Item {
         height: parent.height + rangeMarks.lift * 2
         clip: root.lookWiping
 
-        RetroChart {
-          id: retroChart
-          objectName: "retroChart"
+        Loader {
+          id: retroLoader
+          active: root.look.retro || root.lookWiping
           x: -parent.x
           y: rangeMarks.lift
           width: heroChart.width
           height: heroChart.height
-          geometry: (root.look.retro || root.lookWiping) ? root.geometry : null
-          upColor: root.look.upColor
-          downColor: root.look.downColor
-          up: root.view ? root.view.dayUp : true
-          baselineColor: root.look.dimmer
-          glow: true
-          fullSession: true
-          live: root.live && root.look.retro
-          newestPrice: root.newestPrice
-          surfaceOpen: !root.still
-          still: root.still || root.held
-          hairlineColor: root.look.foreground
-          ghostColor: root.look.ghost
-          ground: root.look.ground
-          scrubX: (root.look.retro || root.lookWiping) ? root.scrubX : -1
-          reveal: (root.look.retro || root.lookWiping) ? root.reveal : 1
-          replayX: (root.look.retro || root.lookWiping) ? root.replayX : -1
-          morphFrom: (root.look.retro || root.lookWiping) ? root.morphFrom : null
-          morph: (root.look.retro || root.lookWiping) ? root.beat : 1
+          sourceComponent: RetroChart {
+            objectName: "retroChart"
+            geometry: root.geometry
+            upColor: root.look.upColor
+            downColor: root.look.downColor
+            up: root.view ? root.view.dayUp : true
+            baselineColor: root.look.dimmer
+            glow: true
+            fullSession: true
+            live: root.live && root.look.retro
+            newestPrice: root.newestPrice
+            surfaceOpen: !root.still
+            still: root.still || root.held
+            hairlineColor: root.look.foreground
+            ghostColor: root.look.ghost
+            ground: root.look.ground
+            scrubX: root.scrubX
+            reveal: root.reveal
+            replayX: root.replayX
+            morphFrom: root.morphFrom
+            morph: root.beat
+          }
         }
       }
 
       RangeMarks {
         id: rangeMarks
-        parent: rangeMarks.chart.underScrub
+        parent: rangeMarks.chart ? rangeMarks.chart.underScrub : heroChart
         anchors.fill: parent
         marks: root.rangeMarks
-        chart: root.look.retro ? retroChart : smoothChart
+        chart: root.look.retro ? root.retroChart : root.smoothChart
         look: root.look
       }
 
@@ -344,7 +353,10 @@ Item {
         // Read where the chart is drawn, so the right edge reaches the last
         // trade.
         onPositionChanged: function(mouse) {
-          if (!root.replayRunning) root.scrubRequested(root.look.retro ? retroChart.fractionAt(mouse.x) : smoothChart.fractionAt(mouse.x))
+          if (!root.replayRunning) {
+            var activeChart = root.look.retro ? root.retroChart : root.smoothChart
+            if (activeChart) root.scrubRequested(activeChart.fractionAt(mouse.x))
+          }
         }
         onExited: if (!root.replayRunning) root.scrubCleared()
         onClicked: root.snapToNow()

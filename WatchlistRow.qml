@@ -60,7 +60,7 @@ Rectangle {
     if (folding && place < 0) return
     endFold()
     if (sorting) return
-    if (lifted || !visible || from < 0 || place < 0) {
+    if (lifted || !visible || !built || from < 0 || place < 0) {
       settle()
       return
     }
@@ -292,13 +292,15 @@ Rectangle {
     color: row.look.ground
   }
 
-  // Built even out of sight: a canvas built as its row comes into sight draws
-  // a frame or two after the row's words.
+  // Built only for rows near sight (`built`), matching `rowContent`: far
+  // off-screen rows allocate no sparkline Canvas, while nearby rows are
+  // already painted before a scroll brings them in.
   Loader {
     x: row.width - row.gap - row.priceWidth - row.gap - row.sparkWidth
     width: row.sparkWidth
     height: Style.space(22)
     anchors.verticalCenter: parent.verticalCenter
+    active: row.built
     sourceComponent: row.lineRetro ? cellsLine : smoothLine
   }
 

@@ -23,10 +23,20 @@ function paintInk(ctx, g, s) {
   var fadeShare = mixed ? g.even : even ? 1 : 0
   var all = function() { return true }
   var lastRegular = -1
-  for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
+  var minY = Infinity
+  var maxY = -Infinity
+  var hasFaint = false
+  for (var n = 0; n < pts.length; n++) {
+    if (!pts[n].ext) lastRegular = n
+    if (pts[n].faint) hasFaint = true
+    var py = pad + pts[n].y * h
+    if (py < minY) minY = py
+    if (py > maxY) maxY = py
+  }
+  var allRuns = runs(pts, all)
   var washes = []
-  if (fadeShare > 0) washes.push({ runs: runs(pts, all), fade: true })
-  if (fadeShare < 1) washes.push({ runs: runs(pts.slice(0, lastRegular + 1), all), fade: false })
+  if (fadeShare > 0) washes.push({ runs: allRuns, fade: true })
+  if (fadeShare < 1) washes.push({ runs: lastRegular === pts.length - 1 ? allRuns : runs(pts.slice(0, lastRegular + 1), all), fade: false })
   var parts = asideParts(aside, pad, w, s.width)
   var clipped = parts.length > 1
   var by = s.hasBaseline ? pad + g.baselineY * h : null
@@ -36,8 +46,8 @@ function paintInk(ctx, g, s) {
     ctx.save()
     if (clipped) clipTo(ctx, parts[p], s.height)
     for (var k = 0; k < washes.length; k++) {
-      ctx.fillStyle = washes[k].fade ? fade(ctx, pts, by, pad, h, s, fadeShare)
-        : sides(ctx, by, s, s.aboveWash * (1 - fadeShare), s.belowWash * (1 - fadeShare))
+      ctx.fillStyle = washes[k].fade ? fade(ctx, minY, maxY, by, s, fadeShare)
+        : sides(ctx, by, s, s.aboveWash * (1 - fadeShare), s.belowWash * (1 - fadeShare), minY, maxY, 0)
       var filled = washes[k].runs
       for (var r = 0; r < filled.length; r++) {
         var run = filled[r]
@@ -61,23 +71,28 @@ function paintInk(ctx, g, s) {
   ctx.lineWidth = 2 * s.weight
   // The whole series in the lighter ink, then the rest over it at full
   // (`faint`), so the hours around the session read as the quieter part of
-  // one line. The stretch the number beside the chart doesn't count keeps
+  // one line. When no trade is faint, the single full stroke draws the whole
+  // series. The stretch the number beside the chart doesn't count keeps
   // the sides' colours, fainter than the dim ink and half as thick, so it
   // reads apart from tonight's dim hours on a dark ground, where a fainter
   // shade alone runs into them.
   var lighter = mixed ? 0.45 + (s.hoursAlpha - 0.45) * fadeShare : even ? s.hoursAlpha : 0.45
+  var strokeMargin = ctx.lineWidth + 1
   for (var q = 0; q < parts.length; q++) {
     if (parts[q].to <= parts[q].from) continue
     ctx.save()
     if (clipped) clipTo(ctx, parts[q], s.height)
     if (parts[q].aside) {
       ctx.lineWidth = s.weight
-      ctx.strokeStyle = sides(ctx, by, s, s.asideAlpha, s.asideAlpha)
-      strokeRuns(ctx, runs(pts, all), pad, w, h, s.dashUnit)
+      ctx.strokeStyle = sides(ctx, by, s, s.asideAlpha, s.asideAlpha, minY, maxY, s.weight + 1)
+      strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
+    } else if (!hasFaint) {
+      ctx.strokeStyle = sides(ctx, by, s, 1, 1, minY, maxY, strokeMargin)
+      strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
     } else {
-      ctx.strokeStyle = sides(ctx, by, s, lighter, lighter)
-      strokeRuns(ctx, runs(pts, all), pad, w, h, s.dashUnit)
-      ctx.strokeStyle = sides(ctx, by, s, 1, 1)
+      ctx.strokeStyle = sides(ctx, by, s, lighter, lighter, minY, maxY, strokeMargin)
+      strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
+      ctx.strokeStyle = sides(ctx, by, s, 1, 1, minY, maxY, strokeMargin)
       strokeRuns(ctx, runs(pts, function(pt) { return !pt.faint }), pad, w, h, s.dashUnit)
     }
     ctx.restore()
@@ -114,27 +129,28 @@ function runs(pts, keep) {
 }
 
 // One ink for both sides: stroking each line twice, clipped to each side,
-// doubles the paint. The dim ink is one share of its own colour: it reads
-// against the full line beside it, not against the other side. With no
-// line to stand against (`by` null), the baseline's ink.
-function sides(ctx, by, s, aboveAlpha, belowAlpha) {
+// doubles the paint. When every point lies strictly on one side of `by`, a
+// plain colour draws identically without a gradient shader. The dim ink is
+// one share of its own colour: it reads against the full line beside it, not
+// against the other side. With no line to stand against (`by` null), the
+// baseline's ink.
+function sides(ctx, by, s, aboveAlpha, belowAlpha, minY, maxY, margin) {
   var c = s.baselineColor
   if (by === null) return s.rgba(c.r, c.g, c.b, aboveAlpha)
   var a = s.aboveColor
   var b = s.belowColor
+  var m = margin || 0
+  if (maxY !== undefined && maxY + m < by) return s.rgba(a.r, a.g, a.b, aboveAlpha)
+  if (minY !== undefined && minY - m > by) return s.rgba(b.r, b.g, b.b, belowAlpha)
   return splitInk(ctx, s.height, by, s.rgba(a.r, a.g, a.b, aboveAlpha), s.rgba(b.r, b.g, b.b, belowAlpha))
 }
 
 // The day's wash: strongest at its far reach on each side, clear at the
 // dashed line, so it shows where the move went. Two stops at one offset
 // merge, so the second sits a hair below.
-function fade(ctx, pts, by, pad, h, s, share) {
-  var top = by - 1
-  var bottom = by + 1
-  for (var i = 0; i < pts.length; i++) {
-    top = Math.min(top, pad + pts[i].y * h)
-    bottom = Math.max(bottom, pad + pts[i].y * h)
-  }
+function fade(ctx, minY, maxY, by, s, share) {
+  var top = Math.min(by - 1, minY)
+  var bottom = Math.max(by + 1, maxY)
   var stop = (by - top) / (bottom - top)
   var a = s.aboveColor
   var b = s.belowColor
@@ -164,29 +180,31 @@ function strokeRuns(ctx, lines, pad, w, h, dashUnit) {
 }
 
 // The dashed line and the ticks in hours still to come, which stand with it
-// before the line reaches them.
-function paintBase(ctx, g, s) {
+// before the line reaches them. Drawn at `yOff` inside a strip canvas when
+// given, or at full-canvas coordinates when omitted.
+function paintBase(ctx, g, s, yOff) {
   var h = s.height - s.pad * 2
-  strokeBaseline(ctx, s.pad, s.width - s.pad, s.pad + g.baselineY * h, s.baselineColor,
+  var cy = s.pad + g.baselineY * h - (yOff || 0)
+  strokeBaseline(ctx, s.pad, s.width - s.pad, cy, s.baselineColor,
     s.weight, [3 * s.dashUnit, 4 * s.dashUnit])
-  strokeTicks(ctx, g, s, true)
+  strokeTicks(ctx, g, s, true, yOff)
 }
 
 // Ticks the line has reached draw in with it; those ahead, in hours still
 // to come, are there with the baseline. A chart turning into another fades
 // the old one's out and the new one's in (`g.tickAlpha`).
-function strokeTicks(ctx, g, s, ahead) {
+function strokeTicks(ctx, g, s, ahead, yOff) {
   var w = s.width - s.pad * 2
   var h = s.height - s.pad * 2
   var inkLast = g.points.length ? g.points[g.points.length - 1].x : 0
   var c = s.baselineColor
   ctx.strokeStyle = c
   ctx.lineWidth = s.weight
+  var cy = s.pad + g.baselineY * h - (yOff || 0)
   for (var k = 0; k < g.ticks.length; k++) {
     if ((g.ticks[k] > inkLast) !== ahead) continue
     if (g.tickAlpha) ctx.strokeStyle = s.rgba(c.r, c.g, c.b, c.a * g.tickAlpha[k])
     var cx = s.pad + g.ticks[k] * w
-    var cy = s.pad + g.baselineY * h
     ctx.beginPath()
     ctx.moveTo(cx, cy - 4 * s.weight)
     ctx.lineTo(cx, cy + 4 * s.weight)
