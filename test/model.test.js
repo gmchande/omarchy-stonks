@@ -2707,11 +2707,12 @@ test("a fetched name or code past its length reads as not sent", () => {
 // those minutes, holding no close, through every refresh after.
 // Yahoo's one-day answers are modeled on its captures at Tokyo's and
 // London's opens (saved.test.js): until the day's first trade, the last
-// session's quote, its last trade five minutes before Yahoo's day ended, as
-// Frankfurt's and Sydney's come; from it the day's, counting from the close
-// before last for six minutes on a calendar with no pre-market. The first
-// trade comes up to 14 minutes after the bell, and no two closes in a row
-// are the same.
+// session's quote, its last trade at Yahoo's day end, or five minutes
+// before it where the close comes earlier, in Hong Kong's and Sydney's
+// closing auctions and on Börse Frankfurt; from it the day's, counting
+// from the close before last for six minutes on a calendar with no
+// pre-market. The first trade comes up to 14 minutes after the bell, and no
+// two closes in a row are the same.
 test("at every open the calendars hold, a row's move counts from the close before its day, or is left out", () => {
   const STALE = 6 * 60
   const codes = { US: "NMS", TSX: "TOR", LSE: "LSE", JPX: "JPX", HKEX: "HKG", ASX: "ASX", XETRA: "GER", FRA: "FRA", OTC: "PNK" }
@@ -2743,7 +2744,8 @@ test("at every open the calendars hold, a row's move counts from the close befor
     const yahoo = (i, now) => {
       const day = days[i], last = days[i - 1]
       const first = day.start + 60 * (i % 15)
-      if (now < day.start) return answer(last, day, close(i - 1), last.end - 300, close(i - 2), [{ t: last.start, c: close(i - 1) }, { t: last.end - 300, c: close(i - 1) }])
+      const lastTrade = cal.closingAuction || cal.quotesLate ? last.end - 300 : last.end
+      if (now < day.start) return answer(last, day, close(i - 1), lastTrade, close(i - 2), [{ t: last.start, c: close(i - 1) }, { t: last.end - 300, c: close(i - 1) }])
       if (now < first) return answer(day, day, close(i - 1), last.end, close(i - 2), [])
       const trades = []
       for (let t = first; t <= now; t += 60) if (day.segs.some(s => t >= s.start && t < s.end)) trades.push(t)

@@ -31,7 +31,7 @@ function carryClose(previous, quote, calendars, now) {
   if (cal && cal.pre) return quote
   // The next quote reads the close from this one, so an unchanged answer
   // after the bell stays unchanged.
-  var seen = previous && !sessionClose(quote) ? sessionClose(previous) || previous.closeSeen || null : null
+  var seen = previous && !sessionClose(quote, cal) ? sessionClose(previous, cal) || previous.closeSeen || null : null
   var reg = quote.session.regular
   var head = Quote.headlineQuote(quote)
   var traded = !!head && head.source === "quote" && head.t !== null && head.t >= reg.start
@@ -56,17 +56,27 @@ function carryClose(previous, quote, calendars, now) {
   return carried
 }
 
-// A trade at the end of Yahoo's day is the session's close, and so is the
-// last in an answer that came once the day's trades had settled
-// (`Quote.SETTLED`), the price Stonks shows until the next open: Frankfurt's
-// last trade comes minutes before Yahoo's day ends at 22:00, and Sydney's two
-// minutes before 16:12. A trade before the end in an answer sooner may not be
-// the last, as Yahoo's answers from Tokyo and London run 15 minutes late.
-function sessionClose(quote) {
+// A trade at the end of Yahoo's day is the session's close, and so is one in
+// the closing auction its calendar names (`closingAuction`, minutes before
+// the close), where only that auction trades: Sydney's last trade comes at
+// 16:10, two minutes before Yahoo's day ends. A market with no closing
+// auction, as Börse Frankfurt, whose last trade comes minutes before its
+// 22:00, closes on the last trade in an answer that came once Yahoo's delay
+// for it (`quotesLate`, minutes) had passed since the end. Any trade before
+// may not be the last, as Yahoo's answers from Tokyo and London run 15
+// minutes late.
+function sessionClose(quote, cal) {
   var reg = quote.session && quote.session.regular
   var head = Quote.headlineQuote(quote)
-  return reg && head && head.source === "quote" && head.t !== null && (head.t >= reg.end || !!quote.settled) && Format.isFiniteNumber(quote.prevClose)
+  return reg && head && head.source === "quote" && head.t !== null && Format.isFiniteNumber(quote.prevClose)
+    && (head.t >= closeFrom(reg, cal) || (!!cal && !!cal.quotesLate && quote.receivedAt >= reg.end + cal.quotesLate * 60))
     ? { day: reg.start, close: head.price, before: quote.prevClose } : null
+}
+
+function closeFrom(reg, cal) {
+  if (!cal || !cal.closingAuction) return reg.end
+  var segs = Calendar.segmentsOn(cal, Calendar.dateStringOf(Calendar.localDate(reg.start, cal)))
+  return segs.length ? Math.min(reg.end, segs[segs.length - 1].end - cal.closingAuction * 60) : reg.end
 }
 
 // Whether the session `to` starts is the next after the one `from` starts:

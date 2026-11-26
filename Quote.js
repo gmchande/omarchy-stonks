@@ -9,9 +9,6 @@ var CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/"
 var SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
 var SPARK_BATCH = 20
 
-// The close and late trades settle within this of a market's last trade.
-var SETTLED = 15 * 60
-
 // Past these, an answer is bad (`Format.fetchedList`). The largest real ones:
 // ^GSPC's All, about 1,190 monthly bars, and a coin's 1M, 744 hourly bars.
 var MOST_BARS = 5000
@@ -343,9 +340,8 @@ function parseChart(json, centExchanges, receivedAt, nightOf) {
     // Its trades are all the day will have, so the chart ends at the last
     // (`Day.tradedAxis`).
     wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
-    // It came once the day's trades had settled (`SETTLED`), so its last is
-    // the day's close (`CarriedClose.sessionClose`).
-    settled: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end + SETTLED,
+    // When the answer came (`CarriedClose.sessionClose`).
+    receivedAt: Format.isFiniteNumber(receivedAt) ? receivedAt : null,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,

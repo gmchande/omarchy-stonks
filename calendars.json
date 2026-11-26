@@ -269,7 +269,8 @@
         "2027": "Published by HKEX in circular CT/077/26 (https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2026/ce_SEHK_CT_077_2026.pdf).",
         "2028": "Derived, not yet published by HKEX or gazetted by the Government: the General Holidays Ordinance (Cap. 149), whose holiday on a Sunday closes the next day and on a Saturday nothing, on the Hong Kong Observatory's 2028 calendar (https://www.hko.gov.hk/en/gts/time/calendar/text/files/T2028e.txt), as HKEX applied it in 2022 for January (circular CT/082/21: Lunar New Year's Eve on a weekday a half day) and in 2023 from March, the years with the same weekdays (circular CT/058/22: Christmas on a Monday closes Monday and Tuesday, and Christmas Eve and New Year's Eve on a Sunday leave no half day)."
       },
-      "hours": "The sessions and the lunch break are HKEX's. A day ends at 16:10 and a half day at 12:10, the latest its closing auction ends, as Yahoo's full days do; Yahoo's half days end at 12:06, before the auction can."
+      "closingAuction": 10,
+      "hours": "The sessions and the lunch break are HKEX's. A day ends at 16:10 and a half day at 12:10, the latest its closing auction ends, as Yahoo's full days do; Yahoo's half days end at 12:06, before the auction can. The closing auction runs from 16:00, or 12:00 on a half day, its 10 minutes trading only at its close."
     },
     "ASX": {
       "exchanges": ["ASX"],
@@ -317,7 +318,8 @@
         "2027": "Published by ASX at the source and in ASX notice 1097.26.09 (https://asxonline.com/content/asxonline/public/notices/2026/september/1097.26.09.html); its early closes on 24 and 31 December at the times ASX has set every year since 2021.",
         "2028": "Derived, not yet published by ASX: its rules as it applied them in 2022 for January and in 2023 from March, the years with the same weekdays: New Year's Day on a Saturday closes Monday 3 January, ANZAC Day on a Tuesday closes, and Christmas Eve and New Year's Eve on a Sunday close nothing early (ASX notice 1136.23.11). Clock changes from Australia/Sydney's rules."
       },
-      "hours": "The open is ASX's. A day ends at 16:12, as Yahoo's do, a minute after its closing auction, and a half day at 14:12, the same minute after its own; Yahoo's half days end at 14:21, ten minutes after the auction."
+      "closingAuction": 12,
+      "hours": "The open is ASX's. A day ends at 16:12, as Yahoo's do, a minute after its closing auction, and a half day at 14:12, the same minute after its own; Yahoo's half days end at 14:21, ten minutes after the auction. From 16:00, or 14:00 on a half day, only the closing auction trades."
     },
     "XETRA": {
       "exchanges": ["XETRA"],
@@ -405,7 +407,8 @@
         "2027": "Holidays published by Deutsche Börse at the source and in its 2027 trading calendar, which marks Ascension Day, Whit Monday, Corpus Christi and 30 December as days whose hours differ (https://cashmarket.deutsche-boerse.com/resource/blob/5674438/fb6e22c77930acea97641cf7d65ef78a/data/deutsche-boerse-trading-calendar-2027.pdf). Derived, not yet published: their closes, 20:00 on the holidays by the source's rule, and 14:00 on 30 December, as in every year since 2021.",
         "2028": "Holidays published by Deutsche Börse at the source, as changes for future years are not excluded. Derived, not yet published: 20:00 closes on the public holidays it trades, Ascension Day, Whit Monday, Corpus Christi and German Unity Day, by the source's rule, and the last trading day, Friday 29 December, closing at 14:00, as on Friday 29 December 2023 (http://cashmarket.deutsche-boerse.com/resource/blob/3735776/e53cb5552fd069e20dc3faaf343c9c2d/data/Final%20trading%20session%202023.pdf). Clock changes from Europe/Berlin's rules."
       },
-      "hours": "Börse Frankfurt's: 08:00 to 22:00, as Yahoo's days are, and 20:00 on a public holiday it trades, when Yahoo's trades end though its 2026 days say 22:00."
+      "quotesLate": 15,
+      "hours": "Börse Frankfurt's: 08:00 to 22:00, as Yahoo's days are, and 20:00 on a public holiday it trades, when Yahoo's trades end though its 2026 days say 22:00. It has no closing auction, and its last trade often comes before the end. Yahoo's quotes from it come 15 minutes late, as Yahoo's list of exchanges says (https://help.yahoo.com/kb/SLN2310.html)."
     },
     "OTC": {
       "exchanges": ["OTC"],
