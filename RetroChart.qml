@@ -37,8 +37,8 @@ Item {
   readonly property real asideShare: greyAside ? 0.45 : 0.4
   readonly property real asideInk: greyAside ? 1 : asideShare
   property var up: true
-  // Lights the last regular trade's cap. Off for small copies, and a range
-  // has none: its last bar need not be the headline trade.
+  // Lights the newest trade's cap. Off for small copies, and a range has
+  // none: its last bar need not be the headline trade.
   property bool glow: false
   // The panel's and the screenshot's day keep the session full at any hour
   // and draw the hours around it lighter (`faint`); a row's lights what
@@ -362,9 +362,9 @@ Item {
     id: cap
     objectName: "liveCap"
     // At the open it lights halfway through the bell's beat (`bloom`).
-    visible: root.glow && root.day && root.shownGrid.lastLit >= 0 && root.replayX < 0 && x < curtain.width && root.bloomed >= 0.5
-    x: root.shownGrid.lastLit * root.grid.pitch
-    y: visible ? root.shownGrid.levels[root.shownGrid.lastLit] * root.pixel : 0
+    visible: root.glow && root.day && root.shownGrid.newest >= 0 && root.replayX < 0 && x < curtain.width && root.bloomed >= 0.5
+    x: root.shownGrid.newest * root.grid.pitch
+    y: visible ? root.shownGrid.levels[root.shownGrid.newest] * root.pixel : 0
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor

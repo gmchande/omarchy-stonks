@@ -292,7 +292,7 @@ function wave(from, to, front) {
     g.baseds[c] = src.baseds ? src.baseds[c] : src.based
     g.olds[c] = c >= front
   }
-  // The lit cap waits for the wave to pass it.
-  g.lastLit = to.lastLit < front ? to.lastLit : -1
+  // The newest trade's cap waits for the wave to pass it.
+  g.newest = to.newest < front ? to.newest : -1
   return g
 }

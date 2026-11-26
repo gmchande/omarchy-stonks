@@ -998,7 +998,7 @@ const tall = { pitch: 42, height: 40 }
 const lines = { pitch: 26, height: 26 }
 const ten = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 
-test("retro draws each column at the price its last trade ended on, holds it across columns the line joins, leaves a break dark, and lights the last bright column", () => {
+test("retro draws each column at the price its last trade ended on, holds it across columns the line joins, leaves a break dark, and lights the newest trade's column", () => {
   // 100 by 32 in 3-pixel cells a pixel apart: 25 columns of 10 whole rows,
   // the two pixels over making none.
   const point = (x, y, more = {}) => ({ x, y, ...more })
@@ -1008,9 +1008,9 @@ test("retro draws each column at the price its last trade ended on, holds it acr
   // Two trades in column 0: the second wins. Columns 1 to 4 hold column 0's
   // price until column 5's trade; columns 6 to 9 stay dark before the break.
   expect(g.levels.slice(0, 11)).toEqual([9, 9, 9, 9, 9, 5, undefined, undefined, undefined, undefined, 9])
-  expect(g.lastLit).toBe(10)
-  // A last trade that is dim leaves the light on the column before it.
-  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).lastLit).toBe(0)
+  expect(g.newest).toBe(10)
+  // A newest trade that is dim still holds the light: the price on top shows it.
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).newest).toBe(5)
   // Columns a trade's price holds across are as dim as that trade.
   expect(grid([point(0, 0, { dim: true }), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([true, true, true, true, true, true])
   expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([false, false, false, false, false, true])
@@ -1422,7 +1422,7 @@ test("each trade says its own time across a change of clocks, the 1D's day keeps
   expect(at("2026-11-01", "20:00") - at("2026-10-30", "20:00")).toBe(49 * 3600)
   expect(M.chartGeometry(sunday.day).ticks).toEqual([5.5, 12, 16].map(h => h / 17))
   expect(M.dayBase(sunday.day)).toBe(100)
-  expect(M.lastLitPoint(M.chartGeometry(sunday.day))).toMatchObject({ x: 1 })
+  expect(M.newestPoint(M.chartGeometry(sunday.day))).toMatchObject({ x: 1 })
   // At 01:30 the night is still joined to Friday, and so is Monday's
   // pre-market from its first trade at 04:00, until Monday's open: from
   // Friday's 04:00 to the newest slot, 04:00, ticked at Friday's open and
@@ -2790,7 +2790,7 @@ describe("another stock's chart bends out of the one before", () => {
       }
     }
     expect(Math.abs(frame.baselineY - chart.baselineY)).toBeLessThan(1e-6)
-    expect(Chart.lastLitPoint(frame).x).toBeCloseTo(Chart.lastLitPoint(chart).x, 6)
+    expect(Chart.newestPoint(frame).x).toBeCloseTo(Chart.newestPoint(chart).x, 6)
   }
 
   test("each way, it starts as the old chart and ends as the new one, with no jump at either end", () => {
@@ -2862,7 +2862,7 @@ describe("another stock's chart bends out of the one before", () => {
         const own = c < front ? to : from
         expect([g.levels[c], g.above[c], g.baseRows[c]]).toEqual([own.levels[c], own.above[c], own.baseRow])
       }
-      expect(g.lastLit).toBe(to.lastLit < front ? to.lastLit : -1)
+      expect(g.newest).toBe(to.newest < front ? to.newest : -1)
     }
   })
 })
