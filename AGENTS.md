@@ -34,34 +34,24 @@ truer, lighter, quicker, simpler or better made.
   market cap moves with the price from Yahoo's last figure, since shares
   change only when the company reports. A "!" means only that a refresh
   failed or is late.
-- **Sources.** Market data comes only from Yahoo's unofficial endpoints and
-  Robinhood's public price history and quotes, with no account or key, as
-  the README says. Robinhood's logo never shows.
+- **Sources.** Market data comes only from Yahoo's and Robinhood's public
+  endpoints, with no account or key, as the README says. Robinhood's logo
+  never shows.
 - **Color.** Up is the theme's green and down its red, never its accent,
   which means "selected". Where a theme has no usable pair, Stonks uses its
   own for that ground, and it never changes the theme's colors.
 - **Calm.** Nothing jumps, and no picture snaps. When the look, range, list
-  or stock changes, everything keeps its place and size. What's read then
-  changes at once, where it stands, such as a price, a name or another
-  list's rows, since words in motion can't be read. A picture travels
-  instead, such as the chart to its new shape, a tick along its bar or a
-  row to its new place, and a message that comes and goes fades, each
-  briefly.
-- **1D at night.** A stock's chart turns to the new day at its open, and
-  draws that day from its pre-market where Yahoo has one, a US stock's
-  from 04:00, so a move made before the open shows where it happened; the
-  night's trades before then leave the chart at the turn. Until the open
-  the chart keeps the day that closed, with tonight and the pre-market
-  joined at its end. Tonight's trades belong to the day ahead: from the
-  night's first trade the panel's % counts from the close just gone, its one
-  dashed line is that close, and the closed day's session draws fainter, in
-  green above that line and red below, so every colour on the chart reads
-  against the one line drawn. The line breaks only for hours that take room
-  on the chart, such as Tokyo's lunch. Until 04:00 in its exchange's time,
-  the rows and the pill report how the day ended, its close and its move,
-  with tonight drawn fainter on their line in green and red by the same
-  rule, or grey where the day they report is already faint, and tonight's
-  move in the pill's hover.
+  or stock changes, everything keeps its place and size. What's read
+  changes at once where it stands, such as a price or another list's rows,
+  since words in motion can't be read. A picture travels, such as the chart
+  to its new shape or a row to its new place, and a message that comes and
+  goes fades, each briefly.
+- **1D at night.** Through the night a stock's chart keeps the day that
+  closed, with tonight joined at its end. Tonight's trades belong to the
+  day ahead, so they count from that close, the chart's one dashed line,
+  and every colour reads against it. The rows and the pill keep the closed
+  day until 04:00 in its exchange's time. The README's "Reading the chart"
+  says the rest.
 - **Character.** The bull and the bear, their sleep while the market rests,
   the live dot and the day's named moments survive any cleanup: each says
   something true, and none cheers a number.
