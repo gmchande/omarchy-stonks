@@ -187,13 +187,14 @@ Item {
   }
 
   // Until the folder is private (`OwnerOnly.write`), the file an earlier run
-  // left plays, if any.
+  // left plays, if any. A write that didn't land is tried again the next
+  // time its sound is wanted.
   function written(look, what, lead) {
     var file = fileOf(look, what, lead)
     if (!madeThisRun[file]) {
       var bytes = typeof what === "number" ? ChartSound.wav(ChartSound.chime(look === "retro", what)) : bundledBytes(look, what)
       var landed = files.write(folder + "/" + file, lead ? Waking.withLeadIn(bytes, lead) : bytes)
-      madeThisRun[file] = true
+      if (landed) madeThisRun[file] = true
       if (rewrote[look] !== "failed") rewrote[look] = landed ? "landed" : "failed"
     }
     return folder + "/" + file
@@ -242,14 +243,26 @@ Item {
         if (root.folder !== "" && !survey.running) survey.running = true
         return
       }
+      // The files ahead wait for the folder to be private (`OwnerOnly.made`),
+      // which starts them again.
+      if (!root.files.made) return stop()
       var look = root.voice
       var due = root.aheadOf(look).filter(function(f) { return !root.madeThisRun[root.fileOf(look, f[0], f[1])] })
-      if (due.length > 0) return root.written(look, due[0][0], due[0][1])
+      // A write that didn't land ends the run: it's tried again when its sound is wanted.
+      if (due.length > 0) {
+        root.written(look, due[0][0], due[0][1])
+        if (!root.madeThisRun[root.fileOf(look, due[0][0], due[0][1])]) stop()
+        return
+      }
       stop()
       // Last, so no file is newer than the stamp that vouches for it.
       if (root.rewrote[look] === "landed" && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
       delete root.rewrote[look]
     }
+  }
+  Connections {
+    target: root.files
+    function onMadeChanged() { ahead.restart() }
   }
 
   // Once a run (`Commands.soundSurvey`). Read as `running` falls, since a

@@ -9,8 +9,11 @@ var SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 // Yahoo's answers asked for, and the most of the list's own shown above them.
 var SHOWN_RESULTS = 8
 
+// Half a UTF-16 pair, as a cut between an emoji's halves leaves one, can't
+// go in a URL, so it is left out of the words asked, and a whole pair stays.
 function searchUrl(query) {
-  return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=" + SHOWN_RESULTS + "&newsCount=0"
+  var carried = query.replace(/[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g, function(c) { return c.length === 2 ? c : "" })
+  return SEARCH_URL + "?q=" + encodeURIComponent(carried) + "&quotesCount=" + SHOWN_RESULTS + "&newsCount=0"
 }
 
 // Why a lookup failed, from its answer (`Fetch.answers`), or none: "none"

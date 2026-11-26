@@ -183,9 +183,20 @@ function overnightResults(json) {
 // sends, such as "__proto__", is left out: its name becomes the warning's.
 var SESSIONS = ["pre", "reg", "post", "overnight"]
 
-function overnightAnswer(result, symbol) {
+// The answer for `asked[at]`, from the results of the request that asked
+// for `asked`: the result naming it, wherever it is, else, where Robinhood
+// doesn't carry it, the placeholder in its place, which names no symbol and
+// has no slot. A place counts only in an answer with a result for every
+// listing asked: in one that left a listing out, a placeholder may have
+// moved into another's place. Null where the answer left the listing out,
+// so it is asked again soon, never taken as not carried.
+function overnightAnswer(results, asked, at) {
   var out = { bars: [], from: null, through: null }
-  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_TRADES) : null
+  var name = robinhoodSymbol(asked[at])
+  var result = results[at] && results[at].symbol === name ? results[at] : null
+  for (var i = 0; !result && i < results.length; i++) if (results[i] && results[i].symbol === name) result = results[i]
+  if (!result) return results.length === asked.length && results[at] && results[at].symbol === "" ? out : null
+  var historicals = Format.fetchedList(result.historicals, MOST_TRADES)
   if (!historicals) return out
   for (var j = 0; j < historicals.length; j++) {
     var bar = historicals[j]

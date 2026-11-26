@@ -417,7 +417,7 @@ test("a scrub reads the trade at or before it, from the day's first trade throug
   expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true, at: pts[pts.length - 1].t })
 })
 
-test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
+test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it, and the header says the lunch break; either side of it the dot is on the line", () => {
   const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
   const pts = M.chartGeometry(toyota, calendars).points
   const reopen = pts.findIndex(p => p.brk)
@@ -428,6 +428,9 @@ test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leav
   expect([M.yAt(pts, morning.x), M.yAt(pts, afternoon.x)]).toEqual([morning.y, afternoon.y])
   const beforeLunch = (pts[reopen - 2].x + morning.x) / 2
   expect(M.yAt(pts, beforeLunch)).toBeCloseTo((pts[reopen - 2].y + morning.y) / 2, 9)
+  const jst = clock => Date.parse(`2026-10-07T${clock}:00+09:00`) / 1000
+  expect(["11:00", "12:00", "12:29", "13:00"].map(clock => marketStatus(toyota, jst("14:55"), jst(clock), calendars)))
+    .toEqual(["At 11:00 JST · Market open", "At 12:00 JST · Lunch break", "At 12:29 JST · Lunch break", "At 13:00 JST · Market open"])
 })
 
 // Smooth's replay of `day`, from its first trade to its last over 2 s, as a
@@ -1467,6 +1470,9 @@ test("search names the kinds it leaves out, beside what it shows or alone", () =
 
 test("request URLs are the exact strings Yahoo is sent, and history never takes the 1D path", () => {
   expect(M.searchUrl("a b")).toContain("q=a%20b")
+  // Half a UTF-16 pair, left by a cut between an emoji's halves, is left
+  // out of the words asked; a whole emoji goes.
+  expect([M.searchUrl("AAPL\ud83d"), M.searchUrl("\udc00\udc00X🚀")].map(url => url.match(/q=([^&]*)/)[1])).toEqual(["AAPL", "X%F0%9F%9A%80"])
   expect(M.historyUrl("AAPL", "1D")).toBeNull()
   // The saved fundamentals answers are the feed's own requests.
   const saved = name => readFileSync(join(fixtures, "fundamentals", name + ".url"), "utf8").replace(/^# /, "").trim()
@@ -1866,11 +1872,11 @@ test("a spark day with a jump shows at once and is checked on a chart, whose ans
 
 // ---------------------------------------------------------------- overnight
 
-// Robinhood's answer by symbol, read as the feed reads it: each result is
-// for the symbol asked in its place.
+// Robinhood's answer by symbol, read as the feed reads it, each symbol by
+// its place in the request.
 const overnight = (answer, symbols) => {
   const results = M.overnightResults(answer)
-  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results[i], symbol)]))
+  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results, symbols, i)]))
 }
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that
 // traded, and how far it reached.
@@ -1893,10 +1899,15 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   // them, and still reaches as far as SILK and NEST.
   expect(bars.REED.through).toBe(Date.parse(raw[2].historicals.at(-1).begins_at) / 1000)
   expect([bars.NEST.through, bars.SILK.through]).toEqual([bars.REED.through, bars.REED.through])
-  // Asked out of the order it answers in, an answer names another symbol
-  // and is no answer for the one asked.
-  expect(overnight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
-    .toEqual({ SILK: { bars: [], from: null, through: null }, NEST: { bars: [], from: null, through: null } })
+  // Asked in another order than it answers in, each listing still reads its
+  // own result. One the answer leaves out is no answer, so it is asked
+  // again soon, and never taken for one Robinhood doesn't carry, even where
+  // the placeholder of one it doesn't carry has moved into its place.
+  const day = fixture("moments/day/robinhood-day.json")
+  expect(overnight(day, ["SILK", "NEST"])).toEqual({ SILK: bars.SILK, NEST: bars.NEST })
+  expect(overnight({ results: day.results.filter((_, i) => i !== 2) }, ["NEST", "SILK", "REED", "GRIT.TO"]))
+    .toEqual({ NEST: bars.NEST, SILK: bars.SILK, REED: null, "GRIT.TO": null })
+  expect(overnight({ results: day.results.slice(1) }, ["NEST", "SILK"])).toEqual({ NEST: null, SILK: bars.SILK })
   expect(overnight({ chart: {} }, ["NEST"])).toBeNull()
 })
 
@@ -3262,7 +3273,7 @@ test("until the next open a listing that trades at night shows the day that clos
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York counted from 04:00, as abroad", () => {
+test("at the open the chart holds the last session, with the new one's first trades at its end, until the new one has three bars, in New York counted from 04:00, as abroad, or a trade an hour past the open", () => {
   // Friday 09:31, from answers Stonks no longer asks for one day at the
   // open: AAPL's chart is Friday's, the S&P 500's Friday's session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
@@ -3331,6 +3342,23 @@ test("at the open the chart holds the last session, with the new one's first tra
   const LSE = calendars.calendars.LSE
   expect(M.dateStringOf(M.localDate(view.day.session.regular.start, LSE))).toBe(M.dateStringOf(M.localDate(london.marketTime, LSE)))
   expect(view.day.points.every(p => p.t < view.day.session.regular.end + 600)).toBe(true)
+  // A listing with fewer than three bars an hour after its open trades too
+  // seldom to wait for: once a trade comes past that hour, its chart is the
+  // new day, though a two-day answer comes, as one asked in a batch with a
+  // US stock in its pre-market. SHEL.L's of 3 November, thinned to a bar at
+  // 08:00 and one more, at 08:20 or at 09:10.
+  const lse = clock => M.epochAt(LSE, "2026-11-03", clock)
+  const thinTo = clocks => {
+    const answer = structuredClone(fixture("moments/london-2026-11-03-0330/2d/shel.l.json"))
+    const r = answer.chart.result[0], q = r.indicators.quote[0]
+    const keep = r.timestamp.map(t => t < lse("08:00") || t === lse("08:00"))
+    r.timestamp = r.timestamp.filter((_, i) => keep[i]).concat(clocks.map(lse))
+    for (const k of Object.keys(q)) q[k] = q[k].filter((_, i) => keep[i]).concat(clocks.map(() => k === "volume" ? 100 : 3915))
+    r.meta.regularMarketTime = lse(clocks.at(-1))
+    const quote = M.carryClose(null, M.parseChart(answer, cents, lse("10:00")), calendars, lse("10:00"))
+    return M.viewChart("SHEL.L", "1D", { "SHEL.L": quote }, {}, {}, {}, calendars, lse("10:00")).day
+  }
+  expect([!!thinTo(["08:20"]).held, !!thinTo(["09:10"]).held]).toEqual([true, false])
   // Tokyo at Sunday 20:05 New York, Monday 09:05 there: Yahoo's day answer
   // has turned to Monday and holds no bar yet, so a chart of it alone is
   // empty. Asked for two days until Monday has a bar (`twoDays`), the

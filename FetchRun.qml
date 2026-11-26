@@ -42,7 +42,7 @@ Item {
   }
 
   function read(text) {
-    var fresh = Fetch.answers(text, parsed)
+    var fresh = Fetch.answers(text, parsed, gate ? gate.now() : 0)
     if (fresh.length === 0) return fresh
     root.parsed = fresh[fresh.length - 1].end
     root.got = got.concat(fresh)

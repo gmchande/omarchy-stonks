@@ -26,6 +26,8 @@ Item {
 
   // With blockWrites, a failed save is heard before setText returns. Bytes
   // the same as the last write's are skipped: neither saved nor failed.
+  // Quickshell skips them even when that write failed, so the write after a
+  // failed one starts from no path.
   property bool failed: false
   function write(path, data) {
     if (!root.made) {
@@ -33,6 +35,7 @@ Item {
       root.makeFolder()
       return false
     }
+    if (root.failed) file.path = ""
     file.path = path
     root.failed = false
     if (typeof data === "string") file.setText(data)

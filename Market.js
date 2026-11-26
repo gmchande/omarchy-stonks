@@ -108,12 +108,14 @@ function holidayName(name) {
 }
 
 // The status, then shorter forms for a narrower header; each keeps the
-// time, its day and its zone.
+// time, its day and its zone. A scrub into a calendar's lunch break says
+// so, as the header at rest does.
 function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
     var at = "At " + tradeDay(quote, read.t, now, calendars) + tradeTime(quote, read.t, calendars)
-    return [at + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT)), at]
+    var lunch = !read.close && Calendar.breakUntil(Calendar.calendarFor(calendars, quote), scrubT)
+    return [at + " · " + (lunch ? "Lunch break" : phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT))), at]
   }
   var cal = Calendar.calendarFor(calendars, quote)
   var brk = cal ? Calendar.breakUntil(cal, now) : null

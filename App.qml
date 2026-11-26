@@ -55,12 +55,15 @@ Item {
     closingFromHost = false
   }
 
+  // A listed stock asked for is the one shown, so a search's preview, which
+  // would hide it, ends.
   function applyRequest() {
     if (!ready || !window.visible) return
     var symbol = requestedSymbol
     var range = requestedRange
     requestedSymbol = ""
     requestedRange = ""
+    if (symbol && service.allSymbols.indexOf(symbol) >= 0) root.body.cancelAdding()
     service.summon(symbol, range)
   }
 

@@ -235,11 +235,34 @@ function readSaved(path, cap) {
 
 // What a read found: { text }, { missing: true } where nothing is there, or
 // { refused: true } for anything else: no regular file, one over `cap`
-// bytes, one that couldn't be read, or a read that didn't end.
+// bytes, one that couldn't be read, or a read that didn't end. A text that
+// isn't the file's whole is `lossy`.
 function readSavedFile(code, bytes, text, cap) {
-  if (code === 0 && bytes <= cap) return { text: String(text) }
+  if (code === 0 && bytes <= cap) return wholeText(String(text), bytes) ? { text: String(text) } : { text: String(text), lossy: true }
   if (code === 3) return { missing: true }
   return { refused: true }
+}
+
+// Qt reads each byte that isn't UTF-8 as U+FFFD, three bytes, and drops a
+// byte-order mark at the start, three bytes: a text holding U+FFFD is the
+// file's whole only if it comes to the bytes read, or three fewer.
+function wholeText(text, bytes) {
+  if (text.indexOf("\ufffd") < 0) return true
+  var made = fileBytes(text)
+  return made === bytes || made === bytes - 3
+}
+
+// How many bytes `text` takes in a file, as UTF-8.
+function fileBytes(text) {
+  var bytes = 0
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charCodeAt(i)
+    if (c < 0x80) bytes += 1
+    else if (c < 0x800) bytes += 2
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < text.length) { bytes += 4; i++ }
+    else bytes += 3
+  }
+  return bytes
 }
 
 // A file of the plugin's as a path a command can take, from the URL QML
@@ -320,27 +343,23 @@ function chimePlayer(names, folder) {
     + "( timeout -k 1 2 pw-play --media-role Notification --latency 30ms \"$1/$name\" & ) ;; esac; done", "sh", folder]
 }
 
-// The update that restarts the shell: in a terminal Omarchy opens, which
-// shows what changes and asks, and only when the plugin's folder moved. Git
-// shows the changes for it, and runs here without its pager, which would
-// hold a long list until q is pressed with nothing saying so. The
-// launcher joins its arguments into a `bash -c` script, so the last one is
-// shell code.
-function updateAndRestart(pluginId) {
+// The update, in a terminal Omarchy opens, which shows what changes and
+// asks; Git shows the changes for it, and runs here without its pager,
+// which would hold a long list until q is pressed with nothing saying so.
+// One runs at a time: a second, opened while the first waits on its
+// question, would see the first move the folder. With `restart`, and only
+// when the plugin's folder moved, it asks Stonks to restart the shell,
+// which Stonks does only while it holds no change unsaved
+// (`IpcTarget.restartIfSaved`): one made while the terminal waits may not
+// have saved. Without, Stonks holds what a restart would lose. The launcher
+// joins its arguments into a `bash -c` script, so the last one is shell
+// code.
+function update(pluginId, restart) {
   return ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-    "p=$HOME/.config/omarchy/plugins/" + pluginId + "; was=$(git -C \"$p\" rev-parse HEAD);"
-    + " " + updating(pluginId) + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
-    + " && echo 'Restarting the shell…' && omarchy restart shell"]
-}
-
-// The update alone, in the same terminal, while Stonks holds what a restart
-// would lose.
-function update(pluginId) {
-  return ["omarchy", "launch", "floating", "terminal", "with", "presentation", updating(pluginId)]
-}
-
-function updating(pluginId) {
-  return "GIT_PAGER= omarchy plugin update " + pluginId
+    "p=$HOME/.config/omarchy/plugins/" + pluginId + "; exec 9< \"$p\" && flock -n 9"
+    + " || { echo 'Stonks is already updating in another terminal.'; exit 1; };"
+    + " was=$(git -C \"$p\" rev-parse HEAD); GIT_PAGER= omarchy plugin update " + pluginId
+    + (restart ? " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]] && omarchy-shell " + pluginId + " restartIfSaved" : "")]
 }
 
 // A paste's (`Field`): the clipboard's text, or the primary selection's, as

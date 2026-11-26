@@ -401,6 +401,16 @@ test("a run's output splits into its answers, each said by what came back", () =
   const early = M.answers(text.slice(0, half + 3))
   const rest = M.answers(text, early[early.length - 1].end)
   expect(early.concat(rest).map(a => [a.index, a.kind, a.body, a.retryAfter])).toEqual(got)
+  // A Retry-After may be a date, as HTTP allows: the seconds until then,
+  // none once it's past, and none for words that are neither.
+  const date = Date.parse("Wed, 21 Oct 2026 07:28:00 GMT") / 1000
+  const dated = retry => M.answers(trailer(0, 429, 0, retry), 0, date - 90)[0].retryAfter
+  expect([dated("Wed, 21 Oct 2026 07:28:00 GMT"), dated("Wed, 21 Oct 2026 07:20:00 GMT"), dated("soon")]).toEqual([90, 0, 0])
+  // A line that starts like a mark and runs on in digits, as a broken host
+  // could send, holds no answer until it ends, and reads at once.
+  const began = performance.now()
+  expect(M.answers("\n@@stonks 0 200 " + "1".repeat(100000))).toEqual([])
+  expect(performance.now() - began).toBeLessThan(500)
 })
 
 test("a spark day keeps the last chart's verdict, and a jump past it waits for a chart", () => {
@@ -704,7 +714,7 @@ test("the data file reads as written and repairs hand edits", () => {
   // A save is weighed in the bytes the file holds, as Stonks reads it back:
   // names in any script count as UTF-8 does.
   for (const name of ["Tech", "Énergie", "日本株", "Rockets 🚀", "x".repeat(4096)])
-    expect(M.fileBytes(JSON.stringify({ name }))).toBe(Buffer.byteLength(JSON.stringify({ name })))
+    expect(load("Commands.js").fileBytes(JSON.stringify({ name }))).toBe(Buffer.byteLength(JSON.stringify({ name })))
   // Sounds start off, in a new install and in a file from before them, and
   // only a saved true turns them on; the version check stays on unless a
   // saved false turns it off. Newer settings may add other defaults.
@@ -733,6 +743,10 @@ test("the data file reads as written and repairs hand edits", () => {
   // {"length": 1e12}, would hold the shell's thread for each index it names.
   const posing = M.fileSettings({ symbols: { length: 2, 0: "NEST", 1: "SILK" }, lists: { length: 1, 0: { name: "Growth", symbols: ["BO"] } } })
   expect([posing.symbols, posing.lists]).toEqual([["NVDA", "AAPL", "MSFT", "SPY", "TSLA"], []])
+  // A symbol holding half a UTF-16 pair can't go in a URL, so it is left
+  // out, in All and in a list.
+  const halved = M.fileSettings({ symbols: ["NEST", "\ud800X"], lists: [{ name: "Growth", symbols: ["BO", "Y\udc00"] }] })
+  expect([halved.symbols, halved.lists[0].symbols]).toEqual([["NEST", "BO"], ["BO"]])
   // The cadence stays between 30 seconds and 15 minutes.
   for (const [given, kept] of [[15, 30], [1000, 900], [120, 120], ["nope", 60]])
     expect([given, M.fileSettings({ refreshIntervalSec: given }).refreshIntervalSec]).toEqual([given, kept])
@@ -759,6 +773,12 @@ test("the data file reads as written and repairs hand edits", () => {
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
+  // Thousands of lists of one name, as a hand edit or a sync could leave
+  // them, read at once, each under its own free name.
+  const began = performance.now()
+  const many = M.readListsFile(JSON.stringify({ lists: Array.from({ length: 2000 }, () => ({ name: "a" })) }))
+  expect(performance.now() - began).toBeLessThan(1000)
+  expect([many.lists.length, many.lists[1].name, many.lists[1999].name, new Set(many.lists.map(l => l.name)).size]).toEqual([2000, "a 2", "a 2000", 2000])
   // An order an older build saved by the amount reads as % change, on All
   // and on a list, each keeping its direction and members.
   const byAmount = M.fileSettings({ symbols: ["AAPL", "MSFT"], order: "abs", reversed: true,
@@ -772,6 +792,8 @@ test("the data file reads as written and repairs hand edits", () => {
   const moved = fromBar({ symbols: ["nvda", "spy"], order: "name", barStyle: "icon" })
   expect([moved.symbols, moved.order, "barStyle" in moved]).toEqual([["NVDA", "SPY"], "name", false])
   expect(fromBar({ barStyle: "icon" })).toBeNull()
+  // A section a hand edit made an object with a length is no list.
+  expect(M.settingsFromBar({ bar: { layout: { right: { length: 1, 0: { id: "grvc.stonks", symbols: ["NEST"] } } } } }, "grvc.stonks")).toBeNull()
 })
 
 // Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
@@ -803,7 +825,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
   const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
   // A switch to a list, as the Service persists it.
-  const switched = (s, name) => M.fileSettings(Object.assign({}, s, { list: name }))
+  const switched = (s, name) => M.fileSettings(M.copyWith(s, { list: name }))
   const names = lists => lists.map(list => list.name)
   const current = made.lists.find(list => list.name === made.list)
   test("the file reads", () => expect(read).not.toBeNull())
@@ -820,14 +842,19 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   for (const list of made.lists) test(label(list), () => expect(label(shown(switched(read, list.name)))).toBe(label(list)))
   // After a downgrade, or on a machine sharing the file: the other machine's
   // file is on US; this one switches back to World and sorts it, and writes.
-  test("a later version's keys stay through a write: one at the top, one in a list", () => {
+  // A key a hand edit named "__proto__" stays too.
+  test("a later version's keys, and a hand edit's, stay through a write: one at the top, one in a list", () => {
     const later = JSON.parse(text)
     later.alerts = [{ symbol: "AAPL", above: 400 }]
     later.lists[1].pinned = true
     later.list = "US"
+    const proto = { value: { mine: true }, enumerable: true, writable: true, configurable: true }
+    Object.defineProperty(later, "__proto__", proto)
+    Object.defineProperty(later.lists[1], "__proto__", proto)
     const written = JSON.parse(JSON.stringify(M.withListOrder(switched(M.fileSettings(later), made.list), "symbol")))
+    const own = object => Object.getOwnPropertyDescriptor(object, "__proto__")?.value
     expect([written.list, written.lists[1].name, written.lists[1].order]).toEqual([made.list, "World", "symbol"])
-    expect([written.alerts, written.lists[1].pinned]).toEqual([later.alerts, true])
+    expect([written.alerts, written.lists[1].pinned, own(written), own(written.lists[1])]).toEqual([later.alerts, true, { mine: true }, { mine: true }])
   })
 })
 
@@ -1153,7 +1180,7 @@ test("every key on the key sheet, and every key the README's prose says to press
   expect(pressed.filter(k => !listed.has(k))).toEqual([])
 })
 
-test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
+test("a letter says its key and Shift, never its text's case, and no key says anything held with Ctrl or Alt", () => {
   const { typed } = load("KeyText.js")
   const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, META = 0x10000000, KEYPAD = 0x20000000
   // Caps Lock sends "O" with no Shift, and "o" with it.
@@ -1166,6 +1193,12 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
   expect(typed({ key: 80, modifiers: META, text: "p" })).toBe("")
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
+  expect(typed({ key: 47, modifiers: KEYPAD, text: "/" })).toBe("/")
+  // Qt gives Alt+/ and Alt+[ their own text, and Ctrl+Shift+/ a "?".
+  expect([typed({ key: 47, modifiers: ALT, text: "/" }), typed({ key: 91, modifiers: ALT, text: "[" }),
+    typed({ key: 63, modifiers: CTRL | SHIFT, text: "?" })]).toEqual(["", "", ""])
+  // AltGr, which some layouts type [ and ] with, may come as Qt's group switch.
+  expect([91, 93].map(key => typed({ key, modifiers: 0x40000000, text: String.fromCharCode(key) }))).toEqual(["[", "]"])
 })
 
 test("a stock's day is asked for two days from its pre-market until its third bar, and past the bell until it trades, when Yahoo's day no longer holds the last session", () => {
@@ -2265,7 +2298,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   const quote = { symbol: "SHOP", quoteType: "EQUITY", exchange: "NMS", longname: "Shopify Inc." }
   const result = historicals => ({ symbol: "NEST", historicals })
   const trade = { begins_at: "2026-10-07T00:00:00Z", close_price: "10.00", session: "overnight", interpolated: false }
-  const nest = "M.overnightAnswer(json.results[0], 'NEST').bars.length"
+  const nest = "M.overnightAnswer(json.results, ['NEST'], 0).bars.length"
   const cases = [
     { name: "a search, as sent", call: "M.parseSearch(json).results.length", answer: { quotes: [quote] }, want: 1 },
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
@@ -2376,8 +2409,8 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
 // shell keep 150 more trades at every one, 15,000 after a hundred, and with
 // their times ahead of the clock, ask for an hour again for ever.
 test("a hostile Robinhood's hours keep at most a day's request's trades, and times ahead of the clock ask for a day", () => {
-  const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
-    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
+  const hour = k => M.overnightAnswer([{ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
+    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }], ["X"], 0)
   let kept = hour(0)
   for (let k = 1; k <= 100; k++) kept = M.joinTrades(kept, hour(k))
   expect(kept.bars.length).toBe(M.MOST_TRADES)
@@ -2653,7 +2686,7 @@ test("at every open the calendars hold, a row's move counts from the close befor
 
 // The update check offers main's version only when it comes after the
 // running one, number by number.
-test("a version is newer number by number, and a manifest names one only whole", () => {
+test("a version is newer number by number, a manifest names one only whole, and main's is offered only to a clone of this repo", () => {
   const R = load("Release.js")
   expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
   expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
@@ -2661,6 +2694,13 @@ test("a version is newer number by number, and a manifest names one only whole",
   expect([R.isNewer("1.0.10", ""), R.isNewer("2.x", "1.0.9")]).toEqual([false, false])
   expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
   expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
+  // `omarchy plugin update` updates a clone from its origin: a clone made by
+  // any URL of this repo is offered main's version, a fork's never.
+  const config = url => `[core]\n\tbare = false\n[remote "origin"]\n\turl = ${url}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`
+  expect(["https://github.com/gmchande/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks", '"https://github.com/gmchande/omarchy-stonks.git"',
+    "git@github.com:gmchande/omarchy-stonks.git", "https://github.com/someone/omarchy-stonks.git", "https://github.com/gmchande/omarchy-stonks-fork.git"]
+    .map(url => R.updatesFromMain(config(url)))).toEqual([true, true, true, true, false, false])
+  expect(R.updatesFromMain('[remote "upstream"]\n\turl = https://github.com/gmchande/omarchy-stonks.git\n[remote "origin"]\n\turl = https://github.com/someone/omarchy-stonks.git\n')).toBe(false)
 })
 
 test("search finds the list's own stocks by symbol or by a word of their name, the symbol typed first", () => {

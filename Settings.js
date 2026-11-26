@@ -11,7 +11,9 @@ function nextChangeMode(mode) {
 }
 
 // A hand edit can give an object with a length, as {"length": 1e12}: only
-// a list is read as one, so a few bytes can't hold the shell's thread.
+// a list is read as one, so a few bytes can't hold the shell's thread. A
+// symbol holding half a UTF-16 pair, as a tool that cuts an emoji leaves
+// one, can't go in a URL: kept, it would stop every price refresh.
 function normalizeSymbols(value) {
   var list = []
   if (typeof value === "string") list = value.split(/[\s,]+/)
@@ -20,12 +22,21 @@ function normalizeSymbols(value) {
   var seen = {}
   for (var i = 0; i < list.length; i++) {
     var s = String(list[i] || "").trim().toUpperCase()
-    if (s && seen[s] !== true) {
+    if (s && seen[s] !== true && carried(s)) {
       seen[s] = true
       out.push(s)
     }
   }
   return out
+}
+
+function carried(symbol) {
+  try {
+    encodeURIComponent(symbol)
+    return true
+  } catch (e) {
+    return false
+  }
 }
 
 function canRemove(symbols) {
@@ -47,11 +58,14 @@ function normalizeReversed(order, value) {
   return normalizeOrder(order) !== "manual" && value === true
 }
 
+// A hand edit can give a section as an object with a length, as for the
+// symbols.
 function barEntryFor(config, id) {
   if (!config || !config.bar || !config.bar.layout) return null
   var sections = ["left", "center", "right"]
   for (var s = 0; s < sections.length; s++) {
-    var arr = config.bar.layout[sections[s]] || []
+    var arr = config.bar.layout[sections[s]]
+    if (!Array.isArray(arr)) continue
     for (var i = 0; i < arr.length; i++) {
       if (arr[i] && arr[i].id === id) return arr[i]
     }
@@ -86,19 +100,6 @@ function readListsFile(text) {
   }
 }
 
-// How many bytes `text` takes in the file, as UTF-8.
-function fileBytes(text) {
-  var bytes = 0
-  for (var i = 0; i < text.length; i++) {
-    var c = text.charCodeAt(i)
-    if (c < 0x80) bytes += 1
-    else if (c < 0x800) bytes += 2
-    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < text.length) { bytes += 4; i++ }
-    else bytes += 3
-  }
-  return bytes
-}
-
 // `symbols`, `order` and `reversed` are All's, as version 1 wrote them; a
 // named list is a subset of All.
 function fileSettings(src) {
@@ -108,7 +109,7 @@ function fileSettings(src) {
   var symbols = own.length ? own : normalizeSymbols(["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   for (var i = 0; i < lists.length; i++) symbols = symbols.concat(lists[i].symbols)
   symbols = normalizeSymbols(symbols)
-  return Object.assign({}, from, {
+  return copyWith(from, {
     version: 1,
     symbols: symbols,
     featured: String(from.featured || ""),
@@ -126,39 +127,51 @@ function fileSettings(src) {
   })
 }
 
+// A copy of `from` with `values` over it, every key in the order it came.
+// Object.assign would take a key named "__proto__", as a hand edit may
+// give one, as the copy's prototype, and the next save would leave it out.
+function copyWith(from, values) {
+  var out = {}
+  ;[from, values].forEach(function(source) {
+    Object.keys(source).forEach(function(key) {
+      Object.defineProperty(out, key, { value: source[key], enumerable: true, writable: true, configurable: true })
+    })
+  })
+  return out
+}
+
 // A hand edit can leave a list with no name, the name All, or another
 // list's name in another case. It keeps all it holds under the first free
-// name like its own (`freeListName`); lists named well keep theirs, so they
-// are named first.
+// name like its own: "List" for no name, then "All 2", "growth 2", "List
+// 3". Lists named well keep theirs, so they are named first. Names are
+// weighed by their upper case, as `listIndex` weighs them, each once, and
+// each name's next number is kept, so thousands of lists of one name read
+// at once. Kept as an object's keys, each after a letter so none is
+// "__proto__": Qt's Set looks through every key it holds.
 function normalizeLists(value) {
   if (!Array.isArray(value)) return []
   var lists = []
   for (var i = 0; i < value.length; i++) if (value[i] && typeof value[i] === "object") lists.push(value[i])
-  var named = []
+  var taken = { kALL: true }
   var names = lists.map(function(list) {
     var name = listName(list.name)
-    if (listNameProblem(name, named) !== "") return null
-    named.push({ name: name })
+    if (!name || taken["k" + name.toUpperCase()] === true) return null
+    taken["k" + name.toUpperCase()] = true
     return name
   })
+  var next = {}
   return lists.map(function(list, i) {
     var name = names[i]
     if (name === null) {
-      name = freeListName(listName(list.name), named)
-      named.push({ name: name })
+      var base = listName(list.name) || "List"
+      var n = next["k" + base.toUpperCase()] || 1
+      for (; taken["k" + (name = n === 1 ? base : base + " " + n).toUpperCase()] === true; n++) {}
+      next["k" + base.toUpperCase()] = n + 1
+      taken["k" + name.toUpperCase()] = true
     }
-    return Object.assign({}, list, { name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
+    return copyWith(list, { name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
       reversed: normalizeReversed(list.order, list.reversed) })
   })
-}
-
-// "List" for no name, then "All 2", "growth 2", "List 3": the first not taken.
-function freeListName(name, lists) {
-  var base = name || "List"
-  for (var n = 1; ; n++) {
-    var tried = n === 1 ? base : base + " " + n
-    if (listNameProblem(tried, lists) === "") return tried
-  }
 }
 
 function listName(value) {
@@ -213,18 +226,18 @@ function withList(settings, name, change) {
   var i = listIndex(settings.lists, name)
   if (i < 0) {
     var all = change({ symbols: settings.symbols, order: settings.order, reversed: settings.reversed })
-    return fileSettings(Object.assign({}, settings, { symbols: all.symbols, order: all.order, reversed: all.reversed }))
+    return fileSettings(copyWith(settings, { symbols: all.symbols, order: all.order, reversed: all.reversed }))
   }
   var lists = settings.lists.slice()
   lists[i] = change(lists[i])
-  return fileSettings(Object.assign({}, settings, { lists: lists }))
+  return fileSettings(copyWith(settings, { lists: lists }))
 }
 
 function withSymbolAdded(settings, symbol) {
   var s = String(symbol || "").trim().toUpperCase()
   if (!s) return settings
   return withList(settings, settings.list, function(list) {
-    return Object.assign({}, list, { symbols: list.symbols.concat([s]) })
+    return copyWith(list, { symbols: list.symbols.concat([s]) })
   })
 }
 
@@ -242,7 +255,7 @@ function withMembership(settings, symbol, name, member, shown) {
   var i = listIndex(settings.lists, name)
   if (i >= 0) {
     var next = withList(settings, name, function(list) {
-      return Object.assign({}, list, { symbols: member ? list.symbols.concat([symbol]) : without(list.symbols) })
+      return copyWith(list, { symbols: member ? list.symbols.concat([symbol]) : without(list.symbols) })
     })
     var after = neighbour(shown, symbol)
     if (!member && charted && after && i === listIndex(settings.lists, settings.list)) next.featured = after
@@ -251,8 +264,8 @@ function withMembership(settings, symbol, name, member, shown) {
   // Every symbol is in All already.
   if (member || !canRemove(settings.symbols) || settings.symbols.indexOf(symbol) < 0) return settings
   var symbols = without(settings.symbols)
-  return fileSettings(Object.assign({}, settings, { symbols: symbols, featured: charted ? neighbour(shown, symbol) || symbols[0] : settings.featured,
-    lists: settings.lists.map(function(list) { return Object.assign({}, list, { symbols: without(list.symbols) }) }) }))
+  return fileSettings(copyWith(settings, { symbols: symbols, featured: charted ? neighbour(shown, symbol) || symbols[0] : settings.featured,
+    lists: settings.lists.map(function(list) { return copyWith(list, { symbols: without(list.symbols) }) }) }))
 }
 
 // `before`: the settings before the removal; `left`: the stock it left featured.
@@ -266,23 +279,23 @@ function withRemovalUndone(settings, before, symbol, left) {
   }
   var lists = settings.lists.map(function(list) {
     var j = listIndex(before.lists, list.name)
-    return j < 0 ? list : Object.assign({}, list, { symbols: restore(list.symbols, before.lists[j].symbols) })
+    return j < 0 ? list : copyWith(list, { symbols: restore(list.symbols, before.lists[j].symbols) })
   })
   var upper = function(value) { return String(value || "").toUpperCase() }
   var back = upper(before.featured) === symbol && upper(left) !== symbol && upper(settings.featured) === upper(left)
-  return fileSettings(Object.assign({}, settings, { symbols: restore(settings.symbols, before.symbols), lists: lists,
+  return fileSettings(copyWith(settings, { symbols: restore(settings.symbols, before.symbols), lists: lists,
     featured: back ? symbol : settings.featured }))
 }
 
 function withListOrder(settings, order) {
   return withList(settings, settings.list, function(list) {
-    return Object.assign({}, list, { order: normalizeOrder(order), reversed: false })
+    return copyWith(list, { order: normalizeOrder(order), reversed: false })
   })
 }
 
 function withListReversed(settings) {
   return withList(settings, settings.list, function(list) {
-    return Object.assign({}, list, { reversed: normalizeReversed(list.order, !list.reversed) })
+    return copyWith(list, { reversed: normalizeReversed(list.order, !list.reversed) })
   })
 }
 
@@ -291,7 +304,7 @@ function withManualOrder(settings, symbols) {
     var moved = normalizeSymbols(symbols)
     var same = moved.length === list.symbols.length
       && moved.every(function(s) { return list.symbols.indexOf(s) >= 0 })
-    return same ? Object.assign({}, list, { symbols: moved, order: "manual", reversed: false }) : list
+    return same ? copyWith(list, { symbols: moved, order: "manual", reversed: false }) : list
   })
 }
 
@@ -300,7 +313,7 @@ function withManualOrder(settings, symbols) {
 function withListCreated(settings, name, symbol) {
   if (listNameProblem(name, settings.lists) !== "") return settings
   var list = { name: listName(name), symbols: symbol ? [symbol] : [], order: "manual", reversed: false }
-  return fileSettings(Object.assign({}, settings, { lists: settings.lists.concat([list]), list: symbol ? settings.list : list.name }))
+  return fileSettings(copyWith(settings, { lists: settings.lists.concat([list]), list: symbol ? settings.list : list.name }))
 }
 
 function renameProblem(settings, name, newName) {
@@ -311,15 +324,15 @@ function withListRenamed(settings, name, newName) {
   var i = listIndex(settings.lists, name)
   if (i < 0 || renameProblem(settings, settings.lists[i].name, newName) !== "") return settings
   var lists = settings.lists.slice()
-  lists[i] = Object.assign({}, lists[i], { name: listName(newName) })
+  lists[i] = copyWith(lists[i], { name: listName(newName) })
   var current = settings.list === settings.lists[i].name ? lists[i].name : settings.list
-  return fileSettings(Object.assign({}, settings, { lists: lists, list: current }))
+  return fileSettings(copyWith(settings, { lists: lists, list: current }))
 }
 
 function withListMoved(settings, name, delta) {
   var from = listIndex(settings.lists, name)
   if (from < 0) return settings
-  return fileSettings(Object.assign({}, settings, { lists: movedSymbols(settings.lists, from, from + delta) }))
+  return fileSettings(copyWith(settings, { lists: movedSymbols(settings.lists, from, from + delta) }))
 }
 
 function withListDeleted(settings, name) {
@@ -327,7 +340,7 @@ function withListDeleted(settings, name) {
   if (i < 0) return settings
   var lists = settings.lists.slice()
   lists.splice(i, 1)
-  return fileSettings(Object.assign({}, settings, { lists: lists }))
+  return fileSettings(copyWith(settings, { lists: lists }))
 }
 
 // Both as `fileSettings` returns them, so their keys come in one order.

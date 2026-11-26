@@ -4,28 +4,23 @@ import "Commands.js" as Commands
 // Reads a file Stonks keeps, or a setting it reads, outside the shell's
 // thread (`Commands.readSaved`): a regular file only, up to `cap` bytes.
 // `done(answer)` hears what it held (`Commands.readSavedFile`). A read asked
-// while one is out ends that one unheard, and `drop()` ends it with nothing
-// heard.
+// while one is out ends that one unheard.
 Item {
   id: root
 
   signal done(var answer)
 
-  // { path, cap, dropped } of the read out, and of the one asked after it.
+  // { path, cap } of the read out, and of the one asked after it.
   property var current: null
   property var next: null
   property int code: -1
+  // A read is out: `done` is still to come.
+  readonly property bool out: current !== null
 
   function read(path, cap) {
-    root.next = { path: path, cap: cap, dropped: false }
+    root.next = { path: path, cap: cap }
     if (reading.running) reading.running = false
     else root.start()
-  }
-
-  function drop() {
-    root.next = null
-    if (root.current) root.current.dropped = true
-    reading.running = false
   }
 
   function start() {
@@ -46,7 +41,7 @@ Item {
       var ran = root.current
       if (root.next) return root.start()
       root.current = null
-      if (!ran || ran.dropped) return
+      if (!ran) return
       root.done(Commands.readSavedFile(root.code, held.data.byteLength, held.text, ran.cap))
     }
   }

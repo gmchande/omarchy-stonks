@@ -85,5 +85,6 @@ Item {
     pluginId: root.pluginId
     service: dataService
     windowHost: host
+    updates: versionWatch
   }
 }

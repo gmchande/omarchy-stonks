@@ -11,8 +11,9 @@
 # a closed one asks, and the key that wakes that screen asks its rows at
 # once; a click that stops a run ahead shows its chart from the answers
 # already in; a window closed while a cap is on its way asks nothing more
-# for it; and the bell keeps quiet once every screen goes off before it
-# rings. HOME and curl are scratch; the fake curl answers from
+# for it; the bell keeps quiet once every screen goes off before it rings;
+# and GitHub, unanswered as Yahoo answers again, is asked again at once.
+# HOME and curl are scratch; the fake curl answers from
 # test/fixtures/moments/fetch-2026-10-07.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetching.qml

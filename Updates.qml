@@ -13,8 +13,10 @@ Item {
   // The manifest's id (`Plugin`), which `omarchy plugin update` takes.
   property string pluginId: ""
   // `omarchy plugin update` takes only a folder holding its own clone, a
-  // `.git` folder; a copy or a worktree it refuses. There the service never
-  // asks GitHub for main's version, so no update is offered.
+  // `.git` folder; a copy or a worktree it refuses. It updates a clone from
+  // its origin, so a fork's would install the fork, not main's version
+  // (`Release.updatesFromMain`). Elsewhere the service never asks GitHub for
+  // main's version, so no update is offered.
   property bool updatable: false
   // The manifest's version when first read: the code running.
   property string runningVersion: ""
@@ -55,11 +57,10 @@ Item {
     restartShell.startDetached()
   }
 
-  // Detached, so the terminal outlives a restart. Omarchy shows what changes
-  // and asks. A no, "up to date", a failed fetch and a rolled-back
-  // validation leave HEAD where it was or exit 1, and Omarchy has rescanned
-  // the plugins by its exit. The launcher joins its arguments into a
-  // `bash -c` script, so the last one is shell code.
+  // Detached, so the terminal outlives a restart (`Commands.update`).
+  // Omarchy shows what changes and asks. A no, "up to date", a failed fetch
+  // and a rolled-back validation leave HEAD where it was or exit 1, and
+  // Omarchy has rescanned the plugins by its exit.
   function update(restart) {
     if (restart) updateAndRestart.startDetached()
     else updatePlugin.startDetached()
@@ -78,9 +79,10 @@ Item {
   }
 
   FileView {
-    path: root.pluginId ? Quickshell.env("HOME") + "/.config/omarchy/plugins/" + root.pluginId + "/.git/HEAD" : ""
+    id: gitConfig
+    path: root.pluginId ? Quickshell.env("HOME") + "/.config/omarchy/plugins/" + root.pluginId + "/.git/config" : ""
     printErrors: false
-    onLoaded: root.updatable = true
+    onLoaded: root.updatable = Release.updatesFromMain(gitConfig.text())
   }
 
   Timer {
@@ -97,11 +99,11 @@ Item {
 
   Process {
     id: updatePlugin
-    command: Commands.update(root.pluginId)
+    command: Commands.update(root.pluginId, false)
   }
 
   Process {
     id: updateAndRestart
-    command: Commands.updateAndRestart(root.pluginId)
+    command: Commands.update(root.pluginId, true)
   }
 }
