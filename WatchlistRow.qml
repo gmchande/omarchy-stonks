@@ -52,20 +52,30 @@ Rectangle {
   property int lastPlace: -1
   property real shift: 0
   property int travel: 0
+  property bool sorting: false
+  property int slideMs: 160
+  property int fadeMs: 160
   onPlaceChanged: {
     var from = lastPlace
     lastPlace = place
     if (folding && place < 0) return
     endFold()
+    if (sorting) return
     if (lifted || !visible || from < 0 || place < 0) {
       settle()
       return
     }
+    slideMs = 160
     travel = Math.abs(place - from)
     shift += (from - place) * pitch
     slide.restart()
   }
-  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
+  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, row.slideMs); easing.type: Easing.OutCubic }
+  onShiftChanged: if (slide.running && Math.abs(shift) < 0.5) {
+    slide.stop()
+    shift = 0
+    travel = 0
+  }
   // Lifted or sliding, the row lays the card's ground under its fill, at
   // once, so the rows it passes never show through.
   readonly property bool moving: lifted || slide.running
@@ -131,9 +141,37 @@ Rectangle {
   property bool hadLine: false
   Component.onCompleted: hadLine = !!geometry
   function join() {
+    fadeMs = 160
     opacity = 0
     fadeIn.restart()
     if (geometry) drawLineIn()
+  }
+  function sortGlide(distance) {
+    endFold()
+    fadeIn.stop()
+    opacity = 1
+    slide.stop()
+    if (Math.abs(distance) < 0.5) {
+      shift = 0
+      travel = 0
+      return
+    }
+    slideMs = 220
+    shift = distance
+    travel = Math.max(1, Math.round(Math.abs(distance) / pitch))
+    slide.restart()
+  }
+  function sortArrive(nudge) {
+    endFold()
+    slide.stop()
+    fadeIn.stop()
+    slideMs = 220
+    fadeMs = 220
+    travel = 0
+    shift = nudge
+    opacity = 0
+    slide.restart()
+    fadeIn.restart()
   }
   function drawLineIn() {
     reveal = 0
@@ -154,10 +192,15 @@ Rectangle {
       travel = 0
       return
     }
+    slideMs = 160
     travel = Math.max(travel, Math.round(Math.abs(shift) / pitch))
     slide.restart()
   }
-  NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, row.fadeMs); easing.type: Easing.OutCubic }
+  onOpacityChanged: if (fadeIn.running && opacity > 0.99) {
+    fadeIn.stop()
+    opacity = 1
+  }
   NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.OutCubic }
 
   // In scene coordinates. `second` is Qt's double-click second press, which

@@ -509,18 +509,61 @@ Harness {
       service.switchList(wasList)
 
       // By symbol, A to Z, then Z to A: the rows themselves, not the setting.
+      // A featured row that stays in sight glides to its new slot and keeps
+      // its highlight on it the whole way.
       var shown = function() { return body.watchlist.displayedSymbols.join(",") }
       var aToZ = service.symbols.slice().sort()
+      var list = body.watchlist
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      var tracked = list.displayedSymbols.filter(function(s, i) {
+        var nextAt = aToZ.indexOf(s)
+        return nextAt >= 0 && nextAt !== i && list.wholeInSight(i, 0) && list.wholeInSight(nextAt, 0)
+      })[0]
+      if (tracked) {
+        click(row(tracked))
+        within(1500, function() { return service.featuredSymbol === tracked })
+        rest()
+      }
+      var trackedRow = tracked ? row(tracked) : null
+      var fill = harness.find(body, "rowHighlight")
+      var fromY = trackedRow ? trackedRow.y : 0
+      var toY = tracked ? aToZ.indexOf(tracked) * list.rowPitch : 0
+      var glided = false
+      var rode = true
+      var off = ""
+      var trackGlide = function() {
+        if (!trackedRow || !fill) return
+        var y = trackedRow.y
+        if (Math.min(fromY, toY) + 1 < y && y < Math.max(fromY, toY) - 1) glided = true
+        Qt.callLater(function() {
+          if (!trackedRow || !fill) return
+          if (!fill.visible || Math.abs(fill.y - trackedRow.y) >= 0.5) {
+            rode = false
+            off = [fill.visible, fill.y.toFixed(1), trackedRow.y.toFixed(1)].join("/")
+          }
+        })
+      }
+      if (trackedRow) trackedRow.yChanged.connect(trackGlide)
       click("orderLabel")
       var ordered = within(1500, function() { return shown() === aToZ.join(",") })
+      rest()
+      if (trackedRow) trackedRow.yChanged.disconnect(trackGlide)
+      if (!glided || !rode) fillOff.push("a sort (" + [glided, rode, off].join(" ") + ")")
+      fillFollows("a sort")
       click("orderArrow")
       var reversed = within(1500, function() { return shown() === aToZ.slice().reverse().join(",") })
+      rest()
+      fillFollows("reversing the order")
       // A percent, then an amount, then since the open.
       var next = ({ pct: "abs", abs: "open", open: "pct" })[service.changeMode]
       click("unitTarget")
       harness.check("the order's word puts the rows in the next order, its arrow reverses them, and the unit steps to the next unit",
         ordered && reversed && within(1500, function() { return service.changeMode === next }), [ordered, reversed, shown(), service.changeMode, "wanted " + next].join(" "))
       service.setOrder("manual")
+      rest()
+      fillFollows("returning to manual order")
 
       // Two of them, so one range for every click can't pass.
       var options = harness.findAll(body, "rangeOption")
@@ -687,7 +730,7 @@ Harness {
         list.contentHeight > list.height && within(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
         [list.contentHeight, list.height, list.contentY, service.symbols.join(",")].join(" "))
       fillFollows("the wheel")
-      harness.check("the selected row's fill slides to the row clicked and stays on it through a drag, an add, a removal and the wheel",
+      harness.check("the selected row's fill slides to the row clicked and stays on it through a drag, a sort, an add, a removal and the wheel",
         fillOff.length === 0, fillOff.join(", "))
 
       // QtTest sends no touchpad, so its event goes to the list's handler as

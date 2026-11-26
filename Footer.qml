@@ -12,6 +12,8 @@ Item {
   id: root
 
   property Look look
+  property bool seen: true
+  property bool still: false
   property int rowHeight: Style.space(30)
   // The rows' scrollbar gutter: the words and fill stop short of it, the
   // ground doesn't.
@@ -34,16 +36,87 @@ Item {
   readonly property bool undoing: undoLabel !== ""
   readonly property string sideLabel: undoing ? undoLabel : updateLabel
   readonly property real undoRoom: sideLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
-  // The room the words are centred beside: it follows the end button's at
-  // the shell's pace, so the words glide as the button comes and goes,
-  // while a change of the bar's own width moves them at once.
-  property real wordsRoom: undoRoom
-  Behavior on wordsRoom {
-    NumberAnimation {
-      duration: Motion.duration(Style, 160)
-      easing.type: Easing.Bezier
-      easing.bezierCurve: Motion.curve(Style)
+  // The room the main button and its words leave for the end button: both
+  // glide together on OutCubic, stopping within half a pixel, cleanly
+  // uncovering the side button as it fades in.
+  property real wordsRoom: 0
+  property real sideIn: 1
+  property real noteIn: 1
+
+  Component.onCompleted: settle()
+  onUndoRoomChanged: {
+    if (still) return
+    if (!seen || !visible || Motion.duration(Style, 160) <= 0 || Math.abs(undoRoom - wordsRoom) < 0.5) {
+      roomAnim.stop()
+      wordsRoom = undoRoom
+      return
     }
+    roomAnim.stop()
+    roomAnim.to = undoRoom
+    roomAnim.start()
+  }
+  onWordsRoomChanged: if (roomAnim.running && Math.abs(wordsRoom - roomAnim.to) < 0.5) {
+    roomAnim.stop()
+    wordsRoom = roomAnim.to
+  }
+  NumberAnimation {
+    id: roomAnim
+    target: root
+    property: "wordsRoom"
+    duration: Motion.duration(Style, 160)
+    easing.type: Easing.OutCubic
+  }
+
+  onSideLabelChanged: {
+    if (still) return
+    if (sideLabel !== "" && seen && visible && Motion.duration(Style, 140) > 0) {
+      sideInAnim.stop()
+      sideIn = 0
+      sideInAnim.start()
+    } else {
+      sideInAnim.stop()
+      sideIn = 1
+    }
+  }
+  onSideInChanged: if (sideInAnim.running && sideIn > 0.99) {
+    sideInAnim.stop()
+    sideIn = 1
+  }
+  NumberAnimation {
+    id: sideInAnim
+    target: root
+    property: "sideIn"
+    to: 1
+    duration: Motion.duration(Style, 140)
+    easing.type: Easing.OutCubic
+  }
+
+  onNoteChanged: {
+    if (still) return
+    if (note !== "" && noteOpacity >= 1 && seen && visible && Motion.duration(Style, 120) > 0) {
+      noteInAnim.stop()
+      noteIn = 0
+      noteInAnim.start()
+    } else {
+      noteInAnim.stop()
+      noteIn = 1
+    }
+  }
+  onNoteOpacityChanged: if (noteOpacity < 1 && noteInAnim.running) {
+    noteInAnim.stop()
+    noteIn = 1
+  }
+  onNoteInChanged: if (noteInAnim.running && noteIn > 0.99) {
+    noteInAnim.stop()
+    noteIn = 1
+  }
+  NumberAnimation {
+    id: noteInAnim
+    target: root
+    property: "noteIn"
+    to: 1
+    duration: Motion.duration(Style, 120)
+    easing.type: Easing.OutCubic
   }
 
   // A note stays while the pointer is on the bar.
@@ -51,11 +124,28 @@ Item {
   property real noteOpacity: 1
   property real coveredOpacity: 1
   function fadeIn() { coveredIn.restart() }
-  // Closing stops the fade where it is; an open shows it whole.
-  function freeze() { coveredIn.stop() }
+  // Closing stops fades and slides where they are; an open shows them whole.
+  function freeze() {
+    if (coveredIn.running) coveredIn.pause()
+    if (roomAnim.running) roomAnim.pause()
+    if (sideInAnim.running) sideInAnim.pause()
+    if (noteInAnim.running) noteInAnim.pause()
+  }
   function settle() {
     coveredIn.stop()
     coveredOpacity = 1
+    roomAnim.stop()
+    wordsRoom = undoRoom
+    sideInAnim.stop()
+    sideIn = 1
+    noteInAnim.stop()
+    noteIn = 1
+  }
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
   }
   NumberAnimation {
     id: coveredIn
@@ -66,6 +156,10 @@ Item {
     duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
     easing.bezierCurve: Motion.curve(Style)
+  }
+  onCoveredOpacityChanged: if (coveredIn.running && coveredOpacity > 0.99) {
+    coveredIn.stop()
+    coveredOpacity = 1
   }
 
   signal clicked()
@@ -165,18 +259,27 @@ Item {
   }
 
   FooterButton {
+    z: 1
     anchors.fill: parent
     anchors.topMargin: root.hintHeight + Style.space(6)
-    anchors.rightMargin: root.gutter + root.undoRoom
+    anchors.rightMargin: root.gutter + root.wordsRoom
     mouse: addMouse
     acts: root.acts
     retro: root.look.retro
     foreground: root.look.foreground
 
+    // Opaque ground behind the gliding button so its right edge cleanly
+    // uncovers the side button without crossing borders.
+    Rectangle {
+      z: -1
+      anchors.fill: parent
+      radius: parent.radius
+      color: root.look.ground
+    }
+
     // Centred in its own box, beside the end button.
     Item {
-      width: root.width - root.gutter - root.wordsRoom
-      height: parent.height
+      anchors.fill: parent
 
       Grid {
         id: footerRow
@@ -197,7 +300,7 @@ Item {
           textFormat: Text.PlainText
           text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
           color: root.note !== "" || root.notice !== "" ? root.look.foreground : root.look.dim
-          opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
+          opacity: root.note !== "" ? root.noteOpacity * root.noteIn : root.coveredOpacity
           font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
@@ -208,7 +311,7 @@ Item {
           textFormat: Text.PlainText
           text: root.note === "" && root.notice !== "" ? root.noticeShown.action : ""
           color: root.look.foreground
-          opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
+          opacity: root.note !== "" ? root.noteOpacity * root.noteIn : root.coveredOpacity
           font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
@@ -217,7 +320,11 @@ Item {
 
     MouseArea {
       id: addMouse
-      anchors.fill: parent
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      // Never steals a click meant for the side button while the border glides.
+      width: Math.min(parent.width, Math.max(0, root.width - root.gutter - root.undoRoom))
       // Undoes the press's give, so a press near the edge still counts.
       scale: 1 / parent.scale
       hoverEnabled: true
@@ -230,6 +337,7 @@ Item {
 
   FooterButton {
     objectName: "footerUndo"
+    z: 0
     visible: root.sideLabel !== ""
     anchors.top: parent.top
     anchors.bottom: parent.bottom
@@ -237,7 +345,7 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: root.gutter
     width: root.undoRoom - Style.space(4)
-    opacity: root.undoing ? root.undoOpacity : 1
+    opacity: (root.undoing ? root.undoOpacity : 1) * root.sideIn
     mouse: undoMouse
     retro: root.look.retro
     foreground: root.look.foreground

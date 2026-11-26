@@ -101,6 +101,9 @@ Item {
   readonly property real morph: 1 - Math.pow(1 - beat, 3)
   property bool stockSwitch: false
   readonly property real arrival: stockSwitch ? morph : 1
+  // Smooth eases on OutCubic, retro steps evenly in time: drives the header
+  // animal across both stock switches and range switches.
+  readonly property real crossing: beat < 1 ? (retro ? beat : morph) : 1
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
   // What plays alongside keeps to it, and to its InOutSine. The reader asks

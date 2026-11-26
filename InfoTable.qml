@@ -18,7 +18,12 @@ Item {
   property var factLists: []
   property var ranges: []
   property Look look
+  property bool seen: true
+  property bool still: false
   property int rowGap: Style.space(4)
+
+  signal settled()
+  function settle() { settled() }
 
   readonly property int gap: Style.space(14)
   readonly property int innerGap: Style.space(6)
@@ -96,6 +101,7 @@ Item {
   implicitHeight: lineHeight * 2 + rowGap
 
   Repeater {
+    id: rows
     model: 2
 
     Item {
@@ -125,6 +131,7 @@ Item {
       }
 
       InfoRule {
+        id: ruleItem
         objectName: row.index === 0 ? "periodRule" : "yearRule"
         visible: !!row.line
         x: root.layout.ruleX
@@ -134,6 +141,12 @@ Item {
         high: row.line ? row.line.range.high : null
         price: row.line ? row.line.range.price : null
         look: root.look
+        seen: root.seen
+        still: root.still
+        Connections {
+          target: root
+          function onSettled() { ruleItem.settle() }
+        }
       }
 
       Text {
