@@ -41,6 +41,14 @@ Item {
   // The draw-in's share of the ink, and a replay's place (-1 without one).
   property real reveal: 1
   property real replayX: -1
+  // The chart the one on show bends out of, and how far (`ChartMotion`).
+  property var morphFrom: null
+  property real morph: 1
+  // Another stock's figures arrive on the same beat (`ChartMotion.arrival`),
+  // coming up from below for a row further down (`arrivalFrom` 1) and down
+  // from above for one higher (-1).
+  property real arrival: 1
+  property int arrivalFrom: 0
   property int chartHeight: Style.space(190)
   property string order: "manual"
   property bool reversed: false
@@ -121,6 +129,8 @@ Item {
       now: root.now
       baselineText: root.baselineText
       changeCycles: root.changeCycles
+      arrival: root.arrival
+      arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
 
       Rectangle {
@@ -152,6 +162,8 @@ Item {
         scrubX: root.look.retro ? -1 : root.scrubX
         reveal: root.look.retro ? 1 : root.reveal
         replayX: root.look.retro ? -1 : root.replayX
+        morphFrom: root.look.retro ? null : root.morphFrom
+        morph: root.look.retro ? 1 : root.morph
         live: root.live && !root.look.retro
         newestPrice: root.newestPrice
         surfaceOpen: !root.still
@@ -179,6 +191,8 @@ Item {
         scrubX: root.look.retro ? root.scrubX : -1
         reveal: root.look.retro ? root.reveal : 1
         replayX: root.look.retro ? root.replayX : -1
+        morphFrom: root.look.retro ? root.morphFrom : null
+        morph: root.look.retro ? root.morph : 1
       }
 
       RangeMarks {

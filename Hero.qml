@@ -37,6 +37,13 @@ Item {
   // it, where the extended-hours trade steps aside.
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
+  // Another stock's figures arrive on the switch's beat (`ChartMotion.arrival`,
+  // 0 to 1), from 0.55 and 4 px toward the row clicked (`arrivalFrom`, 1 for
+  // one further down), as a list scrolls.
+  property real arrival: 1
+  property int arrivalFrom: 0
+  opacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
+  transform: Translate { y: root.arrivalFrom * Style.space(4) * (1 - root.arrival) }
 
   readonly property string freshnessText: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is on top. None once its quote

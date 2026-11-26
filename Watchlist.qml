@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
@@ -176,8 +177,7 @@ Flickable {
     target: root
     property: "contentY"
     duration: Motion.duration(Style, 160)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
+    easing.type: Easing.OutCubic
   }
 
   RowPointer {
@@ -394,6 +394,7 @@ Flickable {
       var row = rowRepeater.itemAt(i)
       if (row) row.pause()
     }
+    if (highlightSlide.running) highlightSlide.pause()
   }
 
   function settleRows() {
@@ -401,6 +402,8 @@ Flickable {
       var row = rowRepeater.itemAt(i)
       if (row) row.settle()
     }
+    highlightSlide.stop()
+    highlightShift = 0
   }
 
   function forgetGoneCursor() {
@@ -596,10 +599,65 @@ Flickable {
     }
   }
 
+  // The selected row's fill and outline, drawn here rather than by the row,
+  // so it slides from the row it was on to the row clicked, on the switch's
+  // beat, and then follows its row wherever the row goes: a scroll, a
+  // neighbour's slide, an add or a removal. A lifted row draws its own. With
+  // the row moving it lays the card's ground under it, as the row would,
+  // just under that row.
+  readonly property WatchlistRow featuredItem: rowRepeater.count >= 0 ? rowItem(featuredSymbol) : null
+  property string highlightedSymbol: ""
+  property real highlightShift: 0
+  onFeaturedSymbolChanged: {
+    var from = rowItem(highlightedSymbol)
+    var to = rowItem(featuredSymbol)
+    var was = from ? from.y + highlightShift : 0
+    highlightedSymbol = featuredSymbol
+    highlightSlide.stop()
+    highlightShift = 0
+    if (!surfaceOpen || !from || !to || from === to || !from.visible || !to.visible || to.moving) return
+    highlightShift = was - to.y
+    highlightSlide.start()
+  }
+  NumberAnimation {
+    id: highlightSlide
+    target: root
+    property: "highlightShift"
+    to: 0
+    duration: Motion.duration(Style, Motion.SWITCH_MS)
+    easing.type: Easing.OutCubic
+  }
+
   Item {
     id: rowsBox
     width: Math.max(0, root.width - root.gutter)
     height: root.implicitHeight
+
+    Rectangle {
+      id: highlight
+      objectName: "rowHighlight"
+      readonly property WatchlistRow row: root.featuredItem
+      readonly property bool moving: !!row && row.moving
+      visible: !!row && row.visible && row.highlighted
+      // Under the rows at rest; under its own row alone while that moves.
+      z: moving ? row.z - 0.25 : -1
+      width: row ? row.width : 0
+      height: row ? row.height : 0
+      y: row ? row.y + (moving ? 0 : root.highlightShift) : 0
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+      border.width: row && row.cursor ? Style.hoverBorderWidth : 0
+      border.color: Style.hoverBorderFor(root.look.foreground, Commons.Color.accent)
+      Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
+
+      Rectangle {
+        z: -1
+        anchors.fill: parent
+        radius: parent.radius
+        visible: highlight.moving
+        color: root.look.ground
+      }
+    }
 
     Repeater {
       id: rowRepeater

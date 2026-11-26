@@ -12,11 +12,17 @@ Item {
 
   // `kind` is "bull", "bear", "plain" (no move known yet: the bull in plain
   // ink) or "" (a flat day), and `chart` what it reads: a turn on the same
-  // chart crossfades in smooth, any other change is at once. `asleep` is its
-  // market resting; `bell`, that the clock alone changed that, so the eyes
-  // close or open over 320 ms;
+  // chart crossfades in smooth, any other change is at once, but another
+  // stock (`stock`) crosses over on the switch's beat (`crossing`). `asleep`
+  // is its market resting; `bell`, that the clock alone changed that, so the
+  // eyes close or open over 320 ms;
   // `scrubbed`, that a scrub has it awake, so the sleep after it is no bell.
-  property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
+  property var animal: ({ kind: "", chart: "", stock: "", asleep: false, bell: false, scrubbed: false })
+  // How far another stock's animal has come, 0 to 1 (`ChartMotion.arrival`):
+  // smooth fades the cells that change, retro wipes them in a column at a
+  // time from the left. Never a turn, which says the stock's own day turned,
+  // nor the bell's eyes: it arrives as it is.
+  property real crossing: 1
   property Look look
   // While the panel or window shows (`seen`), the animal greets you at each
   // open and then fidgets ever more rarely (`Cells.fidgetMove`); asleep, its
@@ -89,6 +95,8 @@ Item {
   function show(fade) {
     var k = animal ? animal.kind : ""
     shownChart = animal ? animal.chart : ""
+    shownKind = k
+    shownStock = animal ? animal.stock : ""
     turn.stop()
     turnBull.to = k === "bull" || k === "plain" ? 1 : 0
     turnBear.to = k === "bear" ? 1 : 0
@@ -122,8 +130,49 @@ Item {
     if (rung && fidgetStep >= 0) fidgetNext()
   }
 
-  // While still, nothing moves: a change waits for the open's `settle`.
-  onAnimalChanged: if (!still) show(animal.chart === shownChart)
+  // While still, nothing moves: a change waits for the open's `settle`. The
+  // surface works the animal out a piece at a time as a stock arrives, its
+  // kind before its chart, so it is taken once those land together: a new
+  // kind on the old chart would read as a turn.
+  onAnimalChanged: if (!still) Qt.callLater(take)
+  function take() {
+    if (still) return
+    var before = drawn(shownKind)
+    var stock = !!animal && animal.stock !== shownStock
+    show(!stock && animal.chart === shownChart)
+    if (stock) cross(before, drawn(kind))
+  }
+  property string shownStock: ""
+  property string shownKind: ""
+
+  // The cells of `k` on show, in their ink.
+  function drawn(k) {
+    if (k === "") return { pixels: [], color: look.upColor }
+    var up = k !== "bear"
+    return { pixels: Cells.spriteFor(up, drawnLids, pricked), color: k === "plain" ? look.dim : up ? look.upColor : look.downColor }
+  }
+
+  // Smooth keeps the cells both share in one ink and fades the rest; retro
+  // wipes the whole sprite.
+  property var crossLeaving: []
+  property var crossComing: []
+  property var crossStaying: []
+  property color leavingColor: look.upColor
+  property color comingColor: look.upColor
+  function cross(from, to) {
+    var key = function(p) { return p.x + "," + p.y }
+    var same = !look.retro && Qt.colorEqual(from.color, to.color)
+    var had = {}
+    from.pixels.forEach(function(p) { had[key(p)] = true })
+    var has = {}
+    to.pixels.forEach(function(p) { has[key(p)] = true })
+    crossStaying = same ? to.pixels.filter(function(p) { return had[key(p)] }) : []
+    crossLeaving = same ? from.pixels.filter(function(p) { return !has[key(p)] }) : from.pixels
+    crossComing = same ? to.pixels.filter(function(p) { return !had[key(p)] }) : to.pixels
+    leavingColor = from.color
+    comingColor = to.color
+  }
+  readonly property bool crossShown: crossing < 1 && (crossLeaving.length > 0 || crossComing.length > 0)
   onStillChanged: if (still) {
     if (turn.running) turn.pause()
     if (shutting.running) shutting.pause()
@@ -135,19 +184,61 @@ Item {
   height: Style.space(28)
 
   // One layer each, so smooth's turn crossfades between them.
-  PixelSprite {
-    id: bull
+  Item {
     anchors.fill: parent
-    visible: opacity > 0
-    pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
-    color: root.kind === "plain" ? root.look.dim : root.look.upColor
+    visible: !root.crossShown
+    PixelSprite {
+      id: bull
+      anchors.fill: parent
+      visible: opacity > 0
+      pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
+      color: root.kind === "plain" ? root.look.dim : root.look.upColor
+    }
+    PixelSprite {
+      id: bear
+      anchors.fill: parent
+      visible: opacity > 0
+      pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
+      color: root.look.downColor
+    }
   }
-  PixelSprite {
-    id: bear
+
+  // Retro's wipe in whole columns of the sprite's 20.
+  readonly property real crossEdge: root.look.retro ? Math.floor(root.crossing * 20) / 20 * width : width
+  Item {
+    visible: root.crossShown
     anchors.fill: parent
-    visible: opacity > 0
-    pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
-    color: root.look.downColor
+    PixelSprite {
+      anchors.fill: parent
+      pixels: root.crossStaying
+      color: root.comingColor
+    }
+    Item {
+      x: root.look.retro ? root.crossEdge : 0
+      width: parent.width - x
+      height: parent.height
+      clip: true
+      PixelSprite {
+        x: -parent.x
+        width: root.width
+        height: root.height
+        opacity: root.look.retro ? 1 : 1 - root.crossing
+        pixels: root.crossLeaving
+        color: root.leavingColor
+      }
+    }
+    Item {
+      width: root.crossEdge
+      height: parent.height
+      clip: true
+      PixelSprite {
+        width: root.width
+        height: root.height
+        opacity: root.look.retro ? 1 : root.crossing
+        pixels: root.crossComing
+        color: root.comingColor
+      }
+    }
   }
 
   ParallelAnimation {

@@ -38,7 +38,11 @@ Item {
   property bool helpShown: false
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
-
+  // Another stock's name and status fade in on the switch's beat
+  // (`ChartMotion.arrival`), still where they stand: the header holds still
+  // around the animal and the icons.
+  property real arrival: 1
+  readonly property real wordsOpacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
 
   signal styleRequested(string style)
   signal soundsRequested()
@@ -119,6 +123,7 @@ Item {
     id: slot
     animal: root.animal
     look: root.look
+    crossing: root.arrival
     seen: root.seen
     still: root.still
     anchors.left: parent.left
@@ -190,6 +195,7 @@ Item {
   Text {
     id: titleText
     visible: root.titled
+    opacity: root.wordsOpacity
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     y: Math.round((root.contentHeight - implicitHeight - Style.space(2) - statusWords.implicitHeight) / 2)
@@ -215,6 +221,7 @@ Item {
   Text {
     id: statusWords
     anchors.left: slot.right
+    opacity: root.wordsOpacity
     anchors.leftMargin: Style.space(14)
     width: Math.min(implicitWidth, root.wordsRoom)
     y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)

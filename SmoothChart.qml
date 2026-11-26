@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Chart.js" as Chart
+import "Morph.js" as Morph
 import "SmoothPaint.js" as SmoothPaint
 import "Tones.js" as Tones
 import "Motion.js" as Motion
@@ -15,7 +16,9 @@ import "Motion.js" as Motion
 // the chart doesn't count draws fainter and thinner, with no wash
 // (`geometry.aside`), and the rest keeps a flat wash under the session.
 // Three layers, so each paints only when what it draws changes: the
-// baseline, the ink under a clip the draw-in widens, and the scrub.
+// baseline, the ink under a clip the draw-in widens, and the scrub. Another
+// chart bends out of the one before (`morphFrom`, `morph`), every frame a
+// chart drawn as any is.
 Item {
   id: root
 
@@ -33,9 +36,12 @@ Item {
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
-  // The baseline is always there; the ink draws in from the left to the
-  // newest trade.
+  // The baseline is always there; the ink draws in from the first trade to
+  // the newest.
   property real reveal: 1
+  // The chart this one bends out of, and how far it has come, 0 to 1.
+  property var morphFrom: null
+  property real morph: 1
   // A replay's place, 0..1, or -1 without one: the ink draws in behind it.
   property real replayX: -1
   // The dot ripples while the market trades, as Apple's does: three times as a
@@ -59,19 +65,33 @@ Item {
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
   readonly property real pad: 3 * weight
-  readonly property var lastPoint: Chart.lastLitPoint(geometry)
+  // Worked out once a change, then a frame of it at each step. A change that
+  // comes mid-bend bends on from the frame on screen.
+  property var bendFrom: null
+  property var lastShown: null
+  onMorphFromChanged: bendFrom = morphFrom && morph < 1 && lastShown ? lastShown : morphFrom
+  readonly property var plan: bendFrom && geometry ? Morph.plan(bendFrom, geometry) : null
+  readonly property var shown: plan && morph < 1 ? Morph.frame(plan, morph) : geometry
+  readonly property var lastPoint: Chart.lastLitPoint(shown)
   readonly property bool day: !!geometry && geometry.day === true
   // Against the dashed line under it, and in the line's own ink with none.
   readonly property color dotColor: !lastPoint || !hasBaseline ? baselineColor
-    : lastPoint.y > geometry.baselineY ? belowColor : aboveColor
-  readonly property bool drawable: Chart.drawable(geometry)
-  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
-  // The draw-in sweeps to the newest trade's dot: the line's width and a half,
-  // and a pixel.
-  readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
+    : lastPoint.y > shown.baselineY ? belowColor : aboveColor
+  readonly property bool drawable: Chart.drawable(shown)
+  readonly property bool hasBaseline: Chart.hasBaseline(shown)
+  // The dot rides a line that had one, and comes with the line's end to one
+  // that hadn't.
+  readonly property bool dotRides: !!plan && bendFrom.day === true && Chart.lastLitPoint(bendFrom) !== null
+  // The draw-in sweeps from before the first trade's dot to past the
+  // newest's: the line's width and a half, and a pixel.
+  readonly property real inkFirst: drawable ? shown.points[0].x : 0
+  readonly property real inkLast: drawable ? shown.points[shown.points.length - 1].x : 0
+  readonly property real inkLeft: Math.max(0, pad + inkFirst * (width - pad * 2) - 3 * weight)
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
-  // What is laid over the ink draws in with it (`RangeMarks`).
+  // What is laid over the ink shows once the ink has drawn past it, and as a
+  // chart bends into this one, over the second half (`RangeMarks`).
   readonly property real inkDrawn: curtain.width
+  readonly property real marksShown: Math.max(0, Math.min(1, morph * 2 - 1))
   // Each side's wash adds the lightness the up colour's does at 16%
   // (`Tones.washAlpha`), so a down day's reads as strongly as an up day's.
   readonly property real aboveWash: Tones.washAlpha(aboveColor, upColor, ground, 0.16, 1)
@@ -80,7 +100,8 @@ Item {
   readonly property real aboveFade: Tones.washAlpha(aboveColor, upColor, ground, 0.34, 1)
   readonly property real belowFade: Tones.washAlpha(belowColor, upColor, ground, 0.34, 1)
 
-  onGeometryChanged: { base.requestPaint(); ink.requestPaint(); marks.requestPaint() }
+  onShownChanged: { base.requestPaint(); ink.requestPaint() }
+  onGeometryChanged: marks.requestPaint()
   onBaselineColorChanged: { base.requestPaint(); ink.requestPaint() }
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
@@ -123,21 +144,13 @@ Item {
     return { top: top, bottom: bottom }
   }
 
-  // Ticks the line has reached draw in with it; those ahead, in hours still to
-  // come, are there with the baseline; with no baseline, none.
-  function strokeTicks(ctx, ahead) {
-    var w = width - pad * 2
-    var h = height - pad * 2
-    ctx.strokeStyle = baselineColor
-    ctx.lineWidth = weight
-    for (var k = 0; k < geometry.ticks.length; k++) {
-      if ((geometry.ticks[k] > inkLast) !== ahead) continue
-      var cx = pad + geometry.ticks[k] * w
-      var cy = pad + geometry.baselineY * h
-      ctx.beginPath()
-      ctx.moveTo(cx, cy - 4 * weight)
-      ctx.lineTo(cx, cy + 4 * weight)
-      ctx.stroke()
+  // The sizes and inks the painter reads.
+  function paintStyle(canvas) {
+    return {
+      width: canvas.width, height: canvas.height, pad: pad, weight: weight, dashUnit: dashUnit,
+      hasBaseline: hasBaseline, baselineColor: baselineColor, aboveColor: aboveColor, belowColor: belowColor,
+      aboveWash: aboveWash, belowWash: belowWash, aboveFade: aboveFade, belowFade: belowFade,
+      hoursAlpha: hoursAlpha, asideAlpha: asideAlpha, rgba: function(r, g, b, a) { return Qt.rgba(r, g, b, a) }
     }
   }
 
@@ -150,17 +163,14 @@ Item {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
       if (!root.hasBaseline) return
-      var h = height - root.pad * 2
-      SmoothPaint.strokeBaseline(ctx, root.pad, width - root.pad, root.pad + root.geometry.baselineY * h, root.baselineColor,
-        root.weight, [3 * root.dashUnit, 4 * root.dashUnit])
-      root.strokeTicks(ctx, true)
+      SmoothPaint.paintBase(ctx, root.shown, root.paintStyle(base))
     }
   }
 
   Item {
     id: curtain
     width: root.replayX >= 0 ? root.width * Math.min(1, root.replayX)
-      : root.reveal >= 1 ? root.width : root.inkRight * Math.max(0, root.reveal)
+      : root.reveal >= 1 ? root.width : root.inkLeft + (root.inkRight - root.inkLeft) * Math.max(0, root.reveal)
     height: root.height
     clip: true
 
@@ -175,138 +185,8 @@ Item {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
         if (!root.drawable) return
-        var geometry = root.geometry
-        var pad = root.pad
-        var pts = geometry.points
-        var w = width - pad * 2
-        var h = height - pad * 2
-        // A range, or a day set apart (`geometry.aside`), keeps a flat wash
-        // under its session, up to the last regular trade, and none under
-        // the stretch the number beside the chart doesn't count. Any other
-        // day's fades under every trade, so no hour of it takes an edge. A
-        // range has no extended trades.
-        var aside = geometry.aside
-        var even = root.day && !aside
-        var lastRegular = -1
-        for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
-        var filled = runs(even ? pts : pts.slice(0, lastRegular + 1), function() { return true })
-        var parts = SmoothPaint.asideParts(aside, pad, w, width)
-        var clipped = parts.length > 1
-        var by = root.hasBaseline ? pad + geometry.baselineY * h : null
-
-        for (var s = 0; by !== null && s < parts.length; s++) {
-          if (parts[s].aside || parts[s].to <= parts[s].from) continue
-          ctx.save()
-          if (clipped) SmoothPaint.clipTo(ctx, parts[s], height)
-          ctx.fillStyle = even ? fade(ctx, pts, by, pad, h) : sides(ctx, by, root.aboveWash, root.belowWash)
-          for (var r = 0; r < filled.length; r++) {
-            var run = filled[r]
-            if (run.length < 2) continue
-            ctx.beginPath()
-            ctx.moveTo(pad + run[0].x * w, by)
-            for (var i = 0; i < run.length; i++) {
-              if (i > 0 && run[i].untraded) ctx.lineTo(pad + run[i].x * w, pad + run[i - 1].y * h)
-              ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
-            }
-            ctx.lineTo(pad + run[run.length - 1].x * w, by)
-            ctx.closePath()
-            ctx.fill()
-          }
-          ctx.restore()
-        }
-
-        ctx.lineJoin = "round"
-        ctx.lineCap = "round"
-        ctx.lineWidth = 2 * root.weight
-        // The whole series in the lighter ink, then the rest over it at full
-        // (`faint`), so the hours around the session read as the quieter
-        // part of one line. The stretch the number beside the chart doesn't
-        // count keeps the sides' colours, fainter than the dim ink and half
-        // as thick, so it reads apart from tonight's dim hours on a dark
-        // ground, where a fainter shade alone runs into them.
-        var lighter = even ? root.hoursAlpha : 0.45
-        for (var p = 0; p < parts.length; p++) {
-          if (parts[p].to <= parts[p].from) continue
-          ctx.save()
-          if (clipped) SmoothPaint.clipTo(ctx, parts[p], height)
-          if (parts[p].aside) {
-            ctx.lineWidth = root.weight
-            ctx.strokeStyle = sides(ctx, by, root.asideAlpha, root.asideAlpha)
-            strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-          } else {
-            ctx.strokeStyle = sides(ctx, by, lighter, lighter)
-            strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-            ctx.strokeStyle = sides(ctx, by, 1, 1)
-            strokeRuns(ctx, runs(pts, function(p) { return !p.faint }), pad, w, h)
-          }
-          ctx.restore()
-        }
-
-        if (root.hasBaseline) root.strokeTicks(ctx, false)
-      }
-
-      // A point `keep` refuses, or a break (`brk`), ends a stretch.
-      function runs(pts, keep) {
-        var out = []
-        var run = []
-        for (var i = 0; i < pts.length; i++) {
-          if (pts[i].brk || !keep(pts[i])) {
-            if (run.length) out.push(run)
-            run = []
-          }
-          if (keep(pts[i])) run.push(pts[i])
-        }
-        if (run.length) out.push(run)
-        return out
-      }
-
-      // One ink for both sides: stroking each line twice, clipped to each
-      // side, doubles the paint. The dim ink is one share of its own colour:
-      // it reads against the full line beside it, not against the other
-      // side. With no line to stand against (`by` null), the baseline's ink.
-      function sides(ctx, by, aboveAlpha, belowAlpha) {
-        if (by === null) return Qt.rgba(root.baselineColor.r, root.baselineColor.g, root.baselineColor.b, aboveAlpha)
-        var a = root.aboveColor
-        var b = root.belowColor
-        return SmoothPaint.splitInk(ctx, height, by, Qt.rgba(a.r, a.g, a.b, aboveAlpha), Qt.rgba(b.r, b.g, b.b, belowAlpha))
-      }
-
-      // The day's wash: strongest at its far reach on each side, clear at
-      // the dashed line, so it shows where the move went. Two stops at one
-      // offset merge, so the second sits a hair below.
-      function fade(ctx, pts, by, pad, h) {
-        var top = by - 1
-        var bottom = by + 1
-        for (var i = 0; i < pts.length; i++) {
-          top = Math.min(top, pad + pts[i].y * h)
-          bottom = Math.max(bottom, pad + pts[i].y * h)
-        }
-        var stop = (by - top) / (bottom - top)
-        var a = root.aboveColor
-        var b = root.belowColor
-        var g = ctx.createLinearGradient(0, top, 0, bottom)
-        g.addColorStop(0, Qt.rgba(a.r, a.g, a.b, root.aboveFade))
-        g.addColorStop(stop, Qt.rgba(a.r, a.g, a.b, 0))
-        g.addColorStop(Math.min(1, stop + 0.0001), Qt.rgba(b.r, b.g, b.b, 0))
-        g.addColorStop(1, Qt.rgba(b.r, b.g, b.b, root.belowFade))
-        return g
-      }
-
-      // A lone trade, a day's only one or one beside a break, is a dot three
-      // times the line's width, so it reads at a glance. It never breathes:
-      // that is the live dot's alone.
-      function strokeRuns(ctx, lines, pad, w, h) {
-        for (var r = 0; r < lines.length; r++) {
-          var line = lines[r]
-          if (line.length > 1) {
-            SmoothPaint.strokeLine(ctx, line, pad, w, h, root.dashUnit)
-            continue
-          }
-          ctx.fillStyle = ctx.strokeStyle
-          ctx.beginPath()
-          ctx.arc(pad + line[0].x * w, pad + line[0].y * h, ctx.lineWidth * 1.5, 0, Math.PI * 2)
-          ctx.fill()
-        }
+        SmoothPaint.paintInk(ctx, root.shown, root.paintStyle(ink))
+        root.lastShown = root.shown
       }
     }
   }
@@ -350,10 +230,12 @@ Item {
 
   // Outside the canvas, so it ripples without repainting the line: three
   // ripples, about 6 s, when the mark plays (`LiveMark`). A range has no dot:
-  // its last bar need not be the headline trade.
+  // its last bar need not be the headline trade. It shows as the ink reaches
+  // it, and while a chart bends into this one, only if the old one had one.
   Item {
     id: dot
-    visible: root.day && root.lastPoint !== null && root.reveal >= 1 && root.replayX < 0
+    visible: root.day && root.lastPoint !== null && root.replayX < 0 && root.inkDrawn >= x
+      && (root.morph >= 1 || root.dotRides)
     x: root.lastPoint ? root.pad + root.lastPoint.x * (root.width - root.pad * 2) : 0
     y: root.lastPoint ? root.pad + root.lastPoint.y * (root.height - root.pad * 2) : 0
 

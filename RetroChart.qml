@@ -6,6 +6,7 @@ import qs.Commons as Commons
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 import "Chart.js" as Chart
+import "Morph.js" as Morph
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below, each by its own price's side of the close, as smooth's line is. The
@@ -14,7 +15,9 @@ import "Chart.js" as Chart
 // doesn't count (`geometry.aside`) draws fainter, its stems every other
 // cell. The unlit cells paint when the size changes, the baseline and the
 // columns when the data changes; the draw-in widens a clip a whole column at a
-// time, and the ticks and the scrub are cells laid over them.
+// time, and the ticks and the scrub are cells laid over them. Another chart
+// takes over from the one before (`morphFrom`, `morph`) a column at a time
+// from the left, each column with its own dashed row (`Morph.wave`).
 Item {
   id: root
 
@@ -67,6 +70,9 @@ Item {
   // The grid and the baseline are always there; the columns fill in from the
   // left to the newest trade's.
   property real reveal: 1
+  // The chart this one takes over from, and how far it has come, 0 to 1.
+  property var morphFrom: null
+  property real morph: 1
   // A replay's place, 0..1, or -1 without one: the columns fill in behind it.
   property real replayX: -1
   // The surface under the chart, which the stems are seen against.
@@ -76,6 +82,16 @@ Item {
   property bool bells: true
 
   readonly property var grid: Chart.retroGrid(geometry, width, height, pixel, gap)
+  // The grid this one takes over from: a change that comes mid-wave goes on
+  // from the columns on screen.
+  property var fromGrid: null
+  property var lastGrid: null
+  onMorphFromChanged: fromGrid = !morphFrom ? null
+    : morph < 1 && lastGrid ? lastGrid : Chart.retroGrid(morphFrom, width, height, pixel, gap)
+  // The columns the new chart has taken, a whole number, so a frame that
+  // takes none paints nothing.
+  readonly property int front: fromGrid && morph < 1 ? Math.floor(morph * grid.columns) : grid.columns
+  readonly property var shownGrid: fromGrid && front < grid.columns ? Morph.wave(fromGrid, grid, front) : grid
   readonly property bool day: !!geometry && geometry.day === true
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
@@ -85,9 +101,14 @@ Item {
   // Through the newest trade's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
+  // The first trade's column, where the draw-in starts.
+  readonly property int firstColumn: drawable ? Chart.retroColumn(grid, geometry.points[0].x) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Chart.retroColumn(grid, scrubX) : -1
   // What is laid over the ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
+  // What is laid over the ink shows as a chart takes over, over the second
+  // half (`RangeMarks`).
+  readonly property real marksShown: Math.max(0, Math.min(1, morph * 2 - 1))
   // The stems are retro's wash: each side adds the lightness the up colour's
   // does at 35% (`Tones.washAlpha`), less under a lighter cap. `solid` draws each
   // stem at its cap's ink, for a chart so small that faint stems leave the
@@ -100,7 +121,7 @@ Item {
   readonly property real aboveStemAside: Tones.washAlpha(greyAside ? greyColor : aboveColor, upColor, ground, 0.35 * asideShare, asideShare)
   readonly property real belowStemAside: Tones.washAlpha(greyAside ? greyColor : belowColor, upColor, ground, 0.35 * asideShare, asideShare)
 
-  onGridChanged: { base.requestPaint(); ink.requestPaint() }
+  onShownGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()
   // The unlit cells change only with the chart's size, so a new price
   // repaints none of them.
@@ -177,22 +198,24 @@ Item {
     onPaint: {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
-      var g = root.grid
+      var g = root.shownGrid
       var pixel = root.pixel
       if (!root.hasBaseline) return
       // Every other cell, so it lives on the bars' grid, not as a hairline
       // across them.
       ctx.fillStyle = root.baselineColor
-      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, g.baseRow * pixel, pixel, pixel - root.gap)
+      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, (g.baseRows ? g.baseRows[bc] : g.baseRow) * pixel, pixel, pixel - root.gap)
     }
   }
 
   // A replay that has left the start reveals the column after it, where
-  // every later point stands (`Chart.retroColumn`).
+  // every later point stands (`Chart.retroColumn`). The draw-in starts at the
+  // first trade's column.
   Item {
     id: curtain
     width: (root.replayX >= 0 ? Math.max(Math.ceil(root.grid.columns * Math.min(1, root.replayX)), root.grid.ownStart ? Chart.retroColumn(root.grid, root.replayX) + 1 : 0)
-      : root.reveal >= 1 ? root.grid.columns : Math.ceil(root.inkColumns * Math.max(0, root.reveal))) * root.grid.pitch
+      : root.reveal >= 1 ? root.grid.columns
+      : root.firstColumn + Math.ceil((root.inkColumns - root.firstColumn) * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
     clip: true
 
@@ -205,15 +228,17 @@ Item {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
         if (!root.drawable) return
-        var g = root.grid
+        var g = root.shownGrid
+        root.lastGrid = g
         var pixel = root.pixel
         var asideInk = root.asideInk
         for (var c = 0; c < g.columns; c++) {
           if (g.levels[c] === undefined) continue
-          var baseY = g.baseRow * pixel
+          var baseRow = g.baseRows ? g.baseRows[c] : g.baseRow
+          var baseY = baseRow * pixel
           var y = g.levels[c] * pixel
           var above = g.above[c]
-          var aside = c >= g.asideFrom && c < g.asideTo
+          var aside = g.aside ? g.aside[c] : c >= g.asideFrom && c < g.asideTo
           // With no line under it, a column takes the baseline's ink.
           var color = aside && root.greyAside ? root.greyColor : !root.hasBaseline ? root.baselineColor : above ? root.aboveColor : root.belowColor
           var lighter = root.fullSession ? g.faint[c] : g.dim[c]
@@ -233,8 +258,8 @@ Item {
               // Every other cell from the one on the dashed line, so the
               // cells line up across columns.
               var step = y < baseY ? -1 : 1
-              var far = Math.abs(g.levels[c] - g.baseRow)
-              for (var k = 1; k < far; k += 2) ctx.fillRect(x, (g.baseRow + k * step) * pixel, pixel, pixel - root.gap)
+              var far = Math.abs(g.levels[c] - baseRow)
+              for (var k = 1; k < far; k += 2) ctx.fillRect(x, (baseRow + k * step) * pixel, pixel, pixel - root.gap)
             } else ctx.fillRect(x, top, pixel, h)
           }
           ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, dim)
@@ -247,7 +272,8 @@ Item {
   // The ticks, cut at the chart's edges as a canvas cuts: on the pill's six
   // rows a baseline on the top or bottom row would put a cell outside it.
   // Those the columns have reached draw in with them; those ahead, in hours
-  // still to come, are there with the baseline.
+  // still to come, are there with the baseline. While a chart takes over,
+  // each side of the wave has its own chart's.
   Repeater {
     model: root.bells && root.hasBaseline ? root.geometry.ticks.length : 0
 
@@ -256,7 +282,24 @@ Item {
       readonly property int column: Math.min(root.grid.columns - 1, Math.floor(root.geometry.ticks[index] * root.grid.columns))
       readonly property int row: root.grid.baseRow
       readonly property real cellTop: Math.max(0, (row - 1) * root.pixel)
-      visible: column >= root.inkColumns || column * root.grid.pitch < curtain.width
+      visible: column < root.front && (column >= root.inkColumns || column * root.grid.pitch < curtain.width)
+      x: column * root.grid.pitch
+      y: cellTop
+      width: root.pixel
+      height: Math.min(root.height, (row + 2) * root.pixel) - cellTop
+      color: root.baselineColor
+    }
+  }
+
+  Repeater {
+    model: root.bells && root.fromGrid && Chart.hasBaseline(root.morphFrom) && root.front < root.grid.columns ? root.morphFrom.ticks.length : 0
+
+    Rectangle {
+      required property int index
+      readonly property int column: Math.min(root.fromGrid.columns - 1, Math.floor(root.morphFrom.ticks[index] * root.fromGrid.columns))
+      readonly property int row: root.fromGrid.baseRow
+      readonly property real cellTop: Math.max(0, (row - 1) * root.pixel)
+      visible: column >= root.front
       x: column * root.grid.pitch
       y: cellTop
       width: root.pixel
@@ -290,14 +333,14 @@ Item {
     color: root.hairlineColor
   }
 
-  // The pixel version of the smooth chart's live dot, once the day has drawn
-  // in: four blinks, white, colour, white, when the mark plays (`LiveMark`).
+  // The pixel version of the smooth chart's live dot, once the columns reach
+  // it: four blinks, white, colour, white, when the mark plays (`LiveMark`).
   Rectangle {
     id: cap
     objectName: "liveCap"
-    visible: root.glow && root.day && root.grid.lastLit >= 0 && root.reveal >= 1 && root.replayX < 0
-    x: root.grid.lastLit * root.grid.pitch
-    y: visible ? root.grid.levels[root.grid.lastLit] * root.pixel : 0
+    visible: root.glow && root.day && root.shownGrid.lastLit >= 0 && root.replayX < 0 && x < curtain.width
+    x: root.shownGrid.lastLit * root.grid.pitch
+    y: visible ? root.shownGrid.levels[root.shownGrid.lastLit] * root.pixel : 0
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor

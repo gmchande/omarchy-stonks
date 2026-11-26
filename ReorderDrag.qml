@@ -109,8 +109,7 @@ Item {
     target: root
     property: "liftedY"
     duration: Motion.duration(Style, 160)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
+    easing.type: Easing.OutCubic
     onFinished: {
       var at = root.keys.indexOf(root.lifted)
       root.cancel()

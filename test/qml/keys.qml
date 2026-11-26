@@ -371,6 +371,32 @@ Harness {
       harness.check("in the " + s.name + ", PgUp, PgDn, Home and End at the top, middle and end of rows longer than two screens move the cursor a screenful or to the end, in sight",
         rows.length * list.rowPitch > 2 * list.sightHeight && wrong.length === 0, rows.length + " rows | " + wrong.join(" | "))
 
+      // Enter shows the row PgDn moved to, the selected row's fill slides
+      // there, and it stays on that row as PgUp scrolls the rows back. PgDn
+      // pages until the rows have scrolled.
+      list.select(rows[0])
+      within(1500, function() { return !list.settling })
+      for (var page = 0; page < 3 && list.contentY === 0; page++) {
+        press("PageDown")
+        within(1500, function() { return !list.settling })
+      }
+      var picked = list.cursorRow
+      press("⏎")
+      var fill = harness.find(b, "rowHighlight")
+      var onPicked = function() {
+        var shown = list.rowItem(picked)
+        return b.featuredSymbol === picked && !list.settling && !!fill && fill.visible && Math.abs(fill.y - shown.y) < 0.5
+      }
+      var there = within(1500, onPicked)
+      var top = list.contentY
+      for (page = 0; page < 3 && list.contentY === top; page++) {
+        press("PageUp")
+        within(1500, function() { return !list.settling })
+      }
+      var stays = list.contentY < top && within(1500, onPicked)
+      harness.check("in the " + s.name + ", Enter after PgDn slides the selected row's fill to that row, and it stays on it as PgUp scrolls the rows",
+        top > 0 && there && stays, [picked, top, there, stays].join(" "))
+
       // A list of one row, then an empty one.
       service.createList("Single", rows[0])
       service.createList("Empty")

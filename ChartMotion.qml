@@ -5,9 +5,11 @@ import "History.js" as History
 import "Quote.js" as Quote
 import "Motion.js" as Motion
 // The chart a surface shows, the moment it shows (the scrub, and the replay
-// that drives it), and the one motion, a draw-in from the left, for every
-// change of chart. It decides once per change of the view the surface holds,
-// whoever made it, and draws nothing itself.
+// that drives it), and how a change of chart moves: another stock bends out
+// of the one before (`morph`), with what else changes with the stock on the
+// same beat (`arrival`); any other change draws in from the first trade. It
+// decides once per change of the view the surface holds, whoever made it,
+// and draws nothing itself.
 Item {
   id: root
 
@@ -66,8 +68,12 @@ Item {
   // the price.
   readonly property var latest: chart ? chart.latest : null
   // A range whose first fetch failed shows the day.
-  readonly property var geometry: historyShown ? History.historyGeometry(history)
-    : day ? Chart.chartGeometry(day, calendars) : null
+  readonly property var geometry: geometryOf(chart)
+  function geometryOf(c) {
+    if (!c) return null
+    if (c.range !== "1D" && c.history) return History.historyGeometry(c.history)
+    return c.day ? Chart.chartGeometry(c.day, calendars) : null
+  }
   // Scrubbing and replay keep from the first trade to the last: while the day
   // runs, its axis runs past them, through hours with no price to read.
   readonly property int scrubStart: day && day.points.length ? day.points[0].t : 0
@@ -81,9 +87,17 @@ Item {
     : Math.max(scrubStart, Math.min(scrubEnd, Math.round(scrubT / 300) * 300))
   readonly property real scrubX: historyShown && scrubShown ? History.historyFraction(history, scrubShown)
     : (!historyActive && day && scrubShown ? Chart.fractionAtTime(day, scrubShown) : -1)
-  // The painters sweep the draw-in to the newest trade, so a day partly gone
-  // takes its whole time too.
+  // The painters sweep the draw-in from the first trade to the newest, so a
+  // day partly gone takes its whole time too.
   property real reveal: 1
+  // Another stock's chart bends out of the one before (`morphFrom`), `morph`
+  // of the way, and what else changes with the stock settles with it
+  // (`arrival`), toward where the list moved (`switched`).
+  property var morphFrom: null
+  property real morph: 1
+  property bool stockSwitch: false
+  readonly property real arrival: stockSwitch ? morph : 1
+  signal switched(string from, string to)
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
   // What plays alongside keeps to it, and to its InOutSine. The reader asks
@@ -116,7 +130,10 @@ Item {
     // A replay and a scrub belong to the chart they started on, and to data
     // that still holds their moment.
     if (moved || asked || (refreshed && scrubT && !covers(next, scrubT))) clearScrub()
-    if (moved) {
+    if (moved && last && next && last.symbol !== next.symbol) {
+      switched(last.symbol, next.symbol)
+      if (surfaceOpen) bend(geometryOf(last))
+    } else if (moved) {
       if (surfaceOpen) drawIn()
     } else if (asked) {
       drawInAnim.stop()
@@ -142,6 +159,8 @@ Item {
   // surface takes no scrub.
   function scrubTo(fraction) {
     if (loading || !surfaceOpen) return
+    // A scrub reads the chart it lands on.
+    if (morphAnim.running) endBend()
     if (historyActive) {
       if (!historyShown) return
       var bar = History.historyBarAt(history, fraction)
@@ -172,9 +191,27 @@ Item {
     scrubT = 0
   }
 
-  readonly property bool drawingIn: drawInAnim.running
+  readonly property bool drawingIn: drawInAnim.running || morphAnim.running
   function drawIn() {
+    endBend()
     drawInAnim.restart()
+  }
+
+  function bend(from) {
+    drawInAnim.stop()
+    reveal = 1
+    morphAnim.stop()
+    stockSwitch = true
+    morphFrom = from
+    morph = 0
+    morphAnim.start()
+  }
+
+  function endBend() {
+    morphAnim.stop()
+    morph = 1
+    morphFrom = null
+    stockSwitch = false
   }
 
   // While the chart asked for is on its way, the one on screen stays whole and
@@ -193,6 +230,7 @@ Item {
     if (loading) return
     stopReplay()
     drawInAnim.stop()
+    endBend()
     reveal = 1
     if (historyActive ? !historyShown || History.drawnBars(history).length < 2 : !geometry || !scrubEnd) return
     replayAnim.from = historyActive ? 0 : Chart.fractionAtTime(day, scrubStart)
@@ -210,13 +248,15 @@ Item {
   }
 
   // A closing surface stops what moves where it is: a replay keeps what it had
-  // drawn, a draw-in what it had revealed, the dim where it was.
+  // drawn, a draw-in what it had revealed, a bend where it was, the dim where
+  // it was.
   function freeze() {
     if (replayAnim.running) {
       replayAnim.pause()
       replayCut()
     }
     drawInAnim.stop()
+    morphAnim.stop()
     slowTimer.stop()
     dimAnim.stop()
   }
@@ -224,11 +264,14 @@ Item {
   // Before an open's first frame.
   function reset() {
     stopReplay()
+    endBend()
     reveal = 1
     scrubT = 0
     dimmed = 0
   }
 
+  // Each travels: OutCubic, as Omarchy's own travel does, so the last
+  // frames still move and the live dot comes as the line ends.
   NumberAnimation {
     id: drawInAnim
     target: root
@@ -236,8 +279,17 @@ Item {
     from: 0
     to: 1
     duration: Motion.duration(Style, 320)
-    easing.type: Easing.Bezier
-    easing.bezierCurve: Motion.curve(Style)
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: morphAnim
+    target: root
+    property: "morph"
+    to: 1
+    duration: Motion.duration(Style, Motion.SWITCH_MS)
+    easing.type: Easing.OutCubic
+    onFinished: root.endBend()
   }
 
   NumberAnimation {

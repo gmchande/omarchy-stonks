@@ -62,7 +62,7 @@ Rectangle {
     shift += (from - place) * pitch
     slide.restart()
   }
-  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
   // Lifted or sliding, the row lays the card's ground under its fill, at
   // once, so the rows it passes never show through.
   readonly property bool moving: lifted || slide.running
@@ -122,7 +122,7 @@ Rectangle {
     slide.restart()
   }
   NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-  NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.OutCubic }
 
   // In scene coordinates. `second` is Qt's double-click second press, which
   // the list may not act on (Watchlist.clickRow).
@@ -169,13 +169,17 @@ Rectangle {
 
   height: Style.space(40)
   radius: look.retro ? 0 : Style.cornerRadius
+  // The ground the row's words and line stand on, the selected fill too.
   readonly property color fill: lifted ? Style.pressedFillFor(look.foreground, Commons.Color.accent)
     : featuredRow ? Style.selectedFillFor(look.foreground, Commons.Color.accent)
     : cursor ? Style.hoverFillFor(look.foreground, Commons.Color.accent) : "transparent"
-  color: fill
+  // The list draws the selected row's fill and outline, so it can slide to
+  // the row clicked (`Watchlist.highlight`); lifted, the row draws its own.
+  readonly property bool highlighted: featuredRow && !lifted
+  color: highlighted ? "transparent" : fill
   // Lifted, the row wears the resting control border; under the cursor, the
   // shell's cursor outline (CursorSurface).
-  border.width: lifted ? 1 : cursor ? Style.hoverBorderWidth : 0
+  border.width: lifted ? 1 : cursor && !highlighted ? Style.hoverBorderWidth : 0
   border.color: lifted ? Style.normalBorderFor(look.foreground, Commons.Color.accent)
     : Style.hoverBorderFor(look.foreground, Commons.Color.accent)
 
@@ -186,7 +190,7 @@ Rectangle {
     z: -1
     anchors.fill: parent
     radius: row.radius
-    visible: row.moving
+    visible: row.moving && !row.highlighted
     color: row.look.ground
   }
 

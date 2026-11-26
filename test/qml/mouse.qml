@@ -75,6 +75,18 @@ Harness {
         return list.reorder.lifted === "" && !list.settling && list.displayedSymbols.every(function(symbol) { return list.rowResting(symbol) })
       })
     }
+    // The selected row's fill rests on the row of the stock on show, where
+    // that row is. Each step that moves rows names itself when it doesn't.
+    property var fillOff: []
+    function fillFollows(step) {
+      var list = body.watchlist
+      var fill = harness.find(body, "rowHighlight")
+      var on = within(1500, function() {
+        var shown = row(service.featuredSymbol)
+        return !list.settling && !!fill && !!shown && fill.visible && Math.abs(fill.y - shown.y) < 0.5
+      })
+      if (!on) fillOff.push(step)
+    }
 
     function test_mouse() {
       app.open("{}")
@@ -90,6 +102,7 @@ Harness {
       click(row(rows[1]))
       harness.check("a click on a row shows its chart",
         within(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
+      fillFollows("a click")
 
       // Held and carried past the next row, in your own order.
       var held = row(rows[0])
@@ -105,6 +118,7 @@ Harness {
         within(2000, function() { return service.symbols.join(",") === carried.join(",") }), service.symbols.join(","))
       rows = service.symbols.slice()
       rest()
+      fillFollows("a row dragged past it")
 
       // From the top of the rows, a row held and carried `by` down, the
       // button still held: where the pointer is.
@@ -548,6 +562,7 @@ Harness {
         searching && found && within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !body.adding }), [searching, found, service.symbols.join(",")].join(" "))
       quiet()
       rest()
+      fillFollows("an add")
 
       // A row's × shows once the pointer has put the cursor on it; UNDO
       // stands in the footer after.
@@ -565,6 +580,7 @@ Harness {
       harness.check("a row's × removes it, and UNDO puts it back",
         shown && removed && within(1500, function() { return service.symbols.indexOf(doomed) >= 0 }), [shown, removed, service.symbols.join(",")].join(" "))
       rest()
+      fillFollows("a removal and its undo")
 
       var chart = at("heroChart")
       mouseMove(chart, chart.width / 3, chart.height / 2)
@@ -583,6 +599,9 @@ Harness {
       harness.check("the wheel scrolls the rows and moves none",
         list.contentHeight > list.height && within(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
         [list.contentHeight, list.height, list.contentY, service.symbols.join(",")].join(" "))
+      fillFollows("the wheel")
+      harness.check("the selected row's fill slides to the row clicked and stays on it through a drag, an add, a removal and the wheel",
+        fillOff.length === 0, fillOff.join(", "))
 
       // QtTest sends no touchpad, so its event goes to the list's handler as
       // the WheelHandler hands it on: a swipe whose pixels Hyprland cut to 0.4.
