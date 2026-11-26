@@ -112,8 +112,16 @@ Item {
     blockWrites: false
     atomicWrites: true
     printErrors: false
-    onSaved: root.keep([asyncFile.path])
-    onSaveFailed: root.forget(asyncFile.path)
+    onSaved: {
+      var savedPath = asyncFile.path
+      asyncFile.path = ""
+      if (savedPath) root.keep([savedPath])
+    }
+    onSaveFailed: {
+      var failedPath = asyncFile.path
+      asyncFile.path = ""
+      root.forget(failedPath)
+    }
   }
 
   // The id comes once: as the service is made, or just after (`Plugin`).

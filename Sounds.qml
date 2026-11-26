@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -231,6 +233,8 @@ Item {
       replayOwner = null
       player.running = false
       chimeWait.stop()
+      chimeIdle.stop()
+      chimerUsed = false
       waiting = -1
     }
     ahead.restart()
@@ -358,20 +362,30 @@ Item {
   // `pw-dump` runs to about half a megabyte; one that times out, fails or
   // passes 4 MB counts as recording. Both stop within 7 s, before the next bell.
   // `wanted` says, as they stop, whether the bell is still wanted then.
+  property var listeningWanted: null
   function ring(wanted) {
-    if (!turnedOn || listening.running) return
-    listening.wanted = wanted
-    listening.running = true
+    if (!turnedOn || root.listeningWanted !== null) return
+    root.listeningWanted = wanted
   }
 
-  // `Commands.bellCheck`, and `Commands.recording`.
-  Process {
-    id: listening
-    property var wanted: null
-    command: Commands.bellCheck()
-    stdout: StdioCollector { id: answer }
-    onExited: function(code) {
-      if (listening.wanted() && code === 0 && answer.data.byteLength <= 4000000 && !Commands.recording(answer.text)) root.play("bell")
+  // `Commands.bellCheck`, and `Commands.recording`. Built only while a bell
+  // check runs so `pw-dump`'s stdout buffer (0.5-4 MB) is freed immediately.
+  Loader {
+    active: root.listeningWanted !== null
+    sourceComponent: Process {
+      id: listening
+      property int code: -1
+      command: Commands.bellCheck()
+      stdout: StdioCollector { id: answer }
+      Component.onCompleted: running = true
+      onExited: function(exitCode) { code = exitCode }
+      onRunningChanged: {
+        if (running) return
+        var wanted = root.listeningWanted
+        var ok = !!wanted && wanted() && code === 0 && answer.data.byteLength <= 4000000 && !Commands.recording(answer.text)
+        root.listeningWanted = null
+        if (ok) root.play("bell")
+      }
     }
   }
 
@@ -379,7 +393,6 @@ Item {
   // played), rather than keeping an idle shell alive 24/7 (`Commands.chimePlayer`).
   property bool surfaceOpen: false
   property bool chimerUsed: false
-  onTurnedOnChanged: if (!turnedOn) { chimerUsed = false; chimeIdle.stop() }
   Timer {
     id: chimeIdle
     interval: 5000

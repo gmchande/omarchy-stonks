@@ -160,6 +160,8 @@ Item {
   function keepDay(symbol, chart) {
     if (!chart || !chart.quote || chart.day === chart.quote) return
     if (builtDays[symbol] && builtDays[symbol].day === chart.day) return
+    var keys = Object.keys(builtDays)
+    if (keys.length >= 24 && !(symbol in builtDays)) delete builtDays[keys[0]]
     builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, root.nights), { day: chart.day, latest: chart.latest })
   }
   function dayMadeFrom(symbol, chart, nights) {
@@ -892,7 +894,8 @@ Item {
     var now = root.wallSecond()
     var removed = root.lastRemoval ? root.lastRemoval.symbol : ""
     var keep = function(s) { return root.allSymbols.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
-    for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
+    var keepDay = function(s) { return s === root.view.featured || s === root.previewSymbol || s === removed || root.rowsInSight().indexOf(s) >= 0 }
+    for (var symbol in root.builtDays) if (!keepDay(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
     // A fill is said once while it's on a chart.
     for (var said in root.saidFills) {

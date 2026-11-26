@@ -212,7 +212,10 @@ Item {
   // A search held back while no screen showed it goes once one does.
   onSurfaceOpenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
-    if (!surfaceOpen) previewTo("")
+    if (!surfaceOpen) {
+      previewTo("")
+      rowLinesFrom = ({})
+    }
   }
   onOnScreenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
