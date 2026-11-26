@@ -1237,7 +1237,6 @@ Item {
     morph: motion.morph
     beat: motion.beat
     arrival: motion.arrival
-    arrivalFrom: root.arrivalFrom
     chartHeight: Layout.chartHeight(root.measured, root.windowHeight())
     order: root.order
     reversed: root.reversed
@@ -1544,8 +1543,6 @@ Item {
     onDismissed: root.closeListMenu()
   }
 
-  // Which way the list moved to the stock on show (`ChartMotion.switched`).
-  property int arrivalFrom: 0
   ChartMotion {
     id: motion
     view: root.view
@@ -1560,13 +1557,5 @@ Item {
     }
     onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
     onScrubTChanged: if (!scrubT) root.chimed = -1
-    // The new values come up from below for a row further down the list, and
-    // down from above for one higher, as a list scrolls.
-    onSwitched: function(from, to) {
-      var rows = watchlist.displayedSymbols
-      var a = rows.indexOf(from)
-      var b = rows.indexOf(to)
-      root.arrivalFrom = a < 0 || b < 0 ? 0 : b > a ? 1 : -1
-    }
   }
 }

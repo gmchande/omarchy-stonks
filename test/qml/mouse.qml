@@ -526,6 +526,47 @@ Harness {
       harness.check("the header's look, sound, camera and ? each act, and ? again closes the sheet",
         looked && sounded && shot && sheet && within(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
 
+      // In smooth, a click on another row changes the price and the stock's
+      // name at once, where they stand: only the chart and the animal travel.
+      // Each is found by what it shows above the chart.
+      if (service.retro) body.setStyle("smooth")
+      within(1500, function() { return !service.retro })
+      var aboveChart = function(text) {
+        var top = body.chartItem.mapToItem(body, 0, 0).y
+        var found = null
+        var look = function(item) {
+          if (!item || found) return
+          if (item.visible && item.text === text && item.mapToItem(body, 0, 0).y < top) { found = item; return }
+          for (var i = 0; i < item.children.length; i++) look(item.children[i])
+        }
+        look(body)
+        return found
+      }
+      var heroPrice = aboveChart(body.featured.priceText)
+      var stockName = aboveChart(body.featured.name)
+      var shown = function(item) {
+        if (!item) return "missing"
+        var o = 1
+        for (var p = item; p && p !== body; p = p.parent) o *= p.opacity
+        return Math.round(item.mapToItem(body, 0, 0).y) + "@" + o.toFixed(2)
+      }
+      var standing = shown(heroPrice) + " " + shown(stockName)
+      var wavered = []
+      var bent = false
+      var watches = function() {
+        if (body.motion.arrival >= 1) return
+        bent = true
+        var now = shown(heroPrice) + " " + shown(stockName)
+        if (now !== standing) wavered.push(now)
+      }
+      var smoothTo = body.watchlist.displayedSymbols.filter(function(s) { return !!service.quotes[s] && s !== body.chartSymbol })[0]
+      body.motion.arrivalChanged.connect(watches)
+      click(row(smoothTo))
+      var landed = within(3000, function() { return bent && body.motion.arrival >= 1 && body.chartSymbol === smoothTo })
+      body.motion.arrivalChanged.disconnect(watches)
+      harness.check("in smooth, a click on another row changes its price and name where they stand, at full strength",
+        landed && !!heroPrice && !!stockName && wavered.length === 0, [landed, smoothTo, standing, wavered.slice(0, 3).join(" ")].join(" "))
+
       // In retro, a click on another row changes the price whole: every
       // price the digits take on the way is the one stock's or the other's.
       if (!service.retro) body.setStyle("retro")
