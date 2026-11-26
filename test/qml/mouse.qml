@@ -75,6 +75,18 @@ Harness {
         return list.reorder.lifted === "" && !list.settling && list.displayedSymbols.every(function(symbol) { return list.rowResting(symbol) })
       })
     }
+    // The selected row's fill rests on the row of the stock on show, where
+    // that row is. Each step that moves rows names itself when it doesn't.
+    property var fillOff: []
+    function fillFollows(step) {
+      var list = body.watchlist
+      var fill = harness.find(body, "rowHighlight")
+      var on = within(1500, function() {
+        var shown = row(service.featuredSymbol)
+        return !list.settling && !!fill && !!shown && fill.visible && Math.abs(fill.y - shown.y) < 0.5
+      })
+      if (!on) fillOff.push(step)
+    }
 
     function test_mouse() {
       app.open("{}")
@@ -90,6 +102,7 @@ Harness {
       click(row(rows[1]))
       harness.check("a click on a row shows its chart",
         within(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
+      fillFollows("a click")
 
       // Held and carried past the next row, in your own order.
       var held = row(rows[0])
@@ -105,6 +118,7 @@ Harness {
         within(2000, function() { return service.symbols.join(",") === carried.join(",") }), service.symbols.join(","))
       rows = service.symbols.slice()
       rest()
+      fillFollows("a row dragged past it")
 
       // From the top of the rows, a row held and carried `by` down, the
       // button still held: where the pointer is.
@@ -512,6 +526,32 @@ Harness {
       harness.check("the header's look, sound, camera and ? each act, and ? again closes the sheet",
         looked && sounded && shot && sheet && within(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
 
+      // In retro, a click on another row changes the price whole: every
+      // price the digits take on the way is the one stock's or the other's.
+      if (!service.retro) body.setStyle("retro")
+      within(1500, function() { return service.retro })
+      var digits = harness.find(body, "retroPrice")
+      var listed = body.watchlist.displayedSymbols
+      // One whose price differs, so a mix would show: the walk's stand-in
+      // answers give several stocks one price.
+      var other = listed.filter(function(s) { return !!service.quotes[s] && !!body.featured && service.quotes[s].price !== body.featuredQuote.price })[0]
+      var fromText = digits.text
+      var taken = []
+      var moved = false
+      var takes = function() { taken.push(digits.text) }
+      var moves = function() { if (body.motion.arrival < 1) moved = true }
+      digits.textChanged.connect(takes)
+      body.motion.arrivalChanged.connect(moves)
+      click(row(other))
+      var arrived = within(3000, function() { return moved && body.motion.arrival >= 1 && body.chartSymbol === other })
+      digits.textChanged.disconnect(takes)
+      body.motion.arrivalChanged.disconnect(moves)
+      var toText = body.featured.priceText
+      var mixed = taken.filter(function(text) { return text !== fromText && text !== toText })
+      harness.check("in retro, a click on another row shows its price whole, never a mix of the two",
+        arrived && fromText !== toText && digits.text === toText && mixed.length === 0, [arrived, other, fromText, toText, mixed.join(" ")].join(" "))
+      body.setStyle(retro ? "retro" : "smooth")
+
       click("animal")
       harness.check("a click on the bull or the bear replays the chart",
         within(1500, function() { return body.motion.replayRunning }), body.animalKind)
@@ -548,6 +588,7 @@ Harness {
         searching && found && within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !body.adding }), [searching, found, service.symbols.join(",")].join(" "))
       quiet()
       rest()
+      fillFollows("an add")
 
       // A row's × shows once the pointer has put the cursor on it; UNDO
       // stands in the footer after.
@@ -565,6 +606,7 @@ Harness {
       harness.check("a row's × removes it, and UNDO puts it back",
         shown && removed && within(1500, function() { return service.symbols.indexOf(doomed) >= 0 }), [shown, removed, service.symbols.join(",")].join(" "))
       rest()
+      fillFollows("a removal and its undo")
 
       var chart = at("heroChart")
       mouseMove(chart, chart.width / 3, chart.height / 2)
@@ -583,6 +625,9 @@ Harness {
       harness.check("the wheel scrolls the rows and moves none",
         list.contentHeight > list.height && within(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
         [list.contentHeight, list.height, list.contentY, service.symbols.join(",")].join(" "))
+      fillFollows("the wheel")
+      harness.check("the selected row's fill slides to the row clicked and stays on it through a drag, an add, a removal and the wheel",
+        fillOff.length === 0, fillOff.join(", "))
 
       // QtTest sends no touchpad, so its event goes to the list's handler as
       // the WheelHandler hands it on: a swipe whose pixels Hyprland cut to 0.4.

@@ -27,13 +27,14 @@ Item {
   // `n` of the panel's pixels at text size 12, as `Style.space` rounds them.
   function space(n) { return Math.max(1, Math.round(n * root.spacing)) }
 
-  // The chart's draw-in uncovers the marks with its ink, the room a mark lifts
-  // into included.
+  // A mark shows whole once the chart's ink has drawn past it, never cut,
+  // and as another chart turns into this one, fades in over the turn's
+  // second half (`marksShown`).
   Item {
     y: -root.lift
-    width: root.chart ? Math.min(root.width, root.chart.inkDrawn) : 0
+    width: root.width
     height: root.height + root.lift * 2
-    clip: true
+    opacity: root.chart ? root.chart.marksShown : 0
 
     Repeater {
       model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
@@ -48,7 +49,7 @@ Item {
         // A price's thousands commas reach below the baseline.
         readonly property real overlap: Math.max(mark.overlapOf(0, priceText, priceInk), mark.overlapOf(dateText.x, dateText, dateInk), 0)
         objectName: index === 0 ? "highMark" : "lowMark"
-        visible: mark.overlap <= root.lift
+        visible: mark.overlap <= root.lift && root.chart.inkDrawn >= mark.x + mark.width
         width: priceText.implicitWidth + mark.gap + dateText.implicitWidth
         height: Math.max(priceText.implicitHeight, dateText.implicitHeight)
         x: Math.max(0, Math.min(root.width - mark.width,

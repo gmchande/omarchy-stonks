@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Cells.js" as Cells
+import "Motion.js" as Motion
 // The header: the animal, the stock's name over its status, the speaker, the
 // camera, the look and the ?, with a rule under them, as a shell panel's hero
 // has. The words start after the animal's slot, drawn or not, so neither the
@@ -38,7 +39,11 @@ Item {
   property bool helpShown: false
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
-
+  // Another stock's name and status fade in on the switch's beat
+  // (`ChartMotion.arrival`), still where they stand: the header holds still
+  // around the animal and the icons.
+  property real arrival: 1
+  readonly property real wordsOpacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
 
   signal styleRequested(string style)
   signal soundsRequested()
@@ -46,10 +51,13 @@ Item {
   signal helpRequested()
   signal replayRequested()
   signal retryRequested()
+  // The market's bell rang (`HeaderAnimal.rang`).
+  signal rang(bool woke)
 
   function settle() {
     lookIcon.settle()
     slot.settle()
+    if (wordSwap.running) endSwap()
   }
 
 
@@ -119,25 +127,30 @@ Item {
     id: slot
     animal: root.animal
     look: root.look
+    crossing: root.arrival
     seen: root.seen
     still: root.still
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
     onReplayRequested: root.replayRequested()
+    onRang: function(woke) { root.rang(woke) }
   }
 
   // At the header's top, never above: the panel's body starts there and clips
-  // what draws past it.
+  // what draws past it. It comes and goes with the eyes: in smooth it fades
+  // and drifts its 3 px down as they open, in retro it steps with the lids.
   PixelSprite {
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
-    visible: slot.kind !== "" && slot.lids === 2
+    readonly property real shut: root.look.retro ? slot.lids / 2 : slot.closing
+    visible: slot.kind !== "" && shut > 0
+    opacity: shut
     columns: 3
     rows: 5
     width: cell * 3
     height: cell * 5
     x: slot.x + slot.width + Style.space(1)
-    y: 0
+    y: root.look.retro ? 0 : Math.round(Style.space(3) * (1 - shut))
     pixels: Cells.spritePixels(Cells.SLEEP_Z)
     color: root.look.dim
   }
@@ -190,6 +203,7 @@ Item {
   Text {
     id: titleText
     visible: root.titled
+    opacity: root.wordsOpacity
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     y: Math.round((root.contentHeight - implicitHeight - Style.space(2) - statusWords.implicitHeight) / 2)
@@ -212,19 +226,63 @@ Item {
     strength: 0.08
   }
 
+  // The words as they stand now, and as shown. At the bell, and as trouble
+  // comes or goes, the old fade out and the new in where they stood, as
+  // Omarchy's own status words swap (`phraseSwap`); any other change, as a
+  // scrub's or the clock's, is at once.
+  readonly property var wordsNow: ({ text: measured.length ? measured[fit.form].words : "", tight: fit.tight,
+    bright: scrubbing || live || trouble })
+  property var wordsShown: wordsNow
+  property bool troubleShown: false
+  property real wordsIn: 1
+  onWordsNowChanged: Qt.callLater(takeWords)
+  function takeWords() {
+    var was = wordsShown
+    var now = wordsNow
+    var trouble = root.trouble
+    var swap = seen && arrival >= 1 && was.text !== "" && now.text !== was.text
+      && ((animal.bell && !animal.scrubbed) || trouble !== troubleShown)
+    troubleShown = trouble
+    if (swap) {
+      wordSwap.restart()
+      return
+    }
+    // Any other change shows at once, over a swap under way too, and
+    // another stock's ends the swap, as its words arrive on their own beat.
+    if (wordSwap.running && arrival < 1) endSwap()
+    wordsShown = now
+  }
+  SequentialAnimation {
+    id: wordSwap
+    NumberAnimation { target: root; property: "wordsIn"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
+    ScriptAction { script: root.wordsShown = root.wordsNow }
+    NumberAnimation { target: root; property: "wordsIn"; to: 1; duration: Motion.duration(Style, 200); easing.type: Easing.OutCubic }
+  }
+  function endSwap() {
+    wordSwap.stop()
+    wordsShown = wordsNow
+    wordsIn = 1
+  }
+  // Hidden while open, nothing moves; closing, the words hold through the
+  // fade, and land at the next open (`settle`). Judged a turn later, once
+  // a close has said so too.
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still && wordSwap.running) root.endSwap() })
+  onStillChanged: if (still && wordSwap.running) wordSwap.pause()
+
   Text {
     id: statusWords
     anchors.left: slot.right
+    opacity: root.wordsOpacity * root.wordsIn
     anchors.leftMargin: Style.space(14)
     width: Math.min(implicitWidth, root.wordsRoom)
     y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)
     textFormat: Text.PlainText
-    text: root.measured.length ? root.measured[root.fit.form].words : ""
-    color: root.scrubbing || root.live || root.trouble ? root.look.foreground : root.look.dim
+    text: root.wordsShown.text
+    color: root.wordsShown.bright ? root.look.foreground : root.look.dim
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: root.fit.tight ? 0 : 1
+    font.letterSpacing: root.wordsShown.tight ? 0 : 1
     elide: Text.ElideRight
   }
 
@@ -232,6 +290,7 @@ Item {
     id: retry
     look: root.look
     visible: root.offersRetry
+    opacity: root.wordsIn
     anchors.left: statusWords.right
     anchors.leftMargin: Style.space(16)
     anchors.verticalCenter: statusWords.verticalCenter

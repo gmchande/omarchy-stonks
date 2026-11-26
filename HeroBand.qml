@@ -16,6 +16,9 @@ Item {
   property bool live: false
   // Closing: what moves stops where it is.
   property bool still: false
+  // A screen shows the surface: out of sight, a tick, a range or the bell
+  // changes what they change at once.
+  property bool seen: true
   // The chart on show waits for the next: its live mark holds still with it.
   property bool held: false
   // Once the next chart is a while on its way, the held one dims under a line
@@ -41,6 +44,16 @@ Item {
   // The draw-in's share of the ink, and a replay's place (-1 without one).
   property real reveal: 1
   property real replayX: -1
+  // The chart the one on show bends out of, how far on OutCubic, and how
+  // far in time, which retro's wave takes (`ChartMotion`).
+  property var morphFrom: null
+  property real morph: 1
+  property real beat: 1
+  // Another stock's figures arrive on the same beat (`ChartMotion.arrival`),
+  // coming up from below for a row further down (`arrivalFrom` 1) and down
+  // from above for one higher (-1).
+  property real arrival: 1
+  property int arrivalFrom: 0
   property int chartHeight: Style.space(190)
   property string order: "manual"
   property bool reversed: false
@@ -84,7 +97,17 @@ Item {
   signal snapToNow()
   signal rangeRequested(string range)
 
-  function settle() { listHeader.settle() }
+  function settle() {
+    listHeader.settle()
+    heroItem.settle()
+    rangeRow.settle()
+  }
+  // The market opened: the live dot blooms on the bell's beat.
+  function opened() {
+    if (!root.seen) return
+    if (root.look.retro) retroChart.bloom()
+    else smoothChart.bloom()
+  }
 
   // Between the band's blocks, the body's rhythm (`StonksBody.bandGap`).
   property int bandGap: Style.space(16)
@@ -121,6 +144,10 @@ Item {
       now: root.now
       baselineText: root.baselineText
       changeCycles: root.changeCycles
+      still: root.still
+      seen: root.seen
+      arrival: root.arrival
+      arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
 
       Rectangle {
@@ -152,6 +179,8 @@ Item {
         scrubX: root.look.retro ? -1 : root.scrubX
         reveal: root.look.retro ? 1 : root.reveal
         replayX: root.look.retro ? -1 : root.replayX
+        morphFrom: root.look.retro ? null : root.morphFrom
+        morph: root.look.retro ? 1 : root.morph
         live: root.live && !root.look.retro
         newestPrice: root.newestPrice
         surfaceOpen: !root.still
@@ -179,6 +208,8 @@ Item {
         scrubX: root.look.retro ? root.scrubX : -1
         reveal: root.look.retro ? root.reveal : 1
         replayX: root.look.retro ? root.replayX : -1
+        morphFrom: root.look.retro ? root.morphFrom : null
+        morph: root.look.retro ? root.beat : 1
       }
 
       RangeMarks {
@@ -262,6 +293,8 @@ Item {
       width: parent.width
       options: root.rangeOptions
       value: root.range
+      still: root.still
+      seen: root.seen
       look: root.look
       onSelected: function(value) { root.rangeRequested(value) }
     }

@@ -8,6 +8,10 @@
 // and two thirds along at full height.
 var OUT_CUBIC = [1 / 3, 1, 2 / 3, 1, 1, 1]
 
+// The beat another stock arrives on: the chart, the price, the animal and
+// the row's highlight all move together, on OutCubic, as Omarchy's travel.
+var SWITCH_MS = 260
+
 // `style` is the shell's Style, read in the caller's binding, so a binding
 // follows the shell's switch.
 function duration(style, ms) {

@@ -274,9 +274,9 @@ Item {
   // Changes only at the exchange's midnight, unlike `now`.
   readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
   // The table holds room for both first lines' facts, and their lows and
-  // highs, on every range held for the stock, so a range change moves
-  // nothing. A range first fetched with more digits than any held widens it
-  // once.
+  // highs, on every range held for the stock, and for every stock in All, so
+  // neither a range change nor another stock moves its rules. A range first
+  // fetched with more digits than any held widens it once.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
   // The trades Stonks shows for the stock, beyond Yahoo's bars and figures:
   // the 1D chart's, tonight's too, and the newest. The ranges and the 52W
@@ -285,10 +285,36 @@ Item {
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote, shownTrades) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var heldLines: chart ? History.heldLines(histories, chartSymbol, featuredQuote, shownTrades) : []
-  readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
+  readonly property var infoFactLists: (!dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
-    .concat(heldLines.map(function(line) { return line.facts }))
-  readonly property var infoRanges: !dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range }))
+    .concat(heldLines.map(function(line) { return line.facts }))).concat(listInfo.factLists)
+  readonly property var infoRanges: (!dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range })))
+    .concat(listInfo.ranges)
+  // Every stock in All as the table holds it: its day's and its 52 weeks'
+  // facts and prices, by the shape of their widest, so a refresh that keeps
+  // every shape lays nothing out again.
+  readonly property var listInfoNow: {
+    var all = lists.length ? lists[0].symbols : []
+    var facts = {}
+    var ranges = {}
+    var keep = function(list) {
+      facts[list.map(function(f) { return f.label + " " + f.widest }).join("|")] = list
+    }
+    for (var i = 0; i < all.length; i++) {
+      var q = quotes[all[i]]
+      if (!q) continue
+      var day = Figures.dayLine(q, 0, null)
+      var year = Fundamentals.yearLine(q, null, null, rates, [])
+      ;[day.facts, History.rangeFacts(day.range.widest), year.facts, History.rangeFacts(year.range.widest)].forEach(keep)
+      ;[day.range.widest, year.range.widest].forEach(function(w) { if (w) ranges[w] = { widest: w, lowText: "", highText: "" } })
+    }
+    var factKeys = Object.keys(facts).sort()
+    var rangeKeys = Object.keys(ranges).sort()
+    return { key: factKeys.join("/") + "#" + rangeKeys.join("/"),
+      factLists: factKeys.map(function(k) { return facts[k] }), ranges: rangeKeys.map(function(k) { return ranges[k] }) }
+  }
+  property var listInfo: ({ key: "", factLists: [], ranges: [] })
+  onListInfoNowChanged: if (listInfoNow.key !== listInfo.key) listInfo = listInfoNow
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
@@ -316,7 +342,7 @@ Item {
     var before = Overnight.marketAsleep(featuredQuote, atNight, now - bellWindow, calendars)
     return asleep ? (before ? 1 : 2) : (before ? 4 : 0)
   }
-  readonly property var animal: ({ kind: animalKind, chart: animalChart,
+  readonly property var animal: ({ kind: animalKind, chart: animalChart, stock: chartSymbol,
     asleep: animalSleep === 1 || animalSleep === 2, bell: animalSleep === 2 || animalSleep === 4, scrubbed: animalSleep === 3 })
 
   // ---- The rows
@@ -1160,12 +1186,14 @@ Item {
     live: root.heroLive
     trouble: root.headerLine.trouble
     still: !root.surfaceOpen
+    arrival: motion.arrival
     helpShown: root.showingHelp
     onStyleRequested: function(v) { root.setStyle(v) }
     onSoundsRequested: root.toggleSounds()
     onScreenshotRequested: root.takeScreenshot()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
+    onRang: function(woke) { if (woke) heroBand.opened() }
     onRetryRequested: root.refreshRequested()
   }
 
@@ -1188,6 +1216,7 @@ Item {
     scrubbing: root.scrubT !== 0
     live: root.heroLive
     still: !root.surfaceOpen
+    seen: root.seen
     held: root.chartLoading
     dimmed: motion.dimmed
     // While the header says no prices come, the empty chart says why.
@@ -1204,6 +1233,11 @@ Item {
     scrubX: root.scrubX
     reveal: motion.reveal
     replayX: motion.replayX
+    morphFrom: motion.morphFrom
+    morph: motion.morph
+    beat: motion.beat
+    arrival: motion.arrival
+    arrivalFrom: root.arrivalFrom
     chartHeight: Layout.chartHeight(root.measured, root.windowHeight())
     order: root.order
     reversed: root.reversed
@@ -1268,6 +1302,7 @@ Item {
     rowGap: root.rowGap
     gutter: root.gutter
     surfaceOpen: root.surfaceOpen
+    seen: root.seen
     sourceDown: root.yahooDown
     // A turn later: the change that arranged the rows is still being told.
     onArranged: Qt.callLater(root.land)
@@ -1509,10 +1544,13 @@ Item {
     onDismissed: root.closeListMenu()
   }
 
+  // Which way the list moved to the stock on show (`ChartMotion.switched`).
+  property int arrivalFrom: 0
   ChartMotion {
     id: motion
     view: root.view
     surfaceOpen: root.surfaceOpen
+    onScreen: root.seen
     retro: root.retro
     calendars: root.calendars
     // Made from the chart as drawn in the look on screen.
@@ -1522,5 +1560,13 @@ Item {
     }
     onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
     onScrubTChanged: if (!scrubT) root.chimed = -1
+    // The new values come up from below for a row further down the list, and
+    // down from above for one higher, as a list scrolls.
+    onSwitched: function(from, to) {
+      var rows = watchlist.displayedSymbols
+      var a = rows.indexOf(from)
+      var b = rows.indexOf(to)
+      root.arrivalFrom = a < 0 || b < 0 ? 0 : b > a ? 1 : -1
+    }
   }
 }

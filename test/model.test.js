@@ -2747,3 +2747,169 @@ test("Fidget greets each open once the panel has faded in, then fidgets ever mor
   const wakes = moves.reduce((sum, move) => sum + 1 + move.steps.length, 0)
   expect(wakes).toBeLessThan(300)
 })
+
+describe("another stock's chart bends out of the one before", () => {
+  const Morph = load("Morph.js")
+  const Paint = load("SmoothPaint.js")
+  const Chart = load("Chart.js")
+  const wobble = i => 0.5 + 0.3 * Math.sin(i * 1.7) * Math.cos(i * 0.3)
+  const pt = (x, y, more) => Object.assign({ x, y, ext: false, dim: false, faint: false, brk: false, untraded: false }, more)
+  // A US stock at night: the closed day set apart, tonight's trades after
+  // it, one stretch of them with no trade.
+  const night = {
+    day: true, baselineY: 0.42, aside: { from: 0, to: 0.6 }, ticks: [0.6, 0.9],
+    points: Array.from({ length: 60 }, (_, i) => pt(i * 0.01, wobble(i), { dim: true, faint: true }))
+      .concat(Array.from({ length: 20 }, (_, i) => pt(0.62 + i * 0.012, wobble(i + 60), { ext: true, untraded: i === 8 })))
+  }
+  // Tokyo at lunch: its morning, the break, an afternoon begun.
+  const lunch = {
+    day: true, baselineY: 0.58, aside: null, ticks: [0.8],
+    points: Array.from({ length: 30 }, (_, i) => pt(0.05 + i * 0.012, wobble(i * 3), { ext: i < 4, dim: i < 4, faint: i < 4 }))
+      .concat(Array.from({ length: 15 }, (_, i) => pt(0.55 + i * 0.01, wobble(i * 5), { brk: i === 0 })))
+  }
+  // Where the line is at `x`, and whether it draws at full ink there: null
+  // past its ends and in a break.
+  const lineAt = (g, x) => {
+    const pts = g.points
+    if (x < pts[0].x || x > pts[pts.length - 1].x) return null
+    const i = pts.findIndex(p => p.x >= x)
+    if (i === 0) return { y: pts[0].y, full: !pts[0].faint }
+    const a = pts[i - 1], b = pts[i]
+    if (b.brk) return null
+    return { y: b.untraded ? a.y : a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x), full: !a.faint && !b.faint }
+  }
+  const drawsAs = (frame, chart) => {
+    for (let k = 0; k < 997; k++) {
+      const x = (k + 0.5) / 997
+      const got = lineAt(frame, x), want = lineAt(chart, x)
+      if (want === null) expect(got).toBe(null)
+      else {
+        expect(got).not.toBe(null)
+        expect(Math.abs(got.y - want.y)).toBeLessThan(1e-6)
+        expect(got.full).toBe(want.full)
+      }
+    }
+    expect(Math.abs(frame.baselineY - chart.baselineY)).toBeLessThan(1e-6)
+    expect(Chart.lastLitPoint(frame).x).toBeCloseTo(Chart.lastLitPoint(chart).x, 6)
+  }
+
+  test("each way, it starts as the old chart and ends as the new one, with no jump at either end", () => {
+    for (const [from, to] of [[night, lunch], [lunch, night]]) {
+      const plan = Morph.plan(from, to)
+      expect(Morph.frame(plan, 0)).toBe(from)
+      expect(Morph.frame(plan, 1)).toBe(to)
+      drawsAs(Morph.frame(plan, 1e-9), from)
+      drawsAs(Morph.frame(plan, 1 - 1e-9), to)
+      const end = Morph.frame(plan, 1 - 1e-9).aside
+      if (to.aside) {
+        expect(end.from).toBeCloseTo(to.aside.from, 6)
+        expect(end.to).toBeCloseTo(to.aside.to, 6)
+      } else expect(end.to - end.from).toBeLessThan(1e-6)
+    }
+  })
+
+  test("a break both charts have stays open the whole way", () => {
+    const later = Object.assign({}, lunch, { baselineY: 0.3, points: lunch.points.map((p, i) => Object.assign({}, p, { y: wobble(i + 7) })) })
+    const plan = Morph.plan(lunch, later)
+    for (let t = 0.05; t < 1; t += 0.05) expect(lineAt(Morph.frame(plan, t), 0.5)).toBe(null)
+  })
+
+  // The dashed line a frame draws, and every line its ink splits its
+  // colours on, from what the painter asks of the canvas.
+  const painted = g => {
+    const s = { width: 400, height: 200, pad: 3, weight: 1, dashUnit: 1, hasBaseline: true, hoursAlpha: 0.6, asideAlpha: 0.4,
+      baselineColor: { r: 0.5, g: 0.5, b: 0.5, a: 1 }, aboveColor: { r: 0, g: 1, b: 0 }, belowColor: { r: 1, g: 0, b: 0 },
+      aboveWash: 0.16, belowWash: 0.16, aboveFade: 0.34, belowFade: 0.34, rgba: (r, g, b, a) => ({ r, g, b, a }) }
+    const splits = []
+    let dashed = null, dashing = false
+    const ctx = new Proxy({}, {
+      get: (_, name) => name === "createLinearGradient" ? (x0, y0, x1, y1) => {
+        const stops = []
+        splits.push({ y0, y1, stops })
+        return { addColorStop: (at, color) => stops.push({ at, color }) }
+      } : name === "setLineDash" ? dash => { dashing = dash.length > 0 }
+        : name === "moveTo" ? (x, y) => { if (dashing && dashed === null) dashed = y }
+        : () => {},
+      set: () => true
+    })
+    Paint.paintBase(ctx, g, s)
+    Paint.paintInk(ctx, g, s)
+    // A split ink's first stop, and a fade's clear one, are where the colours meet.
+    return { dashed, meets: splits.map(({ y0, y1, stops }) => {
+      const clear = stops.find(stop => stop.color.a === 0) || stops[0]
+      return y0 + clear.at * (y1 - y0)
+    }) }
+  }
+
+  test("every frame colours its line against the dashed line it draws", () => {
+    for (const [from, to] of [[night, lunch], [lunch, night]]) {
+      const plan = Morph.plan(from, to)
+      for (let t = 0.1; t < 1; t += 0.1) {
+        const { dashed, meets } = painted(Morph.frame(plan, t))
+        expect(meets.length).toBeGreaterThan(0)
+        for (const y of meets) expect(Math.abs(y - dashed)).toBeLessThan(0.05)
+      }
+    }
+  })
+
+  test("retro's wave stands each column on its own chart's dashed row, and lights the newest cell once it has passed", () => {
+    const grid = g => Chart.retroGrid(g, 300, 120, 5, 1)
+    const from = grid(night), to = grid(lunch)
+    expect(from.baseRow).not.toBe(to.baseRow)
+    for (let front = 1; front < to.columns; front += 7) {
+      const g = Morph.wave(from, to, front)
+      for (let c = 0; c < to.columns; c++) {
+        const own = c < front ? to : from
+        expect([g.levels[c], g.above[c], g.baseRows[c]]).toEqual([own.levels[c], own.above[c], own.baseRow])
+      }
+      expect(g.lastLit).toBe(to.lastLit < front ? to.lastLit : -1)
+    }
+  })
+})
+
+test("a tick rolls only the digits it changed, and a price that grows a digit rolls whole", () => {
+  const rolled = (from, to) => M.rolledGlyphs(from, to).arriving.filter(g => g.rolls).map(g => g.glyph).join("")
+  expect(rolled("215.38", "216.12")).toBe("612")
+  expect(rolled("215.38", "215.39")).toBe("9")
+  expect(M.rolledGlyphs("215.38", "216.12").leaving.map(g => g.glyph).join("")).toBe("538")
+  expect(rolled("999.99", "1,000.01")).toBe("1,000.01")
+})
+
+test("a chart without a known close bends and waves into another with no close line it never had", () => {
+  const Morph = load("Morph.js")
+  const Chart = load("Chart.js")
+  const pt = (x, y) => ({ x, y, ext: false, dim: false, faint: false, brk: false, untraded: false })
+  const closed = { day: true, baselineY: 0.4, aside: null, ticks: [], points: [0, 1, 2, 3].map(i => pt(0.1 + i * 0.2, 0.3 + 0.1 * i)) }
+  const unknown = { day: true, baselineY: null, aside: null, ticks: [], points: [0, 1, 2, 3].map(i => pt(0.1 + i * 0.2, 0.6 - 0.1 * i)) }
+  for (const [from, to] of [[unknown, closed], [closed, unknown]]) {
+    const plan = Morph.plan(from, to)
+    for (let t = 0.1; t < 1; t += 0.2) expect(Chart.hasBaseline(Morph.frame(plan, t))).toBe(false)
+  }
+  const grid = g => Chart.retroGrid(g, 300, 120, 5, 1)
+  const g = Morph.wave(grid(unknown), grid(closed), 20)
+  expect(g.baseds.slice(0, 20).every(b => b === true)).toBe(true)
+  expect(g.baseds.slice(20).every(b => b === false)).toBe(true)
+})
+
+test("a price on screen reads as its number, so a rise between prices below zero is a rise and a first price is none", () => {
+  expect(M.shownNumber("\u221210.03") < M.shownNumber("\u22129.93")).toBe(true)
+  expect(M.shownNumber("1,017.26")).toBe(1017.26)
+  expect(Number.isNaN(M.shownNumber("…"))).toBe(true)
+  expect(Number.isNaN(M.shownNumber("—"))).toBe(true)
+})
+
+test("a chart of one trade grows out of the other's line into its own dot, and shrinks back into a line", () => {
+  const Morph = load("Morph.js")
+  const pt = (x, y) => ({ x, y, ext: false, dim: false, faint: false, brk: false, untraded: false })
+  const day = { day: true, baselineY: 0.5, aside: null, ticks: [], points: Array.from({ length: 30 }, (_, i) => pt(0.05 + i * 0.02, 0.5 + 0.3 * Math.sin(i))) }
+  const one = { day: true, baselineY: 0.5, aside: null, ticks: [], points: [pt(0.1, 0.3)] }
+  const into = Morph.plan(day, one)
+  expect(Morph.frame(into, 1)).toBe(one)
+  const end = Morph.frame(into, 1 - 1e-9)
+  expect(end.points.every(p => Math.abs(p.x - 0.1) < 1e-6 && Math.abs(p.y - 0.3) < 1e-6)).toBe(true)
+  expect(end.lone[0].share).toBeCloseTo(1, 6)
+  const out = Morph.plan(one, day)
+  expect(Morph.frame(out, 0)).toBe(one)
+  expect(Morph.frame(out, 1e-9).lone[0].share).toBeCloseTo(1, 6)
+  expect(Morph.frame(out, 1 - 1e-9).lone[0].share).toBeCloseTo(0, 6)
+})

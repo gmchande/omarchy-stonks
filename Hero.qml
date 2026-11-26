@@ -4,6 +4,7 @@ import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Format.js" as Format
+import "Motion.js" as Motion
 // The symbol, the listing line, the price in both looks, the change, and the
 // strip under them. One fitted ink height drives both digit renderers, so they
 // share a top line, a baseline and a left edge at any width. The change and
@@ -37,6 +38,51 @@ Item {
   // it, where the extended-hours trade steps aside.
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
+  // Another stock's figures arrive on the switch's beat (`ChartMotion.arrival`,
+  // 0 to 1), from 0.55 and 4 px toward the row clicked (`arrivalFrom`, 1 for
+  // one further down), as a list scrolls.
+  property real arrival: 1
+  property int arrivalFrom: 0
+  opacity: arrival >= 1 ? 1 : 0.55 + 0.45 * arrival
+  transform: Translate { y: root.arrivalFrom * Style.space(4) * (1 - root.arrival) }
+  // Closing, a roll holds through the fade and lands at the next open
+  // (`settle`); hidden while open, it lands at once; either way none starts.
+  property bool still: false
+  property bool seen: true
+  function settle() {
+    rollAnim.stop()
+    roll = 1
+  }
+  onStillChanged: if (still && rollAnim.running) rollAnim.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+
+  // When the price on show ticks, its changed digits roll, up on a rise and
+  // down on a fall, and the move and its caption with them (`RollingText`).
+  // Never in retro, whose cells change in place, nor as the first price
+  // comes, a scrub, another stock or a new open brings another.
+  property real roll: 1
+  property bool rollUp: true
+  property var lastPrice: null
+  onPriceTextChanged: Qt.callLater(takePrice)
+  function takePrice() {
+    var was = lastPrice
+    var value = Format.shownNumber(priceText)
+    lastPrice = { symbol: symbol, text: priceText, value: value, scrubbing: scrubbing }
+    if (!was || was.text === priceText) return
+    rollAnim.stop()
+    roll = 1
+    if (still || !seen || look.retro || scrubbing || was.scrubbing || was.symbol !== symbol || arrival < 1
+      || !isFinite(value) || !isFinite(was.value) || value === was.value) return
+    rollUp = value > was.value
+    rollAnim.start()
+  }
+  NumberAnimation { id: rollAnim; target: root; property: "roll"; from: 0; to: 1; duration: Motion.duration(Style, Motion.SWITCH_MS); easing.type: Easing.OutCubic }
+  // It ends once the price's digits are within half a pixel of their place,
+  // which no frame after would show.
+  onRollChanged: if (rollAnim.running && (1 - roll) * price.inkHeight < 0.5) {
+    rollAnim.stop()
+    roll = 1
+  }
 
   readonly property string freshnessText: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is on top. None once its quote
@@ -185,11 +231,11 @@ Item {
     font: listingText.font
   }
 
-  Text {
+  RollingText {
+    id: price
     visible: !root.look.retro
     x: -Math.round(root.inkLeft)
     y: root.baselineY - baselineOffset
-    textFormat: Text.PlainText
     text: root.priceText
     // An old night's price dims, as its line did.
     color: root.newestOld ? root.look.dim : root.look.foreground
@@ -197,9 +243,12 @@ Item {
     font.pixelSize: root.fittedSize
     font.bold: true
     font.letterSpacing: -1
+    roll: root.roll
+    up: root.rollUp
   }
 
   BlockDigits {
+    objectName: "retroPrice"
     visible: root.look.retro
     y: root.baselineY - baselineOffset
     // Hidden, it rests, or a scrub in smooth would repaint it every step.
@@ -209,18 +258,19 @@ Item {
     ghostColor: root.look.ghost
   }
 
-  Text {
+  RollingText {
     id: changeText
     objectName: "changeText"
     anchors.right: parent.right
     y: root.baselineY - baselineOffset
-    textFormat: Text.PlainText
     text: Format.lookSigns(root.lines.move, root.look.retro)
     // An old night's move dims with its price.
     color: root.newestOld ? root.look.dim : root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.display
     font.bold: true
+    roll: root.roll
+    up: root.rollUp
     // A range's change is always its percentage, so only the day's cycles.
     MouseArea {
       anchors.fill: parent
@@ -336,15 +386,16 @@ Item {
       font.bold: true
       font.letterSpacing: 1
     }
-    // The move dims with an old night's price.
-    Text {
+    // The move dims with an old night's price, and rolls with the price.
+    RollingText {
       visible: text !== ""
-      textFormat: Text.PlainText
       text: Format.lookSigns(root.caption.changeText, root.look.retro)
       color: root.newestOld ? root.look.dim : root.toneColor(root.caption.tone)
       font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
+      roll: root.roll
+      up: root.rollUp
     }
   }
 }

@@ -277,17 +277,18 @@ function stepTime(quote, t, steps, last) {
 // column to itself, so the column the line starts from is always there
 // (`ownStart`, `retroColumn`). A column between two trades the line joins
 // holds the one before it; a break (`brk`) and a stretch with no trade
-// (`untraded`) leave columns dark. With no previous close known, the columns
-// stand on the floor. A column's side is its own price's against the close,
-// unrounded, as smooth's line is: a price a hair under the close, on the
-// close's row, is below; one at the close is above, as smooth's line there
-// is up.
+// (`untraded`) leave columns dark. With no previous close known (`based`
+// false), the columns stand on the floor. A column's side is its own
+// price's against the close, unrounded, as smooth's line is: a price a hair
+// under the close, on the close's row, is below; one at the close is above,
+// as smooth's line there is up.
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], faint: [], lastLit: -1, ownStart: false }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], faint: [], lastLit: -1, ownStart: false, based: false }
   if (!geometry || !geometry.points) return g
-  g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
+  g.based = hasBaseline(geometry)
+  g.baseRow = g.based ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var aside = geometry.aside
   if (aside) {
     g.asideFrom = Math.floor(aside.from * columns)
