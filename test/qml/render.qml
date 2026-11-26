@@ -1455,8 +1455,14 @@ Harness {
           // the draw-in: held, the mark is drawn as it rests.
           Component.onCompleted: {
             root.find(body, "animal").seen = false
-            var charts = root.find(body, "heroChart").children
-            for (var i = 0; i < charts.length; i++) if (charts[i].still !== undefined) charts[i].still = true
+            var smooth = root.find(body, "smoothChart")
+            var retro = root.find(body, "retroChart")
+            if (smooth) smooth.still = true
+            if (retro) retro.still = true
+            var period = root.find(body, "periodRule")
+            var year = root.find(body, "yearRule")
+            if (period) period.seen = false
+            if (year) year.seen = false
           }
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup
@@ -1917,8 +1923,7 @@ Harness {
         waitForRendering(body)
         target = root.findAll(body.search, "searchResult")[1]
       } else if (control === "chart") {
-        var heroChart = one("heroChart")
-        for (var k = 0; k < heroChart.children.length; k++) if (heroChart.children[k].scrubColumn !== undefined) target = heroChart.children[k]
+        target = one("retroChart")
       }
       verify(!!target, "review control exists: " + control)
       waitForRendering(body)

@@ -92,7 +92,11 @@ Item {
   }
 
   function settle() {
+    crossLeaving = []
+    crossComing = []
+    crossStaying = []
     show(false)
+    crossFromZ = hasZ
   }
 
   function show(fade) {
@@ -141,13 +145,27 @@ Item {
   onAnimalChanged: if (!still) Qt.callLater(take)
   function take() {
     if (still) return
+    var had = shownChart !== ""
     var before = drawn(shownKind)
-    var stock = !!animal && animal.stock !== shownStock
-    show(!stock && animal.chart === shownChart)
-    if (stock) cross(before, drawn(kind))
+    var wasZ = shownKind !== "" && shownAsleep
+    var switched = had && !!animal && (animal.stock !== shownStock || animal.chart !== shownChart)
+    show(!switched && !!animal && animal.chart === shownChart)
+    if (switched) {
+      crossFromZ = wasZ
+      cross(before, drawn(kind))
+    }
   }
   property string shownStock: ""
   property string shownKind: ""
+  property bool crossFromZ: false
+  readonly property bool hasZ: kind !== "" && shownAsleep
+  // Sleep Z crosses in lockstep with the animal on a switch, stays steady when
+  // both sides match, and follows the lids on a market bell.
+  readonly property real sleepZ: crossing < 1
+    ? (crossFromZ === hasZ ? (hasZ ? 1 : 0)
+      : look.retro ? Math.round((hasZ ? crossing : 1 - crossing) * 2) / 2
+      : (hasZ ? crossing : 1 - crossing))
+    : (kind === "" ? 0 : (look.retro ? lids / 2 : closing))
 
   // The cells of `k` on show, in their ink.
   function drawn(k) {

@@ -14,6 +14,7 @@ Item {
   id: root
 
   property bool retro: false
+  property bool seen: true
   property bool still: false
   property color color: Commons.Color.foreground
 
@@ -31,12 +32,22 @@ Item {
   // While still, nothing moves: a change waits for the open's `settle`.
   onRetroChanged: {
     if (still) return
+    if (!seen || Motion.duration(Style, 240) <= 0) {
+      settle()
+      return
+    }
     step.stop()
     step.to = retro ? 0 : 1
     step.start()
   }
   onStillChanged: if (still && step.running) step.pause()
-  NumberAnimation { id: step; target: root; property: "cells"; duration: Motion.duration(Style, 200); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
+  }
+  NumberAnimation { id: step; target: root; property: "cells"; duration: Motion.duration(Style, 240); easing.type: Easing.Linear }
 
   function settle() {
     step.stop()

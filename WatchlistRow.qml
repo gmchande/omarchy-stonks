@@ -52,20 +52,29 @@ Rectangle {
   property int lastPlace: -1
   property real shift: 0
   property int travel: 0
+  property bool sorting: false
+  property int slideMs: 160
   onPlaceChanged: {
     var from = lastPlace
     lastPlace = place
     if (folding && place < 0) return
     endFold()
+    if (sorting) return
     if (lifted || !visible || from < 0 || place < 0) {
       settle()
       return
     }
+    slideMs = 160
     travel = Math.abs(place - from)
     shift += (from - place) * pitch
     slide.restart()
   }
-  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
+  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, row.slideMs); easing.type: Easing.OutCubic }
+  onShiftChanged: if (slide.running && Math.abs(shift) < 0.5) {
+    slide.stop()
+    shift = 0
+    travel = 0
+  }
   // Lifted or sliding, the row lays the card's ground under its fill, at
   // once, so the rows it passes never show through.
   readonly property bool moving: lifted || slide.running
@@ -82,6 +91,7 @@ Rectangle {
     foldY = y
     slide.stop()
     fadeIn.stop()
+    sortFade.stop()
     folding = true
     foldAnim.restart()
   }
@@ -99,7 +109,7 @@ Rectangle {
     NumberAnimation { target: row; property: "opacity"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
     onFinished: row.endFold()
   }
-  readonly property bool resting: !slide.running && !fadeIn.running && !lifted
+  readonly property bool resting: !slide.running && !fadeIn.running && !sortFade.running && !lifted
   signal rested()
   onRestingChanged: if (resting) rested()
   function settle() {
@@ -108,6 +118,7 @@ Rectangle {
     shift = 0
     travel = 0
     fadeIn.stop()
+    sortFade.stop()
     opacity = 1
     drawIn.stop()
     reveal = 1
@@ -116,6 +127,7 @@ Rectangle {
     if (slide.running) slide.pause()
     if (foldAnim.running) foldAnim.pause()
     if (fadeIn.running) fadeIn.pause()
+    if (sortFade.running) sortFade.pause()
     if (drawIn.running) drawIn.pause()
   }
   function holdAt(atY) {
@@ -131,9 +143,38 @@ Rectangle {
   property bool hadLine: false
   Component.onCompleted: hadLine = !!geometry
   function join() {
+    sortFade.stop()
     opacity = 0
     fadeIn.restart()
     if (geometry) drawLineIn()
+  }
+  function sortGlide(distance) {
+    endFold()
+    fadeIn.stop()
+    sortFade.stop()
+    opacity = 1
+    slide.stop()
+    if (Math.abs(distance) < 0.5) {
+      shift = 0
+      travel = 0
+      return
+    }
+    slideMs = 220
+    shift = distance
+    travel = Math.max(1, Math.round(Math.abs(distance) / pitch))
+    slide.restart()
+  }
+  function sortArrive(nudge) {
+    endFold()
+    slide.stop()
+    fadeIn.stop()
+    sortFade.stop()
+    slideMs = 220
+    travel = 0
+    shift = nudge
+    opacity = 0
+    slide.restart()
+    sortFade.restart()
   }
   function drawLineIn() {
     reveal = 0
@@ -154,10 +195,16 @@ Rectangle {
       travel = 0
       return
     }
+    slideMs = 160
     travel = Math.max(travel, Math.round(Math.abs(shift) / pitch))
     slide.restart()
   }
   NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: sortFade; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 220); easing.type: Easing.OutCubic }
+  onOpacityChanged: if (sortFade.running && opacity > 0.99) {
+    sortFade.stop()
+    opacity = 1
+  }
   NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.OutCubic }
 
   // In scene coordinates. `second` is Qt's double-click second press, which

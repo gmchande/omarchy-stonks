@@ -23,6 +23,7 @@ Item {
   id: root
 
   property var geometry: null
+  property string stock: ""
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
@@ -49,6 +50,7 @@ Item {
   property bool live: false
   property string newestPrice: ""
   property bool surfaceOpen: true
+  property bool seen: true
   // Closing: the live mark stops where it is, and ripples again as the surface
   // opens.
   property bool still: false
@@ -71,7 +73,62 @@ Item {
   property var lastShown: null
   onMorphFromChanged: bendFrom = morphFrom && morph < 1 && lastShown ? lastShown : morphFrom
   readonly property var plan: bendFrom && geometry ? Morph.plan(bendFrom, geometry) : null
-  readonly property var shown: plan && morph < 1 ? Morph.frame(plan, morph) : geometry
+
+  // A live tick on the same 1D day glides the newest point and live dot on the
+  // digits' 260 ms beat, stopping within half a pixel.
+  property var prevGeometry: null
+  property string prevStock: ""
+  property var tailFrom: null
+  property real tailT: 1
+  function endTail() {
+    tailAnim.stop()
+    tailT = 1
+    tailFrom = null
+  }
+  function settle() {
+    endTail()
+    bloomAnim.stop()
+    bloomed = 1
+  }
+  function tailGeometry(g, from, t) {
+    if (!g || !from || !g.points || !g.points.length) return g
+    var pts = g.points.slice()
+    var last = pts[pts.length - 1]
+    pts[pts.length - 1] = Object.assign({}, last, {
+      x: from.x + (last.x - from.x) * t,
+      y: from.y + (last.y - from.y) * t
+    })
+    return Object.assign({}, g, { points: pts })
+  }
+  NumberAnimation {
+    id: tailAnim
+    target: root
+    property: "tailT"
+    to: 1
+    duration: Motion.duration(Style, Motion.SWITCH_MS)
+    easing.type: Easing.OutCubic
+    onFinished: root.endTail()
+  }
+  onTailTChanged: if (tailAnim.running && tailFrom && geometry) {
+    var to = Chart.newestPoint(geometry)
+    if (!to) { endTail(); return }
+    var rem = 1 - tailT
+    if (Math.hypot((to.x - tailFrom.x) * rem * (width - pad * 2), (to.y - tailFrom.y) * rem * (height - pad * 2)) < 0.5)
+      endTail()
+  }
+  onMorphChanged: if (morph < 1 && tailAnim.running) endTail()
+  onRevealChanged: if (reveal < 1 && tailAnim.running) endTail()
+  onStillChanged: if (still && tailAnim.running) tailAnim.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.endTail() })
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
+  }
+
+  readonly property var shown: plan && morph < 1 ? Morph.frame(plan, morph)
+    : tailFrom && tailT < 1 && geometry ? tailGeometry(geometry, tailFrom, tailT)
+    : geometry
   readonly property var lastPoint: Chart.newestPoint(shown)
   readonly property bool day: !!geometry && geometry.day === true
   // Against the dashed line under it, and in the line's own ink with none.
@@ -79,9 +136,12 @@ Item {
     : lastPoint.y > shown.baselineY ? belowColor : aboveColor
   readonly property bool drawable: Chart.drawable(shown)
   readonly property bool hasBaseline: Chart.hasBaseline(shown)
-  // The dot rides a line that had one, and comes with the line's end to one
-  // that hadn't.
+  // The dot rides a line that had one; leaving 1D it shrinks and fades over
+  // the first 35% of the bend, and returning to 1D it blooms over the last 35%.
   readonly property bool dotRides: !!plan && bendFrom.day === true && Chart.newestPoint(bendFrom) !== null
+  readonly property real dotShare: !plan || morph >= 1 ? (day ? 1 : 0)
+    : day ? (dotRides ? 1 : Math.max(0, Math.min(1, (morph - 0.65) / 0.35)))
+    : (dotRides ? Math.max(0, 1 - morph / 0.35) : 0)
   // The draw-in sweeps from before the first trade's dot to past the
   // newest's: the line's width and a half, and a pixel.
   readonly property real inkFirst: drawable ? shown.points[0].x : 0
@@ -101,7 +161,40 @@ Item {
   readonly property real belowFade: Tones.washAlpha(belowColor, upColor, ground, 0.34, 1)
 
   onShownChanged: { base.requestPaint(); ink.requestPaint() }
-  onGeometryChanged: marks.requestPaint()
+  onGeometryChanged: {
+    var prev = prevGeometry
+    var wasStock = prevStock
+    prevGeometry = geometry
+    prevStock = stock
+    marks.requestPaint()
+    if (!geometry || !prev || !surfaceOpen || still || !seen || !visible
+      || morph < 1 || reveal < 1 || replayX >= 0
+      || Motion.duration(Style, Motion.SWITCH_MS) <= 0) {
+      endTail()
+      return
+    }
+    if (wasStock !== stock || !prev.day || !geometry.day || prev.start !== geometry.start
+      || (!prev.aside) !== (!geometry.aside)) {
+      endTail()
+      return
+    }
+    var from = (tailAnim.running && lastShown ? Chart.newestPoint(lastShown) : null) || Chart.newestPoint(prev)
+    var to = Chart.newestPoint(geometry)
+    if (!from || !to) {
+      endTail()
+      return
+    }
+    var dx = (to.x - from.x) * (width - pad * 2)
+    var dy = (to.y - from.y) * (height - pad * 2)
+    if (Math.hypot(dx, dy) < 0.5) {
+      endTail()
+      return
+    }
+    tailAnim.stop()
+    tailFrom = { x: from.x, y: from.y }
+    tailT = 0
+    tailAnim.start()
+  }
   onBaselineColorChanged: { base.requestPaint(); ink.requestPaint() }
   onAboveWashChanged: ink.requestPaint()
   onBelowWashChanged: ink.requestPaint()
@@ -248,10 +341,9 @@ Item {
   // At the open it blooms on the bell's beat (`bloom`).
   Item {
     id: dot
-    visible: root.day && root.lastPoint !== null && root.replayX < 0 && root.inkDrawn >= x
-      && (root.morph >= 1 || root.dotRides)
-    scale: 0.4 + 0.6 * root.bloomed
-    opacity: 0.4 + 0.6 * root.bloomed
+    visible: root.dotShare > 0 && root.lastPoint !== null && root.replayX < 0 && root.inkDrawn >= x
+    scale: (0.4 + 0.6 * root.bloomed) * (0.4 + 0.6 * root.dotShare)
+    opacity: (0.4 + 0.6 * root.bloomed) * root.dotShare
     x: root.lastPoint ? root.pad + root.lastPoint.x * (root.width - root.pad * 2) : 0
     y: root.lastPoint ? root.pad + root.lastPoint.y * (root.height - root.pad * 2) : 0
 

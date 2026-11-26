@@ -1187,6 +1187,7 @@ Item {
     trouble: root.headerLine.trouble
     still: !root.surfaceOpen
     arrival: motion.arrival
+    crossing: motion.crossing
     helpShown: root.showingHelp
     onStyleRequested: function(v) { root.setStyle(v) }
     onSoundsRequested: root.toggleSounds()
@@ -1433,6 +1434,8 @@ Item {
     y: root.edge - root.margins - height
     visible: root.rowsShown
     look: root.look
+    seen: root.seen
+    still: !root.surfaceOpen
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note

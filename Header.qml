@@ -40,9 +40,10 @@ Item {
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
   // Another stock's name and status change at once, where they stand; the
-  // animal crosses on the switch's beat (`ChartMotion.arrival`), and a bell's
-  // words wait for it.
+  // animal crosses on the switch's beat (`ChartMotion.crossing`), and a bell's
+  // words wait for a stock switch (`ChartMotion.arrival`).
   property real arrival: 1
+  property real crossing: 1
 
   signal styleRequested(string style)
   signal soundsRequested()
@@ -126,7 +127,7 @@ Item {
     id: slot
     animal: root.animal
     look: root.look
-    crossing: root.arrival
+    crossing: root.crossing
     seen: root.seen
     still: root.still
     anchors.left: parent.left
@@ -141,8 +142,8 @@ Item {
   // and drifts its 3 px down as they open, in retro it steps with the lids.
   PixelSprite {
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
-    readonly property real shut: root.look.retro ? slot.lids / 2 : slot.closing
-    visible: slot.kind !== "" && shut > 0
+    readonly property real shut: slot.sleepZ
+    visible: shut > 0
     opacity: shut
     columns: 3
     rows: 5
@@ -351,6 +352,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
     retro: root.look.retro
+    seen: root.seen
     still: root.still
     pixel: root.cell - 1
     color: lookPress.containsMouse ? root.look.foreground : root.look.dim

@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "Figures.js" as Figures
+import "Motion.js" as Motion
 // The hero, the chart, the range row, the info block and the list's header.
 // Each keeps its height for every symbol, range and look, so the list below
 // never moves.
@@ -99,6 +100,46 @@ Item {
     listHeader.settle()
     heroItem.settle()
     rangeRow.settle()
+    infoBlock.settle()
+    settleLook()
+    smoothChart.settle()
+  }
+
+  // Left-to-right column-pitch wipe on smooth ↔ retro, synced with LookIcon.
+  property real lookWipe: 1
+  readonly property bool lookWiping: lookWipe < 1
+  readonly property real wipeX: Math.min(heroChart.width, Math.round(lookWipe * retroChart.grid.columns) * retroChart.grid.pitch)
+  function settleLook() {
+    lookWipeAnim.stop()
+    lookWipe = 1
+  }
+  Connections {
+    target: root.look
+    function onRetroChanged() {
+      if (root.still) return
+      if (!root.seen || !root.visible || Motion.duration(Style, 240) <= 0) {
+        root.settleLook()
+        return
+      }
+      lookWipeAnim.stop()
+      root.lookWipe = 0
+      lookWipeAnim.start()
+    }
+  }
+  Connections {
+    target: Style
+    ignoreUnknownSignals: true
+    function onReduceMotionChanged() { if (Style.reduceMotion) root.settleLook() }
+  }
+  onStillChanged: if (still && lookWipeAnim.running) lookWipeAnim.pause()
+  onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settleLook() })
+  NumberAnimation {
+    id: lookWipeAnim
+    target: root
+    property: "lookWipe"
+    to: 1
+    duration: Motion.duration(Style, 240)
+    easing.type: Easing.Linear
   }
   // The market opened: the live dot blooms on the bell's beat.
   function opened() {
@@ -160,53 +201,81 @@ Item {
       width: parent.width
       height: root.chartHeight
 
-      SmoothChart {
-        id: smoothChart
-        visible: !root.look.retro
-        anchors.fill: parent
-        // The hidden look draws nothing and follows no scrub until it shows,
-        // so a new chart paints once.
-        geometry: root.look.retro ? null : root.geometry
-        up: root.view ? root.view.dayUp : true
-        upColor: root.look.upColor
-        downColor: root.look.downColor
-        baselineColor: root.look.dimmer
-        hairlineColor: root.look.foreground
-        ground: root.look.ground
-        scrubX: root.look.retro ? -1 : root.scrubX
-        reveal: root.look.retro ? 1 : root.reveal
-        replayX: root.look.retro ? -1 : root.replayX
-        morphFrom: root.look.retro ? null : root.morphFrom
-        morph: root.look.retro ? 1 : root.morph
-        live: root.live && !root.look.retro
-        newestPrice: root.newestPrice
-        surfaceOpen: !root.still
-        still: root.still || root.held
+      Item {
+        id: smoothWrap
+        visible: !root.look.retro || root.lookWiping
+        x: root.lookWiping && root.look.retro ? root.wipeX : 0
+        y: -rangeMarks.lift
+        width: root.lookWiping ? (root.look.retro ? Math.max(0, parent.width - root.wipeX) : root.wipeX) : parent.width
+        height: parent.height + rangeMarks.lift * 2
+        clip: root.lookWiping
+
+        SmoothChart {
+          id: smoothChart
+          objectName: "smoothChart"
+          x: -parent.x
+          y: rangeMarks.lift
+          width: heroChart.width
+          height: heroChart.height
+          // The hidden look draws nothing and follows no scrub until it shows,
+          // so a new chart paints once.
+          geometry: (!root.look.retro || root.lookWiping) ? root.geometry : null
+          stock: root.symbol
+          up: root.view ? root.view.dayUp : true
+          upColor: root.look.upColor
+          downColor: root.look.downColor
+          baselineColor: root.look.dimmer
+          hairlineColor: root.look.foreground
+          ground: root.look.ground
+          scrubX: (!root.look.retro || root.lookWiping) ? root.scrubX : -1
+          reveal: (!root.look.retro || root.lookWiping) ? root.reveal : 1
+          replayX: (!root.look.retro || root.lookWiping) ? root.replayX : -1
+          morphFrom: (!root.look.retro || root.lookWiping) ? root.morphFrom : null
+          morph: (!root.look.retro || root.lookWiping) ? root.morph : 1
+          live: root.live && !root.look.retro
+          newestPrice: root.newestPrice
+          surfaceOpen: !root.still
+          seen: root.seen
+          still: root.still || root.held
+        }
       }
 
-      RetroChart {
-        id: retroChart
-        visible: root.look.retro
-        anchors.fill: parent
-        geometry: root.look.retro ? root.geometry : null
-        upColor: root.look.upColor
-        downColor: root.look.downColor
-        up: root.view ? root.view.dayUp : true
-        baselineColor: root.look.dimmer
-        glow: true
-        fullSession: true
-        live: root.live && root.look.retro
-        newestPrice: root.newestPrice
-        surfaceOpen: !root.still
-        still: root.still || root.held
-        hairlineColor: root.look.foreground
-        ghostColor: root.look.ghost
-        ground: root.look.ground
-        scrubX: root.look.retro ? root.scrubX : -1
-        reveal: root.look.retro ? root.reveal : 1
-        replayX: root.look.retro ? root.replayX : -1
-        morphFrom: root.look.retro ? root.morphFrom : null
-        morph: root.look.retro ? root.beat : 1
+      Item {
+        id: retroWrap
+        visible: root.look.retro || root.lookWiping
+        x: root.lookWiping && !root.look.retro ? root.wipeX : 0
+        y: -rangeMarks.lift
+        width: root.lookWiping ? (!root.look.retro ? Math.max(0, parent.width - root.wipeX) : root.wipeX) : parent.width
+        height: parent.height + rangeMarks.lift * 2
+        clip: root.lookWiping
+
+        RetroChart {
+          id: retroChart
+          objectName: "retroChart"
+          x: -parent.x
+          y: rangeMarks.lift
+          width: heroChart.width
+          height: heroChart.height
+          geometry: (root.look.retro || root.lookWiping) ? root.geometry : null
+          upColor: root.look.upColor
+          downColor: root.look.downColor
+          up: root.view ? root.view.dayUp : true
+          baselineColor: root.look.dimmer
+          glow: true
+          fullSession: true
+          live: root.live && root.look.retro
+          newestPrice: root.newestPrice
+          surfaceOpen: !root.still
+          still: root.still || root.held
+          hairlineColor: root.look.foreground
+          ghostColor: root.look.ghost
+          ground: root.look.ground
+          scrubX: (root.look.retro || root.lookWiping) ? root.scrubX : -1
+          reveal: (root.look.retro || root.lookWiping) ? root.reveal : 1
+          replayX: (root.look.retro || root.lookWiping) ? root.replayX : -1
+          morphFrom: (root.look.retro || root.lookWiping) ? root.morphFrom : null
+          morph: (root.look.retro || root.lookWiping) ? root.beat : 1
+        }
       }
 
       RangeMarks {
@@ -308,6 +377,8 @@ Item {
       factLists: root.factLists
       ranges: root.infoRanges
       look: root.look
+      seen: root.seen
+      still: root.still
       rowGap: Style.space(4)
 
       Rectangle {

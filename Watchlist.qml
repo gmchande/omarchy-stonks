@@ -48,10 +48,7 @@ Flickable {
   // through its fade (`pauseRows`).
   property bool seen: true
   function landMoves() {
-    highlightSlide.stop()
-    highlightShift = 0
-    var rows = rowItems()
-    for (var s in rows) rows[s].endFold()
+    settleRows()
   }
   // Judged a turn later, once a close has said so too.
   onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && root.surfaceOpen) root.landMoves() })
@@ -534,12 +531,63 @@ Flickable {
     rows.forEach(function(r) { r.row.holdAt(r.y) })
   }
 
-  // Another list, another order, or an opening surface is a new arrangement:
-  // the rows take their places at once.
+  // Another list or an opening surface is a new arrangement: the rows take
+  // their places at once.
   function layOut() {
     display(view.shown.slice(), false)
     settleRows()
     forgetGoneCursor()
+  }
+
+  // Sorting or reversing glides rows staying in sight, eases arriving rows
+  // into place without leaving a gap, and settles off-screen rows at once.
+  property bool sorting: false
+  function reorderRows() {
+    var next = view.shown.slice()
+    var same = next.length === displayedSymbols.length && next.every(function(s, i) { return s === displayedSymbols[i] })
+    if (same || !seen || !visible || Motion.duration(Style, 220) <= 0) {
+      layOut()
+      return
+    }
+    var rows = rowItems()
+    var top = contentY
+    var bottom = top + sightHeight
+    var wasY = {}
+    var wasSeen = {}
+    for (var i = 0; i < displayedSymbols.length; i++) {
+      var s = displayedSymbols[i]
+      var r = rows[s]
+      var at = r ? r.y : i * rowPitch
+      wasY[s] = at
+      wasSeen[s] = at + rowHeight > top && at < bottom
+    }
+    highlightSlide.stop()
+    highlightShift = 0
+    sorting = true
+    display(next, false)
+    sorting = false
+    forgetGoneCursor()
+    var newTop = contentY
+    var newBottom = newTop + sightHeight
+    var seenNext = {}
+    for (var j = 0; j < next.length; j++) {
+      var sym = next[j]
+      seenNext[sym] = true
+      var row = rows[sym]
+      if (!row) continue
+      var targetY = j * rowPitch
+      var fromY = wasY[sym] !== undefined ? wasY[sym] : targetY
+      var fromSeen = !!wasSeen[sym]
+      var toSeen = targetY + rowHeight > newTop && targetY < newBottom
+      if (fromSeen && toSeen) {
+        row.sortGlide(fromY - targetY)
+      } else if (!fromSeen && toSeen) {
+        row.sortArrive(fromY < targetY ? -0.4 * rowPitch : 0.4 * rowPitch)
+      } else {
+        row.settle()
+      }
+    }
+    for (var k in rows) if (!seenNext[k]) rows[k].settle()
   }
 
   // Each list's scroll, by its key, for the session: only lists that are
@@ -589,7 +637,7 @@ Flickable {
       contentY = clampY(places[view.listKey] || 0)
     } else if (reordered) {
       reorder.cancel()
-      layOut()
+      reorderRows()
     } else if (sortHeld) {
       applyMembership()
     } else {
@@ -691,6 +739,7 @@ Flickable {
       width: row ? row.width : 0
       height: row ? row.height : 0
       y: row ? row.y + (moving ? 0 : root.highlightShift) : 0
+      opacity: row ? row.opacity : 1
       radius: root.look.retro ? 0 : Style.cornerRadius
       color: Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
       border.width: row && row.cursor ? Style.hoverBorderWidth : 0
@@ -713,6 +762,7 @@ Flickable {
       WatchlistRow {
         id: rowDelegate
         calendars: root.calendars
+        sorting: root.sorting
         place: root.reorder.slotOf(symbol)
         visible: place >= 0 || folding
         onFoldEnded: Qt.callLater(root.releaseFolded)
