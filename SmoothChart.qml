@@ -72,7 +72,7 @@ Item {
   onMorphFromChanged: bendFrom = morphFrom && morph < 1 && lastShown ? lastShown : morphFrom
   readonly property var plan: bendFrom && geometry ? Morph.plan(bendFrom, geometry) : null
   readonly property var shown: plan && morph < 1 ? Morph.frame(plan, morph) : geometry
-  readonly property var lastPoint: Chart.lastLitPoint(shown)
+  readonly property var lastPoint: Chart.newestPoint(shown)
   readonly property bool day: !!geometry && geometry.day === true
   // Against the dashed line under it, and in the line's own ink with none.
   readonly property color dotColor: !lastPoint || !hasBaseline ? baselineColor
@@ -81,7 +81,7 @@ Item {
   readonly property bool hasBaseline: Chart.hasBaseline(shown)
   // The dot rides a line that had one, and comes with the line's end to one
   // that hadn't.
-  readonly property bool dotRides: !!plan && bendFrom.day === true && Chart.lastLitPoint(bendFrom) !== null
+  readonly property bool dotRides: !!plan && bendFrom.day === true && Chart.newestPoint(bendFrom) !== null
   // The draw-in sweeps from before the first trade's dot to past the
   // newest's: the line's width and a half, and a pixel.
   readonly property real inkFirst: drawable ? shown.points[0].x : 0

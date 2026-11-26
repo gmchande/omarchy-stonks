@@ -109,10 +109,11 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // empty, and a finished day ends at its last trade. `ext` marks trades
 // outside the regular session. `dim` marks those that don't trade now: the
 // extended hours, or on a day lit where it trades now (`Day.litFrom`),
-// every trade before that. The dot sits on the newest trade it leaves, and
-// a row's columns light what it leaves. `faint` marks what the panel's
-// chart draws lighter: the extended hours, so the session stays full at
-// any hour, or once the closed day is set apart (`aside`), as `dim`.
+// every trade before that, and a row's columns light what it leaves. The
+// dot sits on the newest trade, lit or not, the one the price on top shows.
+// `faint` marks what the panel's chart draws lighter: the extended hours,
+// so the session stays full at any hour, or once the closed day is set
+// apart (`aside`), as `dim`.
 // `brk` lifts the line across hours of the exchange's day that take room,
 // such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
 // session. Hours that take no room (`axis.skip`), such as a weekend, are no
@@ -270,13 +271,13 @@ function stepTime(quote, t, steps, last) {
 
 // Retro's cells for a chart `width` by `height`, of `pixel` cells `gap`
 // apart: each column's level, whether it is dim, which side of the close
-// it is on (`above`), the last column lit, the baseline's row, and the
-// columns from `asideFrom` to before `asideTo`, which draw aside
-// (`chartGeometry`'s `aside`). The last trade in a column wins: the price at
-// the end of that stretch. A range's start (`rangeStart`) keeps the first
-// column to itself, so the column the line starts from is always there
-// (`ownStart`, `retroColumn`). A column between two trades the line joins
-// holds the one before it; a break (`brk`) and a stretch with no trade
+// it is on (`above`), the newest trade's column (`newest`), the baseline's
+// row, and the columns from `asideFrom` to before `asideTo`, which draw
+// aside (`chartGeometry`'s `aside`). The last trade in a column wins: the
+// price at the end of that stretch. A range's start (`rangeStart`) keeps
+// the first column to itself, so the column the line starts from is always
+// there (`ownStart`, `retroColumn`). A column between two trades the line
+// joins holds the one before it; a break (`brk`) and a stretch with no trade
 // (`untraded`) leave columns dark. With no previous close known (`based`
 // false), the columns stand on the floor. A column's side is its own
 // price's against the close, unrounded, as smooth's line is: a price a hair
@@ -285,7 +286,7 @@ function stepTime(quote, t, steps, last) {
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], faint: [], lastLit: -1, ownStart: false, based: false }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, asideFrom: columns, asideTo: columns, levels: [], above: [], dim: [], faint: [], newest: -1, ownStart: false, based: false }
   if (!geometry || !geometry.points) return g
   g.based = hasBaseline(geometry)
   g.baseRow = g.based ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
@@ -299,12 +300,9 @@ function retroGrid(geometry, width, height, pixel, gap) {
   // Halfway to the next point, where a scrub, which reads the nearest
   // point, leaves the start.
   g.startReach = g.ownStart ? pts[1].x / 2 : 0
-  // The lit cell sits on the last column whose own last trade is bright,
-  // never on one held after it.
   var last = -1
   for (var i = 0; i < pts.length; i++) {
     var col = retroColumn(g, pts[i].x)
-    if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
     for (var held = last + 1; i > 0 && !pts[i].brk && !pts[i].untraded && held < col; held++) {
       g.levels[held] = g.levels[last]
       g.above[held] = g.above[last]
@@ -317,7 +315,7 @@ function retroGrid(geometry, width, height, pixel, gap) {
     g.faint[col] = pts[i].faint
     last = col
   }
-  if (last >= 0 && !g.dim[last]) g.lastLit = last
+  g.newest = last
   return g
 }
 
@@ -330,14 +328,11 @@ function retroColumn(g, x) {
   return x < g.startReach ? 0 : Math.max(1, col)
 }
 
-// Where the dot sits: the newest trade of what trades now, else the regular
-// session's last.
-function lastLitPoint(geometry) {
-  if (!geometry || !geometry.points) return null
-  for (var i = geometry.points.length - 1; i >= 0; i--) {
-    if (!geometry.points[i].dim) return geometry.points[i]
-  }
-  return null
+// Where the dot sits: the newest trade, the one the price on top shows,
+// whether it trades now or not.
+function newestPoint(geometry) {
+  if (!geometry || !geometry.points || !geometry.points.length) return null
+  return geometry.points[geometry.points.length - 1]
 }
 
 // Null past the line and across a break, where the line lifts. Across a
