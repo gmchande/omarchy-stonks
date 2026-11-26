@@ -40,8 +40,13 @@ truer, lighter, quicker, simpler or better made.
 - **Color.** Up is the theme's green and down its red, never its accent,
   which means "selected". Where a theme has no usable pair, Stonks uses its
   own for that ground, and it never changes the theme's colors.
-- **Calm.** Nothing jumps: when the look, range, list or stock changes,
-  everything keeps its place and size.
+- **Calm.** Nothing jumps, and no picture snaps. When the look, range, list
+  or stock changes, everything keeps its place and size. What's read then
+  changes at once, where it stands, such as a price, a name or another
+  list's rows, since words in motion can't be read. A picture travels
+  instead, such as the chart to its new shape, a tick along its bar or a
+  row to its new place, and a message that comes and goes fades, each
+  briefly.
 - **1D at night.** A stock's chart turns to the new day at its open, and
   draws that day from its pre-market where Yahoo has one, a US stock's
   from 04:00, so a move made before the open shows where it happened; the
