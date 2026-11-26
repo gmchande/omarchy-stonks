@@ -407,8 +407,8 @@
         "2027": "Holidays published by Deutsche Börse at the source and in its 2027 trading calendar, which marks Ascension Day, Whit Monday, Corpus Christi and 30 December as days whose hours differ (https://cashmarket.deutsche-boerse.com/resource/blob/5674438/fb6e22c77930acea97641cf7d65ef78a/data/deutsche-boerse-trading-calendar-2027.pdf). Derived, not yet published: their closes, 20:00 on the holidays by the source's rule, and 14:00 on 30 December, as in every year since 2021.",
         "2028": "Holidays published by Deutsche Börse at the source, as changes for future years are not excluded. Derived, not yet published: 20:00 closes on the public holidays it trades, Ascension Day, Whit Monday, Corpus Christi and German Unity Day, by the source's rule, and the last trading day, Friday 29 December, closing at 14:00, as on Friday 29 December 2023 (http://cashmarket.deutsche-boerse.com/resource/blob/3735776/e53cb5552fd069e20dc3faaf343c9c2d/data/Final%20trading%20session%202023.pdf). Clock changes from Europe/Berlin's rules."
       },
-      "quotesLate": 15,
-      "hours": "Börse Frankfurt's: 08:00 to 22:00, as Yahoo's days are, and 20:00 on a public holiday it trades, when Yahoo's trades end though its 2026 days say 22:00. It has no closing auction, and its last trade often comes before the end. Yahoo's quotes from it come 15 minutes late, as Yahoo's list of exchanges says (https://help.yahoo.com/kb/SLN2310.html)."
+      "closesOnLastTrade": true,
+      "hours": "Börse Frankfurt's: 08:00 to 22:00, as Yahoo's days are, and 20:00 on a public holiday it trades, when Yahoo's trades end though its 2026 days say 22:00. It has no closing auction, and its last trade often comes before the end, so the close is the last trade Yahoo sends 15 minutes after its day ends, its delay for Börse Frankfurt (https://help.yahoo.com/kb/SLN2310.html)."
     },
     "OTC": {
       "exchanges": ["OTC"],

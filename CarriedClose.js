@@ -61,15 +61,15 @@ function carryClose(previous, quote, calendars, now) {
 // the close), where only that auction trades: Sydney's last trade comes at
 // 16:10, two minutes before Yahoo's day ends. A market with no closing
 // auction, as Börse Frankfurt, whose last trade comes minutes before its
-// 22:00, closes on the last trade in an answer that came once Yahoo's delay
-// for it (`quotesLate`, minutes) had passed since the end. Any trade before
-// may not be the last, as Yahoo's answers from Tokyo and London run 15
-// minutes late.
+// 22:00, closes on the last trade in an answer that came once the day's
+// trades had settled (`closesOnLastTrade`, `Quote.SETTLED`), as Yahoo's
+// delay for it is no longer. Any trade before may not be the last, as
+// Yahoo's answers from Tokyo and London run 15 minutes late.
 function sessionClose(quote, cal) {
   var reg = quote.session && quote.session.regular
   var head = Quote.headlineQuote(quote)
   return reg && head && head.source === "quote" && head.t !== null && Format.isFiniteNumber(quote.prevClose)
-    && (head.t >= closeFrom(reg, cal) || (!!cal && !!cal.quotesLate && quote.receivedAt >= reg.end + cal.quotesLate * 60))
+    && (head.t >= closeFrom(reg, cal) || (!!cal && !!cal.closesOnLastTrade && !!quote.settled))
     ? { day: reg.start, close: head.price, before: quote.prevClose } : null
 }
 

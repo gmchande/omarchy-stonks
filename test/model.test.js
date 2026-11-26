@@ -93,6 +93,8 @@ test("an answer is new when any bar moves, mid-day ones too, and the same when n
   // both stay.
   expect(M.sameQuote(quote(day), quote([day[0], { t: 300, p: 101 }, { t: 600, p: 100 }, { t: 900, p: 102 }, day[4]]))).toBe(false)
   expect(M.sameQuote(quote(day), Object.assign(quote(day), { price: 101.5 }))).toBe(false)
+  // The same answer from Yahoo, come 15 seconds later, is the same quote.
+  expect(M.sameQuote(M.parseChart(chartAnswer(), [], T0 + 900), M.parseChart(chartAnswer(), [], T0 + 915))).toBe(true)
 })
 
 test("yAt interpolates a polyline and is null past the line", () => {
@@ -2744,7 +2746,7 @@ test("at every open the calendars hold, a row's move counts from the close befor
     const yahoo = (i, now) => {
       const day = days[i], last = days[i - 1]
       const first = day.start + 60 * (i % 15)
-      const lastTrade = cal.closingAuction || cal.quotesLate ? last.end - 300 : last.end
+      const lastTrade = cal.closingAuction || cal.closesOnLastTrade ? last.end - 300 : last.end
       if (now < day.start) return answer(last, day, close(i - 1), lastTrade, close(i - 2), [{ t: last.start, c: close(i - 1) }, { t: last.end - 300, c: close(i - 1) }])
       if (now < first) return answer(day, day, close(i - 1), last.end, close(i - 2), [])
       const trades = []
