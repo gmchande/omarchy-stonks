@@ -12,6 +12,7 @@ import "Rows.js" as Rows
 // lists…", pinned under the lists.
 OverRows {
   id: root
+  fades: true
 
   property var choices: []
   property string current: ""

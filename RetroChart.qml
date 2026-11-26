@@ -339,7 +339,8 @@ Item {
   Rectangle {
     id: cap
     objectName: "liveCap"
-    visible: root.glow && root.day && root.shownGrid.lastLit >= 0 && root.replayX < 0 && x < curtain.width
+    // At the open it lights halfway through the bell's beat (`bloom`).
+    visible: root.glow && root.day && root.shownGrid.lastLit >= 0 && root.replayX < 0 && x < curtain.width && root.bloomed >= 0.5
     x: root.shownGrid.lastLit * root.grid.pitch
     y: visible ? root.shownGrid.levels[root.shownGrid.lastLit] * root.pixel : 0
     width: root.pixel
@@ -362,6 +363,14 @@ Item {
       PauseAnimation { duration: Motion.duration(Style, 160) }
     }
   }
+
+  // How far the cap has come at the open's bell, 0 to 1 (`bloom`).
+  property real bloomed: 1
+  function bloom() {
+    if (!surfaceOpen) return
+    bloomAnim.restart()
+  }
+  NumberAnimation { id: bloomAnim; target: root; property: "bloomed"; from: 0; to: 1; duration: Motion.duration(Style, 320) }
 
   LiveMark {
     live: root.live

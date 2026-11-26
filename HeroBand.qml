@@ -95,6 +95,11 @@ Item {
   signal rangeRequested(string range)
 
   function settle() { listHeader.settle() }
+  // The market opened: the live dot blooms on the bell's beat.
+  function opened() {
+    if (root.look.retro) retroChart.bloom()
+    else smoothChart.bloom()
+  }
 
   // Between the band's blocks, the body's rhythm (`StonksBody.bandGap`).
   property int bandGap: Style.space(16)
@@ -131,6 +136,7 @@ Item {
       now: root.now
       baselineText: root.baselineText
       changeCycles: root.changeCycles
+      still: root.still
       arrival: root.arrival
       arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
@@ -278,6 +284,7 @@ Item {
       width: parent.width
       options: root.rangeOptions
       value: root.range
+      still: root.still
       look: root.look
       onSelected: function(value) { root.rangeRequested(value) }
     }

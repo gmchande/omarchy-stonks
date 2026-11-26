@@ -2866,3 +2866,11 @@ describe("another stock's chart bends out of the one before", () => {
     }
   })
 })
+
+test("a tick rolls only the digits it changed, and a price that grows a digit rolls whole", () => {
+  const rolled = (from, to) => M.rolledGlyphs(from, to).arriving.filter(g => g.rolls).map(g => g.glyph).join("")
+  expect(rolled("215.38", "216.12")).toBe("612")
+  expect(rolled("215.38", "215.39")).toBe("9")
+  expect(M.rolledGlyphs("215.38", "216.12").leaving.map(g => g.glyph).join("")).toBe("538")
+  expect(rolled("999.99", "1,000.01")).toBe("1,000.01")
+})

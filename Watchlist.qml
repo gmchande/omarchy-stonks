@@ -374,11 +374,15 @@ Flickable {
   function display(next, animate) {
     var before = displayedSymbols
     var scrolled = contentY
+    var rows = animate && visible && surfaceOpen ? rowItems() : null
+    // A row that leaves folds away where it stood.
+    for (var f = 0; rows && f < before.length; f++) {
+      if (next.indexOf(before[f]) < 0 && rows[before[f]]) rows[before[f]].fold()
+    }
     displayedSymbols = next
     contentY = clampY(contentY)
     if (glide.running && glide.to > clampY(glide.to)) glideTo(glide.to)
-    if (!animate || !visible) return
-    var rows = rowItems()
+    if (!rows) return
     for (var i = 0; i < next.length; i++) {
       if (before.indexOf(next[i]) < 0 && rows[next[i]]) rows[next[i]].join()
     }
@@ -386,6 +390,10 @@ Flickable {
     if (pulled <= 0) return
     for (var j = 0; j < next.length; j++) {
       if (rows[next[j]]) rows[next[j]].carry(pulled)
+    }
+    for (var k = 0; k < before.length; k++) {
+      var gone = rows[before[k]]
+      if (gone && gone.folding) gone.foldY -= pulled
     }
   }
 
@@ -525,14 +533,34 @@ Flickable {
   }
 
   ListModel { id: rowsModel }
+  // Rows that left All, kept until they have folded away.
+  property var foldKept: []
+  function syncRows() {
+    Rows.syncModel(rowsModel, "symbol", arrangedView.allSymbols.concat(foldKept))
+  }
+  // A turn later, so no row goes inside its own handler.
+  function releaseFolded() {
+    var rows = rowItems()
+    var kept = foldKept.filter(function(s) { return !!rows[s] && rows[s].folding })
+    if (kept.length === foldKept.length) return
+    foldKept = kept
+    syncRows()
+  }
   onViewChanged: {
     var before = arrangedView
     arrangedView = view
     if (!before) return
-    if (before.allSymbols.join() !== view.allSymbols.join()) Rows.syncModel(rowsModel, "symbol", view.allSymbols)
     // A rename keeps the key. StonksBody holds a closed surface's view, so
     // this runs only while open or opening, before reopen().
     var switched = view.listKey !== before.listKey
+    var reordered = view.order !== before.order || view.reversed !== before.reversed
+    if (before.allSymbols.join() !== view.allSymbols.join()) {
+      // A lifted row goes at once: the drag it was in ends with it.
+      var leaving = !switched && !reordered && visible && surfaceOpen
+        ? displayedSymbols.filter(function(s) { return view.allSymbols.indexOf(s) < 0 && foldKept.indexOf(s) < 0 && s !== reorder.lifted }) : []
+      foldKept = foldKept.filter(function(s) { return view.allSymbols.indexOf(s) < 0 }).concat(leaving)
+      syncRows()
+    }
     if (switched) {
       places[before.listKey] = headedY
       reorder.cancel()
@@ -541,7 +569,7 @@ Flickable {
       takeOver()
       layOut()
       contentY = clampY(places[view.listKey] || 0)
-    } else if (view.order !== before.order || view.reversed !== before.reversed) {
+    } else if (reordered) {
       reorder.cancel()
       layOut()
     } else if (sortHeld) {
@@ -550,6 +578,7 @@ Flickable {
       applyShown()
     }
     arranged()
+    if (foldKept.length) Qt.callLater(releaseFolded)
   }
   onSortHeldChanged: if (!sortHeld && surfaceOpen) applyShown()
 
@@ -667,7 +696,8 @@ Flickable {
         id: rowDelegate
         calendars: root.calendars
         place: root.reorder.slotOf(symbol)
-        visible: place >= 0
+        visible: place >= 0 || folding
+        onFoldEnded: Qt.callLater(root.releaseFolded)
         pitch: root.rowPitch
         liftedY: root.reorder.liftedY
         rowCount: rowRepeater.count
@@ -682,10 +712,10 @@ Flickable {
         }
         // Whether the row lies within `above` and `below` of the view at
         // `top`. From its place, not `y`, which a new place may not have
-        // reached yet.
+        // reached yet; a folding row's is where it folds.
         function near(top, above, below) {
-          var at = place * pitch + shift
-          return place >= 0 && at + height > top - above && at < top + root.sightHeight + below
+          var at = folding ? foldY : place * pitch + shift
+          return (place >= 0 || folding) && at + height > top - above && at < top + root.sightHeight + below
         }
         readonly property bool inSight: lifted || near(root.contentY, root.rowPitch, root.rowPitch)
         // Words and pointer built within a screen of where the list rests or
@@ -701,7 +731,7 @@ Flickable {
         property var sightQuote: null
         Binding on sightQuote {
           value: root.quotes[rowDelegate.symbol] || null
-          when: rowDelegate.inSight
+          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         quote: sightQuote
@@ -711,7 +741,7 @@ Flickable {
           value: !rowDelegate.inSight ? rowDelegate.day
             : root.quotes[rowDelegate.symbol] ? Chart.lineDay(rowDelegate.symbol, root.quotes[rowDelegate.symbol], root.nights, root.calendars, root.dayClock)
             : null
-          when: rowDelegate.inSight
+          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         day: sightDay
@@ -722,10 +752,24 @@ Flickable {
         // row; each reads its own line, where its dot sits. At rest a new
         // line, as a refresh brings, leaves the figures be.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
-        view: quote ? Figures.listRow(quote, root.changeMode, newestTrade, sightScrub ? day : null, sightScrub) : null
-        status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
+        // A folding row keeps what it showed: its stock has left the list.
+        Binding on view {
+          value: rowDelegate.quote ? Figures.listRow(rowDelegate.quote, root.changeMode, rowDelegate.newestTrade,
+            rowDelegate.sightScrub ? rowDelegate.day : null, rowDelegate.sightScrub) : null
+          when: !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
+        Binding on status {
+          value: root.entryOf(rowDelegate.symbol) ? root.entryOf(rowDelegate.symbol).status : "loading"
+          when: !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
         // Freshness reads the clock every second: only rows in sight do.
-        freshness: inSight ? root.freshnessOf(symbol) : null
+        Binding on freshness {
+          value: rowDelegate.inSight ? root.freshnessOf(rowDelegate.symbol) : null
+          when: !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
         sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow

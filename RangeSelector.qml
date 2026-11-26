@@ -8,9 +8,9 @@ import "Motion.js" as Motion
 // The range row. The words are spaced evenly from the row's left edge to its
 // right, so they line up with the blocks above and below, and their targets
 // tile the row. The chosen one alone sits in the shell's selected fill with a
-// bright label; a hovered one keeps its dim label, so a hover never reads as a
-// second choice. A wheel notch is one range, however finely the wheel reports
-// it.
+// bright label, one fill that slides from range to range; a hovered one keeps
+// its dim label, so a hover never reads as a second choice. A wheel notch is
+// one range, however finely the wheel reports it.
 Item {
   id: root
 
@@ -19,6 +19,8 @@ Item {
   property Look look
   // What is left of a notch between wheel events.
   property real wheelRemainder: 0
+  // Closing: a new range is taken at once.
+  property bool still: false
 
   signal selected(string value)
 
@@ -57,7 +59,48 @@ Item {
     if (notches.steps !== 0) step(-notches.steps)
   }
 
+  // Where the chosen word's fill is, and how far the fill still has to come
+  // from the last one's (`slide`).
+  readonly property var chosenItem: tokens.count > 0 ? tokens.itemAt(options.map(String).indexOf(value)) : null
+  property real slideX: 0
+  property real slideWidth: 0
+  property var slidFrom: null
+  onChosenItemChanged: {
+    var from = slidFrom
+    var to = chosenItem
+    slide.stop()
+    if (from && to && from !== to && !still) {
+      slideX = from.fillX + slideX - to.fillX
+      slideWidth = from.fillWidth + slideWidth - to.fillWidth
+      slide.start()
+    } else {
+      slideX = 0
+      slideWidth = 0
+    }
+    slidFrom = to
+  }
+  ParallelAnimation {
+    id: slide
+    NumberAnimation { target: root; property: "slideX"; to: 0; duration: Motion.duration(Style, Motion.SWITCH_MS); easing.type: Easing.OutCubic }
+    NumberAnimation { target: root; property: "slideWidth"; to: 0; duration: Motion.duration(Style, Motion.SWITCH_MS); easing.type: Easing.OutCubic }
+  }
+
+  Rectangle {
+    objectName: "rangeHighlight"
+    readonly property var on: root.chosenItem
+    // A press on the chosen word shows the press alone.
+    visible: !!on && !on.pressed
+    x: on ? on.fillX + root.slideX : 0
+    y: on ? on.fillY : 0
+    width: on ? on.fillWidth + root.slideWidth : 0
+    height: on ? on.fillHeight : 0
+    radius: root.look.retro ? 0 : Style.cornerRadius
+    color: Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
+  }
+
   Repeater {
+    id: tokens
     model: root.options
 
     Item {
@@ -70,15 +113,22 @@ Item {
       height: root.height
 
       readonly property bool chosen: String(modelData) === root.value
+      readonly property bool pressed: tokenMouse.pressed
+      readonly property real fillX: x + fill.x
+      readonly property real fillY: y + fill.y
+      readonly property real fillWidth: fill.width
+      readonly property real fillHeight: fill.height
 
+      // The chosen word's fill is the row's (`rangeHighlight`).
       Rectangle {
+        id: fill
         objectName: "rangeToken"
         anchors.centerIn: parent
         width: token.implicitWidth + Style.space(12)
         height: parent.height + Style.space(4)
         radius: root.look.retro ? 0 : Style.cornerRadius
         color: tokenMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-          : parent.chosen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+          : parent.chosen ? "transparent"
           : (tokenMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent")
         Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }

@@ -4,11 +4,23 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Ui
+import "Motion.js" as Motion
 
 // The `?` sheet on both surfaces: key groups in two columns, the credit
-// closing the second, then CLOSE.
+// closing the second, then CLOSE. It fades in over 140 ms as it shows.
 Flickable {
   id: root
+
+  onVisibleChanged: if (visible) {
+    opacity = 0
+    appear.restart()
+  }
+  NumberAnimation { id: appear; target: root; property: "opacity"; to: 1; duration: Motion.duration(Style, 140); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  // Style.easeOut spends its last frames on the last 1%, which no frame shows.
+  onOpacityChanged: if (appear.running && opacity > 0.985) {
+    appear.stop()
+    opacity = 1
+  }
 
   // KeySheet.sheet: { groups }.
   property var sheet: ({ groups: [] })

@@ -236,6 +236,19 @@ function lookSigns(text, retro) {
   return retro ? String(text).replace("+", "▲").replace(MINUS, "▼") : text
 }
 
+// A figure that ticks rolls only the characters that changed: each place of
+// the new text, and whether it rolls in, and the old text's places that roll
+// out. Of the same length, the places line up; of another length, the whole
+// text rolls, as no place keeps its meaning.
+function rolledGlyphs(from, to) {
+  var same = from.length === to.length
+  var arriving = []
+  var leaving = []
+  for (var i = 0; i < to.length; i++) arriving.push({ glyph: to.charAt(i), at: i, rolls: !same || from.charAt(i) !== to.charAt(i) })
+  for (var k = 0; k < from.length; k++) if (!same || from.charAt(k) !== to.charAt(k)) leaving.push({ glyph: from.charAt(k), at: k })
+  return { arriving: arriving, leaving: leaving }
+}
+
 function changeText(chg, mode, digits) {
   if (chg.pct === null) return "—"
   if (mode === "abs") return signedMoney(chg.abs, digits)

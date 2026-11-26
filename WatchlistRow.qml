@@ -46,14 +46,17 @@ Rectangle {
   // joins starts at its own place. It eases `shift`, its distance from its
   // place, to zero, so a change mid-slide goes on from where it is. The row
   // travelling farther rides on top, the cursor's on a tie, so none print
-  // through.
-  y: lifted ? liftedY : place * pitch + shift
+  // through. A row that leaves folds away where it stood (`fold`), under the
+  // rows gliding up into its room.
+  y: lifted ? liftedY : folding ? foldY : place * pitch + shift
   property int lastPlace: -1
   property real shift: 0
   property int travel: 0
   onPlaceChanged: {
     var from = lastPlace
     lastPlace = place
+    if (folding && place < 0) return
+    endFold()
     if (lifted || !visible || from < 0 || place < 0) {
       settle()
       return
@@ -67,10 +70,40 @@ Rectangle {
   // once, so the rows it passes never show through.
   readonly property bool moving: lifted || slide.running
   z: lifted ? rowCount + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
+
+  // Folding: shut from the bottom up and faded, over 120 ms.
+  property bool folding: false
+  property real foldY: 0
+  property real folded: 1
+  signal foldEnded()
+  transform: Scale { yScale: row.folded }
+  function fold() {
+    if (!visible || lifted || place < 0) return
+    foldY = y
+    slide.stop()
+    fadeIn.stop()
+    folding = true
+    foldAnim.restart()
+  }
+  function endFold() {
+    if (!folding) return
+    foldAnim.stop()
+    folding = false
+    folded = 1
+    opacity = 1
+    foldEnded()
+  }
+  ParallelAnimation {
+    id: foldAnim
+    NumberAnimation { target: row; property: "folded"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
+    NumberAnimation { target: row; property: "opacity"; to: 0; duration: Motion.duration(Style, 120); easing.type: Easing.OutCubic }
+    onFinished: row.endFold()
+  }
   readonly property bool resting: !slide.running && !fadeIn.running && !lifted
   signal rested()
   onRestingChanged: if (resting) rested()
   function settle() {
+    endFold()
     slide.stop()
     shift = 0
     travel = 0
@@ -82,6 +115,7 @@ Rectangle {
   }
   function pause() {
     if (slide.running) slide.pause()
+    if (foldAnim.running) foldAnim.pause()
     if (fadeIn.running) fadeIn.pause()
     if (drawIn.running) drawIn.pause()
   }

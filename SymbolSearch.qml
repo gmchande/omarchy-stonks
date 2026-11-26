@@ -10,6 +10,7 @@ import "Search.js" as Search
 // the field: a hidden field keeps them otherwise.
 OverRows {
   id: root
+  fades: true
 
   property Look look
   property int rowHeight: Style.space(30)

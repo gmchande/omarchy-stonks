@@ -1193,6 +1193,7 @@ Item {
     onScreenshotRequested: root.takeScreenshot()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
+    onRang: function(woke) { if (woke) heroBand.opened() }
     onRetryRequested: root.refreshRequested()
   }
 

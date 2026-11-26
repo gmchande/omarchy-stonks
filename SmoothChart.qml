@@ -228,14 +228,30 @@ Item {
     }
   }
 
+  // How far the dot has bloomed at the open's bell, 0 to 1 (`bloom`).
+  property real bloomed: 1
+  function bloom() {
+    if (!surfaceOpen) return
+    bloomAnim.restart()
+  }
+  NumberAnimation { id: bloomAnim; target: root; property: "bloomed"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.OutCubic }
+  // It ends once the halo's edge is within half a pixel of its place.
+  onBloomedChanged: if (bloomAnim.running && (1 - bloomed) * 0.6 * 7 * weight < 0.5) {
+    bloomAnim.stop()
+    bloomed = 1
+  }
+
   // Outside the canvas, so it ripples without repainting the line: three
   // ripples, about 6 s, when the mark plays (`LiveMark`). A range has no dot:
   // its last bar need not be the headline trade. It shows as the ink reaches
   // it, and while a chart bends into this one, only if the old one had one.
+  // At the open it blooms on the bell's beat (`bloom`).
   Item {
     id: dot
     visible: root.day && root.lastPoint !== null && root.replayX < 0 && root.inkDrawn >= x
       && (root.morph >= 1 || root.dotRides)
+    scale: 0.4 + 0.6 * root.bloomed
+    opacity: 0.4 + 0.6 * root.bloomed
     x: root.lastPoint ? root.pad + root.lastPoint.x * (root.width - root.pad * 2) : 0
     y: root.lastPoint ? root.pad + root.lastPoint.y * (root.height - root.pad * 2) : 0
 

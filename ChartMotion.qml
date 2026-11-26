@@ -5,11 +5,11 @@ import "History.js" as History
 import "Quote.js" as Quote
 import "Motion.js" as Motion
 // The chart a surface shows, the moment it shows (the scrub, and the replay
-// that drives it), and how a change of chart moves: another stock bends out
-// of the one before (`morph`), with what else changes with the stock on the
-// same beat (`arrival`); any other change draws in from the first trade. It
-// decides once per change of the view the surface holds, whoever made it,
-// and draws nothing itself.
+// that drives it), and how a change of chart moves: another stock's or
+// another range's bends out of the one before (`morph`), and what else
+// changes with a stock arrives on the same beat (`arrival`); any other change
+// draws in from the first trade. It decides once per change of the view the
+// surface holds, whoever made it, and draws nothing itself.
 Item {
   id: root
 
@@ -116,9 +116,10 @@ Item {
   // included.
   readonly property real replayX: replayRunning && scrubX >= 0 ? scrubX : -1
 
-  // Each change of the view is compared with this once: another chart on
-  // screen draws in; one asked for and not ready keeps the chart on screen
-  // whole and still; new data for the same chart is taken as it is.
+  // Each change of the view is compared with this once: another stock's
+  // chart, or another range's, bends out of the one on screen; one asked for
+  // and not ready keeps the chart on screen whole and still; new data for the
+  // same chart is taken as it is.
   property var seen: null
   onViewChanged: {
     var before = seen
@@ -133,9 +134,10 @@ Item {
     // A replay and a scrub belong to the chart they started on, and to data
     // that still holds their moment.
     if (moved || asked || (refreshed && scrubT && !covers(next, scrubT))) clearScrub()
-    if (moved && last && next && last.symbol !== next.symbol) {
-      switched(last.symbol, next.symbol)
-      if (surfaceOpen) bend(geometryOf(last))
+    var stock = moved && !!last && !!next && last.symbol !== next.symbol
+    if (stock) switched(last.symbol, next.symbol)
+    if (moved && !!last && !!next && (stock || last.range !== next.range)) {
+      if (surfaceOpen) bend(geometryOf(last), stock)
     } else if (moved) {
       if (surfaceOpen) drawIn()
     } else if (asked) {
@@ -200,11 +202,13 @@ Item {
     drawInAnim.restart()
   }
 
-  function bend(from) {
+  // `stock`: another stock, whose figures arrive with it; another range
+  // keeps the price still.
+  function bend(from, stock) {
     drawInAnim.stop()
     reveal = 1
     morphAnim.stop()
-    stockSwitch = true
+    stockSwitch = stock
     morphFrom = from
     beat = 0
     morphAnim.start()

@@ -33,6 +33,9 @@ Item {
   property bool still: false
 
   signal replayRequested()
+  // The market's bell rang, the eyes closing or (`woke`) opening: what else
+  // changes with the bell keeps to their beat (`Header`).
+  signal rang(bool woke)
 
   readonly property string kind: animal ? animal.kind : ""
   // The chart the animal last showed: a change on it is a turn.
@@ -128,6 +131,7 @@ Item {
       shutting.start()
     } else closing = asleep ? 1 : 0
     if (rung && fidgetStep >= 0) fidgetNext()
+    if (rung) rang(!asleep)
   }
 
   // While still, nothing moves: a change waits for the open's `settle`. The
