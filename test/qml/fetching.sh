@@ -22,6 +22,6 @@ plugin_tree fetching.qml
 card_window
 export QT_QPA_PLATFORM=offscreen
 scratch_home fetch-watchlist.json grvc.stonks.json
-echo fetch-2026-10-07 listings-2026-10-07-1455 otc-2026-11-25-1641 > "$STONKS_FAKE_STATE/overnight.set"
+echo fetch-2026-10-07 listings-2026-10-07-1455 otc-2026-11-26-1210 > "$STONKS_FAKE_STATE/overnight.set"
 run_qs 300
 finish "FETCHING DONE"
