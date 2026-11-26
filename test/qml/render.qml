@@ -184,14 +184,25 @@ Harness {
   // last trades hug the baseline from under it.
   readonly property bool shopDayState: stateName.indexOf("popup-shop-1d-") === 0
   readonly property bool holidayState: /^popup-holiday-(smooth|retro)$/.test(stateName)
-  // <popup|min-window>-holiday-<tokyo|london>-<look>: the calendars' longest
+  // <popup|min-window>-holiday-<market>-<look>: the calendars' longest
   // closures, at the exchange's noon, the listing's own saved day featured:
-  // Tokyo's Constitution Memorial Day observed (6 May 2026) and London's
-  // Christmas Day (substitute) (27 December 2027).
+  // Tokyo's Constitution Memorial Day observed (6 May 2026), London's
+  // Christmas Day (substitute) (27 December 2027), Hong Kong's Hong Kong
+  // Special Administrative Region Establishment Day (1 July 2026), Sydney's
+  // King's Birthday (8 June 2026), Xetra's and Börse Frankfurt's New Year's
+  // Eve (31 December 2026), and OTC Markets' Juneteenth National
+  // Independence Day (19 June 2026).
   readonly property var closure: {
-    var match = /^(?:popup|min-window)-holiday-(tokyo|london)-(smooth|retro)$/.exec(stateName)
-    return !match ? null : match[1] === "tokyo" ? { symbol: "7203.T", file: "7203-t-day", date: "2026-05-06" }
-      : { symbol: "SHEL.L", file: "shel-l-day", date: "2027-12-27" }
+    var match = /^(?:popup|min-window)-holiday-(tokyo|london|hongkong|sydney|xetra|frankfurt|otc)-(smooth|retro)$/.exec(stateName)
+    return !match ? null : {
+      tokyo: { symbol: "7203.T", file: "7203-t-day", date: "2026-05-06" },
+      london: { symbol: "SHEL.L", file: "shel-l-day", date: "2027-12-27" },
+      hongkong: { symbol: "0700.HK", file: "moments/hongkong-2026-11-25-2135/0700.hk", date: "2026-07-01" },
+      sydney: { symbol: "BHP.AX", file: "moments/sydney-2026-11-03-1830/bhp.ax", date: "2026-06-08" },
+      xetra: { symbol: "SAP.DE", file: "moments/frankfurt-2026-11-26-0435/sap.de", date: "2026-12-31" },
+      frankfurt: { symbol: "SAP.F", file: "moments/frankfurt-2026-11-26-0435/sap.f", date: "2026-12-31" },
+      otc: { symbol: "TCEHY", file: "moments/otc-2026-11-25-1641/tcehy", date: "2026-06-19" }
+    }[match[1]]
   }
   // <popup|window-of>-first-day-<1d|1y>-<look>: answers saved on 14 October
   // 2026, when the 1Y range's first day held RGTI's 1Y high above Yahoo's

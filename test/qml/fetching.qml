@@ -18,9 +18,12 @@ Harness {
 
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   readonly property var listed: ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
-  // Midnight starting Wednesday 7 October and Saturday 10 October in New York.
+  // Midnight starting Wednesday 7 October, Saturday 10 October, Thanksgiving
+  // (Thursday 26 November) and Saturday 28 November in New York.
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
+  readonly property int thu26: 1795669200
+  readonly property int sat28: 1795842000
 
   function at(day, hour, minute) {
     return day + hour * 3600 + (minute || 0) * 60
@@ -844,6 +847,33 @@ Harness {
       remove("GITHUB.offline")
       harness.check("Yahoo answering again while GitHub's ask is out, which gets no answer, has GitHub asked again at once",
         githubOut && askedAgain, [githubOut, manifests() - manifestsBefore, JSON.stringify(requests().slice(-2))].join(" | "))
+
+      // A holiday asks as a closed day does: an over-the-counter stock,
+      // TCEHY, added on Thanksgiving, when OTC Markets is closed, in the
+      // window through the hour from 12:15, and through the same hour on the
+      // Saturday after, each time answered from Yahoo's answer saved at
+      // 12:10 on Thanksgiving.
+      var otcAsks = function(from) {
+        return harness.yahoo(harness.requests().slice(from)).filter(function(line) {
+          var parts = line.split(" ")
+          return (parts[0] === "chart" || parts[0] === "spark") && parts[1].split(",").indexOf("TCEHY") >= 0
+        }).length
+      }
+      var hourFrom = function(t) {
+        startAt(t)()
+        var from = harness.requests().length
+        tick(3600, 15)
+        return otcAsks(from)
+      }
+      startAt(at(harness.thu26, 12, 10))()
+      service.addSymbol("TCEHY")
+      openWindow()
+      var added = within(3000, function() { return !!service.quotes["TCEHY"] })
+      var holiday = hourFrom(at(harness.thu26, 12, 15))
+      var saturday = hourFrom(at(harness.sat28, 12, 15))
+      harness.check("a holiday asks as a closed day does: an over-the-counter stock through Thanksgiving's hour from 12:15 as through the Saturday's",
+        added && holiday === saturday, [added, "Thanksgiving " + holiday, "Saturday " + saturday].join(" | "))
+      closeWindow()
 
       harness.finish()
     }
