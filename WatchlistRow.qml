@@ -111,7 +111,6 @@ Rectangle {
     opacity = 1
     drawIn.stop()
     reveal = 1
-    lineOwed = false
   }
   function pause() {
     if (slide.running) slide.pause()
@@ -124,13 +123,16 @@ Rectangle {
     slide.stop()
     shift = atY - place * pitch
   }
-  // A day line that arrives while the row fades in draws in; one that
-  // arrives later shows at once.
-  property bool lineOwed: false
+  // A day line that arrives on a row showing none draws in: as the row fades
+  // in, or once it's in view (`inView`), where a long list works out a row's
+  // day only as it comes into sight. A newer day on a line already drawn
+  // shows at once, and so does a line that arrives out of view.
+  property bool inView: false
+  property bool hadLine: false
+  Component.onCompleted: hadLine = !!geometry
   function join() {
     opacity = 0
     fadeIn.restart()
-    lineOwed = !geometry
     if (geometry) drawLineIn()
   }
   function drawLineIn() {
@@ -138,9 +140,9 @@ Rectangle {
     drawIn.restart()
   }
   onGeometryChanged: {
-    if (!lineOwed || !geometry) return
-    lineOwed = false
-    if (fadeIn.running && !fadeIn.paused) drawLineIn()
+    var arrived = !!geometry && !hadLine
+    hadLine = !!geometry
+    if (arrived && (inView || (fadeIn.running && !fadeIn.paused))) drawLineIn()
   }
   // Holds the row on screen while the scroll moves `distance`, then slides
   // it home.

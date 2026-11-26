@@ -99,6 +99,26 @@ Harness {
       rest()
       var rows = service.symbols.slice()
 
+      // A row the wheel brings into view draws its line in from none, as
+      // the list works out its day only once it's in sight.
+      var unseen = rows.filter(function(s) { var r = row(s); return !!r && !r.geometry }).pop()
+      var arriving = row(unseen)
+      var lowest = 1
+      var notes = function() { lowest = Math.min(lowest, arriving.reveal) }
+      if (arriving) arriving.revealChanged.connect(notes)
+      var top = row(rows[0])
+      var over = top ? top.mapToItem(body, top.width / 2, top.height / 2) : Qt.point(0, 0)
+      for (var turn = 0; turn < 12 && arriving && !arriving.inView; turn++) {
+        mouseWheel(body, over.x, over.y, 0, -120)
+        within(300, function() { return arriving.inView })
+      }
+      var drawn = !!arriving && within(2000, function() { return !!arriving.geometry && arriving.reveal >= 1 })
+      if (arriving) arriving.revealChanged.disconnect(notes)
+      harness.check("a row the wheel brings into view draws its line in, from none",
+        !!arriving && drawn && lowest < 1, [unseen, drawn, lowest.toFixed(2)].join(" "))
+      for (var back = 0; back < 12; back++) mouseWheel(body, over.x, over.y, 0, 120)
+      rest()
+
       click(row(rows[1]))
       harness.check("a click on a row shows its chart",
         within(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
