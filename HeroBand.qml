@@ -49,11 +49,9 @@ Item {
   property var morphFrom: null
   property real morph: 1
   property real beat: 1
-  // Another stock's figures arrive on the same beat (`ChartMotion.arrival`),
-  // coming up from below for a row further down (`arrivalFrom` 1) and down
-  // from above for one higher (-1).
+  // While another stock arrives (`ChartMotion.arrival`), its figures roll
+  // no digits (`Hero`).
   property real arrival: 1
-  property int arrivalFrom: 0
   property int chartHeight: Style.space(190)
   property string order: "manual"
   property bool reversed: false
@@ -147,7 +145,6 @@ Item {
       still: root.still
       seen: root.seen
       arrival: root.arrival
-      arrivalFrom: root.arrivalFrom
       onChangeClicked: root.changeClicked()
 
       Rectangle {

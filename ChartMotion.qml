@@ -92,16 +92,15 @@ Item {
   // day partly gone takes its whole time too.
   property real reveal: 1
   // Another stock's chart bends out of the one before (`morphFrom`), and
-  // what else changes with the stock arrives with it (`arrival`), toward
-  // where the list moved (`switched`). One clock, even in time (`beat`, 0 to
-  // 1): what travels eases it on OutCubic (`morph`), and retro's wave takes
-  // columns at its even pace, so none of its frames stands still.
+  // the animal crosses with it (`arrival`), while the words and figures
+  // change at once. One clock, even in time (`beat`, 0 to 1): what travels
+  // eases it on OutCubic (`morph`), and retro's wave takes columns at its
+  // even pace, so none of its frames stands still.
   property var morphFrom: null
   property real beat: 1
   readonly property real morph: 1 - Math.pow(1 - beat, 3)
   property bool stockSwitch: false
   readonly property real arrival: stockSwitch ? morph : 1
-  signal switched(string from, string to)
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
   // What plays alongside keeps to it, and to its InOutSine. The reader asks
@@ -136,7 +135,6 @@ Item {
     // that still holds their moment.
     if (moved || asked || (refreshed && scrubT && !covers(next, scrubT))) clearScrub()
     var stock = moved && !!last && !!next && last.symbol !== next.symbol
-    if (stock) switched(last.symbol, next.symbol)
     if (moved && !!last && !!next && (stock || last.range !== next.range)) {
       if (shows) bend(geometryOf(last), stock)
       else finish()
