@@ -514,8 +514,8 @@ Item {
     id: robinhoodGate
     host: "Robinhood"
     clock: root
-    capacity: 20
-    perMinute: 10
+    capacity: 40
+    perMinute: 20
     onPausedChanged: root.releaseOrder()
     onPausedUntilChanged: root.armClock()
     onBudgetDueAtChanged: root.armClock()
@@ -1016,15 +1016,19 @@ Item {
     var others = root.sights.filter(function(s) { return s.surface !== surface })
     var next = symbols.length ? others.concat([{ surface: surface, symbols: symbols }]) : others
     if (next.length === 0 && root.sights.length === 0) return
+    var first = root.sights.length === 0 && next.length > 0
     root.sights = next
-    root.askOvernight()
+    if (first) root.askOvernight()
     if (next.length > 0) aheadDebounce.restart()
     else aheadDebounce.stop()
   }
   Timer {
     id: aheadDebounce
     interval: 150
-    onTriggered: root.fetchAhead()
+    onTriggered: {
+      root.askOvernight()
+      root.fetchAhead()
+    }
   }
   function rowsInSight() {
     var rows = []

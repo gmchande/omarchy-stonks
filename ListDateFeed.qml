@@ -13,19 +13,24 @@ Item {
   property var batches: []
   readonly property bool busy: batches.length > 0
 
-  // A run the gate holds back fails a turn later, out of the change that
-  // asked for it.
+  // While the host is paused, a run fails a turn later, out of the change
+  // that asked for it; when the budget merely paces it, it waits for the
+  // refill.
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
     var batches = []
     for (var i = 0; i < symbols.length; i += Overnight.LIST_DATE_BATCH) batches.push(symbols.slice(i, i + Overnight.LIST_DATE_BATCH))
     var granted = gate ? gate.take(batches.length) : batches.length
-    root.batches = granted > 0 ? batches.slice(0, granted) : batches
-    root.askedAt = at
     if (granted === 0) {
-      heldTimer.restart()
+      if (gate && gate.paused) {
+        root.batches = batches
+        root.askedAt = at
+        heldTimer.restart()
+      }
       return
     }
+    root.batches = batches.slice(0, granted)
+    root.askedAt = at
     fetchRun.send(root.batches.map(Overnight.listDateUrl), Fetch.instrumentsCap(root.batches[0].length))
   }
 

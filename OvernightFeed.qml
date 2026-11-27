@@ -19,18 +19,23 @@ Item {
   onHoldingChanged: if (!holding && landing) landTimer.start()
 
   // `at`: the clock's own handlers may run before this binding to it has
-  // caught up. A run the gate holds back fails a turn later, out of the
-  // change that asked for it.
+  // caught up. While the host is paused, a run fails a turn later, out of
+  // the change that asked for it; when the budget merely paces it, it waits
+  // for the refill.
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
     var batches = Overnight.overnightBatches(symbols, entries, at)
     var granted = gate ? gate.take(batches.length) : batches.length
-    root.batches = granted > 0 ? batches.slice(0, granted) : batches
-    root.askedAt = at
     if (granted === 0) {
-      heldTimer.restart()
+      if (gate && gate.paused) {
+        root.batches = batches
+        root.askedAt = at
+        heldTimer.restart()
+      }
       return
     }
+    root.batches = batches.slice(0, granted)
+    root.askedAt = at
     var cap = Math.max.apply(null, root.batches.map(function(b) { return Fetch.overnightCap(b.symbols.length, b.span) }))
     fetchRun.send(root.batches.map(function(b) { return Overnight.overnightUrl(b.symbols, b.span) }), cap)
   }
