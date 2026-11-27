@@ -6,6 +6,7 @@ import qs.Ui
 import "plugin" as Stonks
 import "plugin/Freshness.js" as Freshness
 import "plugin/Format.js" as Format
+import "plugin/Gate.js" as Gate
 
 // What a long list costs, counted: 154 symbols through the real Plugin,
 // Service, App and a pill, on a clock this walk sets, from Wednesday 7
@@ -365,6 +366,96 @@ Harness {
       service.newestTrades = trades
       harness.check("one stock's new trade reads the newest trades at most 175 times in all",
         tradeReads.n > 0 && tradeReads.n <= 175, tradeReads.n + " reads")
+
+      // Night trading on the 154-stock list: scrolling through all 154 rows
+      // after a fresh start stays inside Robinhood's budget with no "!"; even
+      // when the budget does pace requests, no row says "Refresh failed",
+      // while a real Robinhood outage still warns on US rows trading tonight
+      // and leaves non-US listings alone.
+      var rhIdle = function() {
+        var f = service.feeds
+        return idle() && !f.overnight.busy && !f.lastTrade.busy && !f.listDates.busy
+      }
+      var settleAll = function() {
+        tryVerify(function() { return rhIdle() && (!service.overnightWanted() || rhGate.paused) }, 15000)
+        tryVerify(rhIdle, 15000)
+      }
+      runCommand(["sh", "-c", "echo listings-2026-10-07-1455 > \"$STONKS_FAKE_STATE/overnight.set\" && echo '2026-10-08T04:45:00.000Z 248.04' > \"$STONKS_FAKE_STATE/NIGHT.trade\""])
+      service.feeds.overnight.entries = ({})
+      service.feeds.listDates.entries = ({})
+      service.feeds.lastTrade.entries = ({})
+      var rhGate = service.feeds.lastTrade.gate
+      rhGate.gate = Gate.openGate(rhGate.capacity)
+      rhGate.budgetDueAt = 0
+      app.floatingWindow.implicitHeight = 800
+      body.featureSymbol("LONG005")
+      list.takeOver()
+      list.contentY = 0
+      harness.time = 1791434760 // Thu 8 Oct 2026 00:46 NY
+      service.tick()
+      settleAll()
+      for (var stop = 1; stop <= 12; stop++) {
+        list.contentY = list.clampY(stop * 6 * list.rowPitch)
+        harness.clockOn(2)
+        settleAll()
+      }
+      list.contentY = 0
+      harness.clockOn(36)
+      settleAll()
+      var scrollFailed = Object.keys(service.nightFailed)
+      var scrollRows = list.rowItems()
+      var scrollWarned = Object.keys(scrollRows).filter(function(s) { return scrollRows[s].inSight && /^!/.test(scrollRows[s].detail) })
+      harness.check("154 stocks at night: scrolling through the list and refreshing stays inside Robinhood's budget with no warning",
+        !rhGate.warned && scrollFailed.length === 0 && scrollWarned.length === 0,
+        "gate warned=" + rhGate.warned + "; nightFailed=" + scrollFailed.length + "; warnedInSight=" + scrollWarned.slice(0, 5).join(","))
+
+      // Force the local budget dry (not paused) right before the next minute's
+      // refresh: it waits on budgetDueAt without stamping any row failed, then
+      // lands once a token refills.
+      var beforePace = service.feeds.lastTrade.entries.LONG005 ? service.feeds.lastTrade.entries.LONG005.at : 0
+      harness.clockOn(59)
+      settleAll()
+      rhGate.gate = Object.assign({}, rhGate.gate, { left: 0, filledAt: harness.time, warned: true })
+      harness.clockOn(1)
+      var pacedAt = harness.time
+      within(2000, function() { return rhGate.budgetDueAt > pacedAt })
+      var pacedRows = list.rowItems()
+      var pacedWarned = Object.keys(pacedRows).filter(function(s) { return pacedRows[s].inSight && /^!/.test(pacedRows[s].detail) })
+      var pacedFailed = Object.keys(service.nightFailed)
+      var pacedDue = rhGate.budgetDueAt
+      if (pacedDue > harness.time) {
+        harness.time = pacedDue
+        service.tick()
+        settleAll()
+      }
+      var refilledAt = service.feeds.lastTrade.entries.LONG005 ? service.feeds.lastTrade.entries.LONG005.at : 0
+      harness.check("when Robinhood's budget holds a night refresh back, no row says Refresh failed and it lands once refilled",
+        pacedWarned.length === 0 && pacedFailed.length === 0 && pacedDue > pacedAt && refilledAt >= pacedDue && refilledAt > beforePace,
+        "pacedWarned=" + pacedWarned.slice(0, 5).map(function(s) { return s + ":" + pacedRows[s].detail }).join(" | ")
+          + "; pacedFailed=" + pacedFailed.length + "; due=" + (pacedDue - pacedAt) + "s; refilled=" + (refilledAt - beforePace) + "s")
+
+      // Real Robinhood outage still warns on US rows trading tonight (and the
+      // featured row) while leaving non-US SHOP.TO normal, and clears once back.
+      runCommand(["touch", harness.state + "/ROBINHOOD.offline"])
+      rhGate.gate = Gate.openGate(rhGate.capacity)
+      harness.clockOn(60)
+      settleAll()
+      var downRows = list.rowItems()
+      var long5Down = downRows.LONG005 ? downRows.LONG005.detail : ""
+      var shopDown = downRows["SHOP.TO"] ? downRows["SHOP.TO"].detail : ""
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.offline"])
+      if (rhGate.pausedUntil > harness.time) harness.time = rhGate.pausedUntil
+      else harness.time += 60
+      service.tick()
+      settleAll()
+      harness.clockOn(60)
+      settleAll()
+      var backRows = list.rowItems()
+      var long5Back = backRows.LONG005 ? backRows.LONG005.detail : ""
+      runCommand(["rm", "-f", harness.state + "/overnight.set", harness.state + "/NIGHT.trade"])
+      harness.check("a real Robinhood outage still shows Refresh failed on US rows trading tonight, leaves SHOP.TO normal, and clears once back",
+        /^! Refresh failed · overnight /.test(long5Down) && !/^!/.test(shopDown) && !/^!/.test(long5Back),
+        "down=" + long5Down + " | SHOP.TO=" + shopDown + " | back=" + long5Back)
 
       app.close()
       harness.finish()

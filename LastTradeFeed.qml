@@ -22,12 +22,16 @@ Item {
     var batches = []
     for (var i = 0; i < symbols.length; i += Overnight.LAST_TRADE_BATCH) batches.push(symbols.slice(i, i + Overnight.LAST_TRADE_BATCH))
     var granted = gate ? gate.take(batches.length) : batches.length
-    root.batches = granted > 0 ? batches.slice(0, granted) : batches
-    root.askedAt = at
     if (granted === 0) {
-      heldTimer.restart()
+      if (gate && gate.paused) {
+        root.batches = batches
+        root.askedAt = at
+        heldTimer.restart()
+      }
       return
     }
+    root.batches = batches.slice(0, granted)
+    root.askedAt = at
     fetchRun.send(root.batches.map(Overnight.lastTradeUrl), Overnight.lastTradeCap(Math.max.apply(null, root.batches.map(function(b) { return b.length }))))
   }
 
