@@ -320,6 +320,9 @@ for i in "${!urls[@]}"; do
     status=000
     exit_code=7
     body=""
+  elif rm "$state/$host.bad.once" 2> /dev/null; then
+    status=502
+    body="Bad Gateway"
   elif [ -e "$state/$host.bad" ]; then
     status=502
     body="Bad Gateway"

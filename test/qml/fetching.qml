@@ -1128,17 +1128,16 @@ Harness {
       startAt(at(sun29, 20, 30))()
       openWindow()
       // 1a: single 502 blip on lastTrade retries once and never warns.
-      touch("ROBINHOOD.bad")
+      touch("ROBINHOOD.bad.once")
       var blipWarned = false
       var blipFrom = harness.requests().length
       harness.clockTo(service.lastTradeDueAt)
-      within(3000, function() {
+      var blipSent = within(3000, function() {
         if (pill.warns || Object.keys(service.nightFailed).length > 0) blipWarned = true
         return harness.requests().slice(blipFrom).some(function(l) { return /^lasttrade .* 502$/.test(l) })
       })
-      remove("ROBINHOOD.bad")
       settle()
-      if (pill.warns || Object.keys(service.nightFailed).length > 0) blipWarned = true
+      if (!blipSent || pill.warns || Object.keys(service.nightFailed).length > 0) blipWarned = true
       // 1b: real outage marks visible US rows failed, and recovery clears
       // NEST, KILN and SPY right after the pause expires (not stuck for 5 min).
       touch("ROBINHOOD.offline")
