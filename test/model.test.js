@@ -1588,8 +1588,12 @@ test("the rows keep the US rule when US stocks are present, and otherwise name t
   const tonight = { t: at("2026-09-08", "21:00"), p: 102, phase: "overnight", base: 101, own: false, closed: true, joined: true, dayStart: at("2026-09-08", "09:30") }
   const overnightShared = M.rowsSharedDay(["A", "L", "I", "K"], quotes, { A: tonight }, calendars)
   expect(M.rowsDayName(overnightShared, at("2026-09-09", "01:00"))).toBe("OVERNIGHT")
-  // Scrubbed back into the closed day, the header names that day rather than OVERNIGHT.
-  expect(M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), true)).toBe("TUE")
+  // Scrubbed back before the night opened, the header names the closed day;
+  // scrubbed into the night (including from a coin's chart), it stays OVERNIGHT.
+  expect([M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "15:00")),
+    M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "20:00")),
+    M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "21:30"))])
+    .toEqual(["TUE", "OVERNIGHT", "OVERNIGHT"])
   expect(day(["L", "I"], at("2026-09-09", "02:00"), { A: tonight })).toBe("TUE")
   expect(day(["B", "I"], at("2026-09-09", "01:00"), { A: tonight })).toBe("TUE")
   const note = (s, now, overnightList, nt = null) => M.rowNote(quotes[s], M.rowModel(quotes[s], 0, "pct", nt), overnightList, now)

@@ -175,7 +175,8 @@ function dayTitles() {
 // list with no US stock takes the day its own rows share, "24H" for rolling
 // coins alone, and blank where they disagree or none names one.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
-  var hasOvernight = false
+  var overnightFrom = null
+  var overnightCal = Overnight.overnightMarket(calendars)
   var usShared = null
   var usMixed = false
   var hasUs = false
@@ -186,7 +187,11 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
     var q = quotes[symbols[i]]
     if (!q) continue
     var nt = newest ? newest[symbols[i]] : null
-    if (nt && nt.joined && nt.closed) hasOvernight = true
+    if (nt && nt.joined && nt.closed) {
+      var night = overnightCal && Format.isFiniteNumber(nt.t) ? Overnight.nightAt(overnightCal, nt.t) : null
+      var from = night ? night.start : Format.isFiniteNumber(nt.t) ? nt.t : 0
+      if (overnightFrom === null || from < overnightFrom) overnightFrom = from
+    }
     if (Overnight.hasOvernight(q, calendars)) {
       hasUs = true
       var usHead = Quote.headlineQuote(q)
@@ -218,12 +223,16 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
   }
   var out = hasUs ? (usMixed || !usShared ? { today: true } : usShared)
     : otherMixed ? null : otherShared ? otherShared : (rolling ? { rolling: true } : null)
-  return hasOvernight ? Object.assign({ overnight: true }, out || {}) : out
+  return overnightFrom !== null ? Object.assign({ overnight: true, overnightFrom: overnightFrom }, out || {}) : out
 }
 
-function rowsDayName(shared, now, scrubDay) {
+function rowsOvernight(shared, scrubT) {
+  return !!shared && !!shared.overnight && !(scrubT && shared.overnightFrom !== undefined && scrubT < shared.overnightFrom)
+}
+
+function rowsDayName(shared, now, scrubT) {
   if (!shared) return ""
-  if (shared.overnight && !scrubDay) return "OVERNIGHT"
+  if (rowsOvernight(shared, scrubT)) return "OVERNIGHT"
   if (shared.today) return "TODAY"
   if (shared.rolling) return "24H"
   if (!shared.quote) return ""
