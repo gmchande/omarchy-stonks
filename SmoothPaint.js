@@ -64,16 +64,17 @@ function paintInk(ctx, g, s) {
     ctx.restore()
   }
 
-  ctx.lineJoin = "round"
+  ctx.lineJoin = s.moving ? "bevel" : "round"
   ctx.lineCap = "round"
   ctx.lineWidth = 2 * s.weight
   // The whole series in the lighter ink, then the rest over it at full
   // (`faint`), so the hours around the session read as the quieter part of
-  // one line. When no trade is faint, the single full stroke draws the whole
-  // series. The stretch the number beside the chart doesn't count keeps
-  // the sides' colours, fainter than the dim ink and half as thick, so it
-  // reads apart from tonight's dim hours on a dark ground, where a fainter
-  // shade alone runs into them.
+  // one line. While moving (`s.moving`), plain joins and a single pass over
+  // non-faint runs keep each frame within 120 Hz's budget; at rest, round
+  // joins and the full base pass draw the exact chart. The stretch the number
+  // beside the chart doesn't count keeps the sides' colours, fainter than
+  // tonight's dim hours and half as thick, so it reads apart from them on a
+  // dark ground, where a fainter shade alone runs into them.
   var lighter = mixed ? 0.45 + (s.hoursAlpha - 0.45) * fadeShare : even ? s.hoursAlpha : 0.45
   var strokeMargin = ctx.lineWidth + 1
   for (var q = 0; q < parts.length; q++) {
@@ -84,6 +85,17 @@ function paintInk(ctx, g, s) {
       ctx.lineWidth = s.weight
       ctx.strokeStyle = sides(ctx, by, s, s.asideAlpha, s.asideAlpha, minY, maxY, s.weight + 1)
       strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
+    } else if (s.moving) {
+      var faint = faintRuns(pts)
+      if (faint.length) {
+        ctx.strokeStyle = sides(ctx, by, s, lighter, lighter, minY, maxY, strokeMargin)
+        strokeRuns(ctx, faint, pad, w, h, s.dashUnit)
+        ctx.strokeStyle = sides(ctx, by, s, 1, 1, minY, maxY, strokeMargin)
+        strokeRuns(ctx, runs(pts, function(pt) { return !pt.faint }), pad, w, h, s.dashUnit)
+      } else {
+        ctx.strokeStyle = sides(ctx, by, s, 1, 1, minY, maxY, strokeMargin)
+        strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
+      }
     } else {
       ctx.strokeStyle = sides(ctx, by, s, lighter, lighter, minY, maxY, strokeMargin)
       strokeRuns(ctx, allRuns, pad, w, h, s.dashUnit)
@@ -118,6 +130,30 @@ function runs(pts, keep) {
       run = []
     }
     if (keep(pts[i])) run.push(pts[i])
+  }
+  if (run.length) out.push(run)
+  return out
+}
+
+// Stretches containing faint trades, extended one trade into each adjacent
+// full stretch (never across a break) so the lighter line meets the full one
+// with no gap while non-faint trades stroke once.
+function faintRuns(pts) {
+  var out = []
+  var run = []
+  for (var i = 0; i < pts.length; i++) {
+    if (pts[i].brk) {
+      if (run.length) out.push(run)
+      run = []
+    }
+    if (pts[i].faint) {
+      if (!run.length && i > 0 && !pts[i].brk) run.push(pts[i - 1])
+      run.push(pts[i])
+    } else if (run.length) {
+      run.push(pts[i])
+      out.push(run)
+      run = []
+    }
   }
   if (run.length) out.push(run)
   return out

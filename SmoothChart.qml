@@ -182,6 +182,9 @@ Item {
     return out.join(",")
   }
   readonly property bool morphing: !!plan && morph < 1
+  // Plain joins and one stroke pass during a morph keep 120 Hz frames under
+  // budget; a resting, live-tail, held or replayed chart always draws exact.
+  readonly property bool moving: !still && morphing
   readonly property string baseKey: hasBaseline
     ? [Math.round(width), Math.round(height), baselineColor, weight, dashUnit, aheadTicksKey,
        morphing ? "m" : Math.round((baselinePx - Math.floor(baselinePx - basePad)) * 16)].join("|")
@@ -189,6 +192,7 @@ Item {
   onBaseKeyChanged: base.requestPaint()
 
   onShownChanged: ink.requestPaint()
+  onMovingChanged: ink.requestPaint()
   onGeometryChanged: {
     var prev = prevGeometry
     var wasStock = prevStock
@@ -271,7 +275,7 @@ Item {
       width: canvas.width, height: canvas.height, pad: pad, weight: weight, dashUnit: dashUnit,
       hasBaseline: hasBaseline, baselineColor: baselineColor, aboveColor: aboveColor, belowColor: belowColor,
       aboveWash: aboveWash, belowWash: belowWash, aboveFade: aboveFade, belowFade: belowFade,
-      hoursAlpha: hoursAlpha, asideAlpha: asideAlpha, rgba: function(r, g, b, a) { return Qt.rgba(r, g, b, a) }
+      hoursAlpha: hoursAlpha, asideAlpha: asideAlpha, moving: moving, rgba: function(r, g, b, a) { return Qt.rgba(r, g, b, a) }
     }
   }
 
@@ -309,6 +313,7 @@ Item {
     Canvas {
       id: ink
       objectName: "ink"
+      property bool drawnMoving: false
       width: root.width
       height: root.height
       onWidthChanged: requestPaint()
@@ -317,7 +322,9 @@ Item {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
         if (!root.drawable) return
-        SmoothPaint.paintInk(ctx, root.shown, root.paintStyle(ink))
+        var style = root.paintStyle(ink)
+        SmoothPaint.paintInk(ctx, root.shown, style)
+        drawnMoving = style.moving
         root.lastShown = root.shown
       }
     }

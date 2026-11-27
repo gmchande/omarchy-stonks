@@ -634,6 +634,57 @@ Harness {
       harness.check("in smooth, a click on another row changes its price and name where they stand, at full strength",
         landed && !!heroPrice && !!stockName && wavered.length === 0, [landed, smoothTo, standing, wavered.slice(0, 3).join(" ")].join(" "))
 
+      // In smooth, stock switches and both directions of a range change draw
+      // with the fast moving pass and hand over to the resting drawing on the
+      // frame the motion ends; a held or replayed chart always draws exact.
+      var smoothChart = harness.find(body, "smoothChart")
+      var smoothInk = harness.find(smoothChart, "ink")
+      var watchHandoff = function(trigger) {
+        var sawMoving = false
+        var endedRest = false
+        var endChecked = false
+        var onPainted = function() {
+          if (body.motion.beat < 1) {
+            if (smoothInk.drawnMoving) sawMoving = true
+          } else if (!endChecked) {
+            endChecked = true
+            endedRest = !smoothInk.drawnMoving
+          }
+        }
+        smoothInk.painted.connect(onPainted)
+        trigger()
+        var done = within(4000, function() { return body.motion.beat >= 1 && !body.motion.drawingIn && endChecked })
+        smoothInk.painted.disconnect(onPainted)
+        return done && sawMoving && endedRest && !smoothInk.drawnMoving
+      }
+      var switchBack = body.watchlist.displayedSymbols.filter(function(s) { return !!service.quotes[s] && s !== body.chartSymbol })[0]
+      var switchHand = watchHandoff(function() { click(row(switchBack)) })
+      var rangeTokens = harness.findAll(harness.find(body, "rangeRow"), "rangeToken")
+      var clickRange = function(label) { click(rangeTokens[body.rangeOptions.indexOf(label)]) }
+      // Warm 1Y once if not yet cached so 1D -> 1Y bends directly on the second click.
+      var to1yHand = watchHandoff(function() { clickRange("1Y") })
+      var to1dHand = watchHandoff(function() { clickRange("1D") })
+      // A chart held mid-morph repaints exact immediately.
+      var heldExact = false
+      clickRange("1Y")
+      if (within(1500, function() { return smoothChart.moving && smoothInk.drawnMoving })) {
+        smoothChart.still = true
+        heldExact = within(1000, function() { return !smoothChart.moving && !smoothInk.drawnMoving })
+        smoothChart.still = false
+      }
+      within(3000, function() { return body.motion.beat >= 1 && !body.motion.drawingIn })
+      clickRange("1D")
+      within(3000, function() { return body.motion.beat >= 1 && !body.motion.drawingIn && body.chartRange === "1D" })
+      // A replayed chart stays exact throughout the replay.
+      click("animal")
+      var replayOn = within(1500, function() { return body.motion.replayRunning })
+      waitForRendering(body)
+      var replayExact = replayOn && !smoothChart.moving && !smoothInk.drawnMoving
+      body.endScrub()
+      harness.check("in smooth, moving charts hand over to exact resting drawing on the frame motion ends, and held or replayed charts draw exact",
+        switchHand && to1yHand && to1dHand && heldExact && replayExact,
+        ["switch=" + switchHand, "1D->1Y=" + to1yHand, "1Y->1D=" + to1dHand, "held=" + heldExact, "replay=" + replayExact].join(" "))
+
       // In retro, a click on another row changes the price whole: every
       // price the digits take on the way is the one stock's or the other's.
       if (!service.retro) body.setStyle("retro")
