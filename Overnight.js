@@ -398,12 +398,13 @@ function nightTrades(quote, atNight, t, calendars) {
 // so one left from a night a listing traded counts no more once it
 // doesn't. `nights` and `lastTrades` are Robinhood's entries, `cal` the
 // night's calendar.
-function nightFailures(nights, lastTrades, open, cal) {
+function nightFailures(nights, lastTrades, open, cal, since) {
   var out = {}
   if (!open) return out
-  for (var symbol in nights) if (nights[symbol].status === "failed") out[symbol] = true
+  var floor = since || 0
+  for (var symbol in nights) if (nights[symbol].status === "failed" && nights[symbol].at >= floor) out[symbol] = true
   for (var quoted in lastTrades)
-    if (lastTrades[quoted].status === "failed" && tradesAtNight(nights[quoted], cal)) out[quoted] = true
+    if (lastTrades[quoted].status === "failed" && lastTrades[quoted].at >= floor && tradesAtNight(nights[quoted], cal)) out[quoted] = true
   return out
 }
 
@@ -545,8 +546,8 @@ function overnightDue(askedAt, now, calendars, failed) {
   var cal = overnightMarket(calendars)
   if (!cal) return false
   if (!askedAt) return true
-  if (failed) return now - askedAt >= OVERNIGHT_INTERVAL
   var night = nightAt(cal, now)
+  if (failed) return (!!night && night.open && askedAt < night.start) || now - askedAt >= OVERNIGHT_INTERVAL
   if (night && night.open) return now - askedAt >= OVERNIGHT_INTERVAL
   for (var day = marketDayAt(cal, now), i = 0; i < 14; i++, day = marketDay(cal, Calendar.previousDateString(day.date))) {
     var ended = Calendar.epochAt(cal, day.date, cal.overnight.close) + OVERNIGHT_LAG

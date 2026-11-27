@@ -12,32 +12,55 @@ Item {
   // Kept in each entry as `at`; a user's refresh waits 10 s by it.
   property int askedAt: 0
   property var batches: []
-  readonly property bool busy: batches.length > 0
+  property int retryAfter: 2500
+  property var retrying: []
+  property bool retried: false
+  readonly property bool busy: batches.length > 0 || retrying.length > 0
   // While a chart draws itself in, answers wait: a day's answer is one
   // JSON.parse that can't be sliced, 17 to 24 ms for 25 listings.
   property bool holding: false
   onHoldingChanged: if (!holding && landing) landTimer.start()
 
   // `at`: the clock's own handlers may run before this binding to it has
-  // caught up. While the host is paused, a run fails a turn later, out of
-  // the change that asked for it; when the budget merely paces it, it waits
-  // for the refill.
+  // caught up. While the host is paused past its first blip, a run fails a
+  // turn later, out of the change that asked for it; on a single timeout
+  // blip or local budget pacing, it waits for the probe or refill.
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
+    sendBatches(symbols, at, false)
+  }
+
+  function sendBatches(symbols, at, isRetry) {
+    if (!symbols.length) return
     var batches = Overnight.overnightBatches(symbols, entries, at)
     var granted = gate ? gate.take(batches.length) : batches.length
     if (granted === 0) {
-      if (gate && gate.paused) {
+      if (gate && gate.paused && (gate.pause === "refused" || gate.silences >= 2)) {
         root.batches = batches
         root.askedAt = at
+        root.retried = true
         heldTimer.restart()
       }
       return
     }
     root.batches = batches.slice(0, granted)
     root.askedAt = at
+    root.retried = isRetry
     var cap = Math.max.apply(null, root.batches.map(function(b) { return Fetch.overnightCap(b.symbols.length, b.span) }))
     fetchRun.send(root.batches.map(function(b) { return Overnight.overnightUrl(b.symbols, b.span) }), cap)
+  }
+
+  // Marks failed entries so `askOvernight` retries them right away once
+  // Robinhood reopens instead of waiting out the five-minute interval.
+  function retryFailed() {
+    var next = null
+    for (var symbol in entries) {
+      if (entries[symbol].status === "failed" && !entries[symbol].retry) {
+        if (!next) next = Object.assign({}, entries)
+        next[symbol] = Object.assign({}, entries[symbol], { retry: true })
+      }
+    }
+    if (next) root.entries = next
   }
 
   // Answers are read about 8 ms a turn, an answer's text or one listing at
@@ -90,18 +113,44 @@ Item {
   // show no overnight price for five minutes.
   function land(job) {
     var next = Object.assign({}, entries)
+    var blip = !!gate && gate.paused && gate.pause === "none" && gate.silences < 2
+    var retrySymbols = []
+    var changed = false
     batches.forEach(function(batch) {
       batch.symbols.forEach(function(symbol) {
         var had = entries[symbol]
         var got = job.listings[symbol]
         if (!got && !had && batch.span === "hour") return
-        next[symbol] = got ? { status: "ok", bars: got.bars, through: got.through, at: askedAt }
-          : { status: "failed", bars: had ? had.bars : [], through: had ? had.through : null, at: askedAt }
+        if (got) {
+          next[symbol] = { status: "ok", bars: got.bars, through: got.through, at: askedAt }
+          changed = true
+        } else if (blip) {
+          return
+        } else if (!root.retried && (!gate || !gate.paused)) {
+          retrySymbols.push(symbol)
+        } else {
+          next[symbol] = { status: "failed", bars: had ? had.bars : [], through: had ? had.through : null, at: askedAt }
+          changed = true
+        }
       })
     })
     root.landing = null
     root.batches = []
-    root.entries = next
+    if (retrySymbols.length > 0) {
+      root.retrying = retrySymbols
+      retryTimer.restart()
+    }
+    if (changed) root.entries = next
+  }
+
+  Timer {
+    id: retryTimer
+    interval: root.retryAfter
+    onTriggered: {
+      var symbols = root.retrying
+      root.retrying = []
+      root.sendBatches(symbols, root.askedAt, true)
+    }
   }
 
   Timer {

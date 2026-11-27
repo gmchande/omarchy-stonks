@@ -79,6 +79,8 @@ Harness {
   // clock runs faster than the wall's.
   Binding { target: plugin.service.feeds.quotes; property: "retryAfter"; value: 200 }
   Binding { target: plugin.service.feeds.preview; property: "retryAfter"; value: 200 }
+  Binding { target: plugin.service.feeds.overnight; property: "retryAfter"; value: 200 }
+  Binding { target: plugin.service.feeds.lastTrade; property: "retryAfter"; value: 200 }
   readonly property var app: plugin.windowHost.app
   // The newest version's check, on the walk's clock: a step turns it on,
   // and says when Yahoo answers again, as the service does.
@@ -1008,6 +1010,153 @@ Harness {
       service.persist({ changeMode: "pct" })
       harness.check("switching changeMode to open judges deferred spark rows and fills in dayOpen",
         openFilled, ["openFilled=" + openFilled].join(" "))
+      closeWindow()
+
+      // Fault 1: a single Robinhood blip (502 or 1st offline timeout) never
+      // stamps "! Refresh failed"; after a real outage, recovery clears every
+      // visible row right away (not 5 minutes later), and r retries non-featured
+      // failed visible rows too; a 19:58 failure never bleeds into 20:00.
+      var rhGate = service.feeds.lastTrade.gate
+      var sun29 = harness.sat28 + 86400
+      var mon30 = sun29 + 86400
+      rhGate.gate = Object.assign({}, rhGate.gate, { left: rhGate.capacity, filledAt: at(sun29, 20, 30), pause: "", pausedUntil: 0, silences: 0, refusals: 0, loneOut: false, warned: false })
+      rhGate.budgetDueAt = 0
+      gate.gate = Object.assign({}, gate.gate, { left: gate.capacity, filledAt: at(sun29, 20, 30), pause: "", pausedUntil: 0, silences: 0, refusals: 0, loneOut: false, warned: false })
+      gate.budgetDueAt = 0
+      startAt(at(sun29, 20, 30))()
+      openWindow()
+      // 1a: single 502 blip on lastTrade retries once and never warns.
+      touch("ROBINHOOD.bad")
+      var blipWarned = false
+      var blipFrom = harness.requests().length
+      harness.clockTo(service.lastTradeDueAt)
+      within(3000, function() {
+        if (pill.warns || Object.keys(service.nightFailed).length > 0) blipWarned = true
+        return harness.requests().slice(blipFrom).some(function(l) { return /^lasttrade .* 502$/.test(l) })
+      })
+      remove("ROBINHOOD.bad")
+      settle()
+      if (pill.warns || Object.keys(service.nightFailed).length > 0) blipWarned = true
+      // 1b: real outage marks visible US rows failed, and recovery clears
+      // NEST, KILN and SPY right after the pause expires (not stuck for 5 min).
+      touch("ROBINHOOD.offline")
+      harness.clockTo(service.overnightDueAt)
+      answerScreens()
+      settle()
+      if (rhGate.pausedUntil > service.now) {
+        harness.clockTo(rhGate.pausedUntil)
+        answerScreens()
+        settle()
+      }
+      var failedDuringOutage = !!service.nightFailed["NEST"] && !!service.nightFailed["KILN"] && !!service.nightFailed["SPY"]
+      remove("ROBINHOOD.offline")
+      var recoverStart = service.now
+      var allClearedAt = 0
+      tick(60, 5, function() {
+        if (!allClearedAt && !service.nightFailed["NEST"] && !service.nightFailed["KILN"] && !service.nightFailed["SPY"])
+          allClearedAt = service.now
+      })
+      var recoveredQuickly = allClearedAt > 0 && allClearedAt - recoverStart <= 30
+      // 1c: r retries non-featured failed visible rows (KILN, SPY) even inside 10 s.
+      touch("ROBINHOOD.bad")
+      harness.clockTo(service.overnightDueAt)
+      answerScreens()
+      settle()
+      var kilnFailed = !!service.nightFailed["KILN"] && !!service.nightFailed["SPY"]
+      remove("ROBINHOOD.bad")
+      var rNightFrom = harness.requests().length
+      service.refresh()
+      var rClearedNonFeatured = within(5000, function() {
+        return !service.nightFailed["KILN"] && !service.nightFailed["SPY"]
+          && harness.requests().slice(rNightFrom).some(function(l) { return /^overnight .*KILN.* 200$/.test(l) })
+      })
+      settle()
+      // 1d: failure at 19:58 NY does not bleed into 20:00 NY.
+      startAt(at(mon30, 19, 58))()
+      touch("ROBINHOOD.bad")
+      service.feeds.overnight.entries = ({})
+      harness.clockTo(at(mon30, 19, 58) + 1)
+      answerScreens()
+      settle()
+      var preNightFailed = !!service.feeds.overnight.entries["NEST"] && service.feeds.overnight.entries["NEST"].status === "failed"
+      remove("ROBINHOOD.bad")
+      harness.clockTo(at(mon30, 20, 0))
+      var bledAtOpen = Object.keys(service.nightFailed).length > 0
+      answerScreens()
+      settle()
+      var cleanAtOpen = !bledAtOpen && Object.keys(service.nightFailed).length === 0
+      harness.check("Robinhood: a single blip never warns, recovery clears visible rows quickly, r retries non-featured failed rows, and pre-night failures don't bleed into 20:00",
+        !blipWarned && failedDuringOutage && recoveredQuickly && kilnFailed && rClearedNonFeatured && preNightFailed && cleanAtOpen,
+        [blipWarned, failedDuringOutage, recoveredQuickly, allClearedAt - recoverStart, kilnFailed, rClearedNonFeatured, preNightFailed, bledAtOpen, Object.keys(service.nightFailed).join(",")].join(" | "))
+      closeWindow()
+
+      // Fault 12: budget-paced HistoryFeed waits for refill instead of showing
+      // sticky "<RANGE> UNAVAILABLE".
+      var tue1 = mon30 + 86400
+      startAt(at(tue1, 14, 30))()
+      openWindow()
+      service.feature("NEST")
+      within(2000, function() { return service.featuredSymbol === "NEST" })
+      body.selectRange("1D")
+      within(2000, function() { return !body.historyActive })
+      gate.gate = Object.assign({}, gate.gate, { left: 0, filledAt: service.now, pause: "", pausedUntil: 0, warned: true })
+      gate.budgetDueAt = 0
+      body.selectRange("10Y")
+      var budgetSet = within(2000, function() { return gate.budgetDueAt > service.now })
+      var noStickyFail = budgetSet && !body.historyFailed
+      var refillAt = gate.budgetDueAt
+      harness.clockTo(refillAt)
+      answerScreens()
+      var refilledHistory = within(5000, function() { return body.historyShown && body.chartRange === "10Y" && !body.historyFailed })
+      body.selectRange("1D")
+      gate.gate = Object.assign({}, gate.gate, { left: gate.capacity, filledAt: service.now, warned: false })
+      gate.budgetDueAt = 0
+      harness.check("a budget-paced range history waits for budget refill instead of failing with sticky unavailable",
+        budgetSet && noStickyFail && refilledHistory,
+        [budgetSet, noStickyFail, refilledHistory, body.historyFailed, body.historyShown].join(" | "))
+      closeWindow()
+
+      // Fault 14: search preview stalled while Yahoo is paused on a quiet
+      // weekend turns overdue and surfaces the header pause warning.
+      var sat5 = tue1 + 4 * 86400
+      startAt(at(sat5, 12, 15))()
+      openWindow()
+      touch("YAHOO.refuse")
+      gate.gate = Object.assign({}, gate.gate, { pause: "refused", pausedUntil: service.now + 300, refusals: 1, loneOut: false })
+      body.startAdding()
+      body.previewTo("AAPL")
+      var previewOwed = within(2000, function() { return (service.owed["AAPL"] || 0) > 0 })
+      harness.clockTo(service.now + 95)
+      answerScreens()
+      var previewHeaderWarn = within(2000, function() { return /busy/i.test(body.headerText) })
+      var previewOverdue = (service.owed["AAPL"] || 0) > 0 && service.now - service.owed["AAPL"] >= 90
+      body.cancelAdding()
+      remove("YAHOO.refuse")
+      gate.gate = Object.assign({}, gate.gate, { left: gate.capacity, filledAt: service.now, pause: "", pausedUntil: 0, refusals: 0, silences: 0, loneOut: false })
+      harness.check("a stalled search preview while Yahoo is paused turns overdue and shows the header pause warning",
+        previewOwed && previewOverdue && previewHeaderWarn,
+        [previewOwed, previewOverdue, previewHeaderWarn, body.headerText, body.featuredFreshness.state].join(" | "))
+      closeWindow()
+
+      // Fault 13: a 1-symbol watchlist with a 404 symbol shows "! No data for
+      // this symbol" instead of false global "Can't get prices".
+      var savedSettings = service.fileSettings
+      service.save(Object.assign({}, savedSettings, { symbols: ["ZZZZBADSYM"], lists: [], list: "", featured: "ZZZZBADSYM" }))
+      openWindow()
+      var badLanded = within(5000, function() {
+        var e = service.entries["ZZZZBADSYM"]
+        return service.featuredSymbol === "ZZZZBADSYM" && !!e && e.status === "failed" && !!body.watchlist.rowItem("ZZZZBADSYM")
+      })
+      var badHero = harness.find(body, "hero")
+      var badRow = body.watchlist.rowItem("ZZZZBADSYM")
+      var badNotDown = badLanded && !body.yahooDown && !/Can't get prices/.test(body.headerText)
+      var badSaysSymbol = !!badHero && /NO DATA FOR THIS SYMBOL/.test(badHero.listingLead)
+        && !!badRow && /No data for this symbol/.test(badRow.detail)
+      service.save(savedSettings)
+      within(5000, function() { return service.allSymbols.indexOf("NEST") >= 0 })
+      harness.check("a 1-symbol watchlist with a 404 symbol shows No data for this symbol, not global Can't get prices",
+        badLanded && badNotDown && badSaysSymbol,
+        [badLanded, body.yahooDown, body.headerText, badHero ? badHero.listingLead : "no hero", badRow ? badRow.detail : "no row"].join(" | "))
       closeWindow()
 
       harness.finish()

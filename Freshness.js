@@ -116,15 +116,16 @@ function overdueClock(owed, now) {
   return at
 }
 
-// How many of `symbols` warn, as `freshnessWarns` reads each: its refresh
-// failed, or is overdue by `clock`, `overdueClock`'s.
+// How many of `symbols` warn because Yahoo failed or went overdue, as
+// `freshnessWarns` reads each. A symbol Yahoo answered as missing (404 /
+// omitted) is its own trouble, not Yahoo's.
 function warningCount(symbols, entries, previewEntries, owed, clock) {
   var count = 0
   for (var i = 0; i < symbols.length; i++) {
     var symbol = symbols[i]
     var entry = entries && entries[symbol] || previewEntries && previewEntries[symbol] || null
     var owedSince = owed[symbol] || 0
-    if (entry && entry.status === "failed" || owedSince > 0 && clock - owedSince >= OVERDUE_AFTER) count++
+    if (entry && entry.status === "failed" && !entry.missing || owedSince > 0 && clock - owedSince >= OVERDUE_AFTER) count++
   }
   return count
 }

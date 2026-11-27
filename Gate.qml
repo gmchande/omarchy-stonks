@@ -24,6 +24,7 @@ Item {
   // The lone request after a pause is out.
   readonly property bool loneOut: gate.loneOut
   readonly property bool warned: gate.warned
+  readonly property int silences: gate.silences
   // Moves on as each pause begins: a run notes it as it is sent.
   readonly property int pauses: gate.pauses
 
