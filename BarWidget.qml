@@ -33,6 +33,7 @@ BarWidget {
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
   // Matches what the panel shows on 1D, tonight's move included.
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
+  readonly property bool newestOld: service ? Figures.newestStale(newest, service.now) : false
   readonly property var featured: featuredQuote ? Figures.rowModel(featuredQuote, 0, service.changeMode, newest) : null
   // What the pill has no room for: at night "overnight" and how the closed
   // day ended, else a price's session outside the regular one, and the time
@@ -445,13 +446,14 @@ BarWidget {
         font.bold: true
       }
 
-      // The text form says the price too, as a ticker does.
+      // The text form says the price too, as a ticker does. An old night's
+      // price and move dim, as on the panel and rows (`Hero.newestOld`).
       Text {
         visible: root.barStyle === "text" && !!root.featured
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: root.featured ? root.featured.priceText : ""
-        color: button.foreground
+        color: root.newestOld ? root.dimColor : button.foreground
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
@@ -462,7 +464,7 @@ BarWidget {
         textFormat: Text.PlainText
         text: root.changeText
         // With no price, trouble is in the bar's ink, as the header says it.
-        color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
+        color: root.featured ? (root.newestOld ? root.dimColor : root.trendColor) : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
@@ -513,7 +515,7 @@ BarWidget {
           text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text
           fontFamily: button.fontFamily
           fontSize: modelData.text.length > 3 ? button.fontSize * 0.9 : button.fontSize
-          color: !modelData.move ? button.foreground : root.stackedMove.sign > 0 ? root.upColor
+          color: !modelData.move ? button.foreground : root.newestOld ? root.dimColor : root.stackedMove.sign > 0 ? root.upColor
             : root.stackedMove.sign < 0 ? root.downColor : root.dimColor
         }
       }

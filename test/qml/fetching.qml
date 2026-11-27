@@ -624,19 +624,22 @@ Harness {
       openWindow()
       harness.clockTo(at(harness.wed7 + 86400, 1, 21) + 29)
       var staleWake = service.clockInterval
+      var freshOld = pill.newestOld
       var freshHover = ""
       var staleHover = ""
       mouseMove(pill, pill.width / 2, pill.height / 2)
       freshHover = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       harness.clockTo(at(harness.wed7 + 86400, 1, 21) + 31)
+      var staleOld = pill.newestOld
       mouseMove(pill, pill.width / 2, pill.height / 2)
       staleHover = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       closeWindow()
       harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second",
-        staleWake === 2005 && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%",
-        ["staleWake=" + staleWake, "fresh=" + freshHover, "stale=" + staleHover].join(" | "))
+        staleWake === 2005 && !freshOld && staleOld
+          && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%",
+        ["staleWake=" + staleWake, "old=" + freshOld + "->" + staleOld, "fresh=" + freshHover, "stale=" + staleHover].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
