@@ -65,7 +65,7 @@ function paintInk(ctx, g, s) {
   }
 
   ctx.lineJoin = s.moving ? "bevel" : "round"
-  ctx.lineCap = s.moving ? "butt" : "round"
+  ctx.lineCap = "round"
   ctx.lineWidth = 2 * s.weight
   // The whole series in the lighter ink, then the rest over it at full
   // (`faint`), so the hours around the session read as the quieter part of

@@ -2992,7 +2992,7 @@ describe("another stock's chart bends out of the one before", () => {
     const allFull = { day: false, baselineY: 0.5, aside: null, ticks: [], points: Array.from({ length: 40 }, (_, i) => pt(i / 39, wobble(i))) }
     const mFull = strokeLog(allFull, true)
     const rFull = strokeLog(allFull, false)
-    expect([mFull.lineJoin, mFull.lineCap]).toEqual(["bevel", "butt"])
+    expect([mFull.lineJoin, mFull.lineCap]).toEqual(["bevel", "round"])
     expect([rFull.lineJoin, rFull.lineCap]).toEqual(["round", "round"])
     expect(mFull.strokes).toBe(1)
     expect(rFull.strokes).toBe(2)

@@ -182,9 +182,9 @@ Item {
     return out.join(",")
   }
   readonly property bool morphing: !!plan && morph < 1
-  // Plain joins and one stroke pass while the line moves keep 120 Hz frames
-  // under budget; a held, replayed or resting chart always draws exact.
-  readonly property bool moving: !still && (morphing || (!!tailFrom && tailT < 1))
+  // Plain joins and one stroke pass during a morph keep 120 Hz frames under
+  // budget; a resting, live-tail, held or replayed chart always draws exact.
+  readonly property bool moving: !still && morphing
   readonly property string baseKey: hasBaseline
     ? [Math.round(width), Math.round(height), baselineColor, weight, dashUnit, aheadTicksKey,
        morphing ? "m" : Math.round((baselinePx - Math.floor(baselinePx - basePad)) * 16)].join("|")
