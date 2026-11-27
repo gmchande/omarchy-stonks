@@ -2972,6 +2972,40 @@ describe("another stock's chart bends out of the one before", () => {
     }
   })
 
+  test("while moving, smooth ink uses plain joins and strokes non-faint stretches once; at rest it draws exact round joins", () => {
+    const strokeLog = (g, moving) => {
+      const s = { width: 400, height: 200, pad: 3, weight: 1, dashUnit: 1, hasBaseline: true, hoursAlpha: 0.6, asideAlpha: 0.4,
+        moving, baselineColor: { r: 0.5, g: 0.5, b: 0.5, a: 1 }, aboveColor: { r: 0, g: 1, b: 0 }, belowColor: { r: 1, g: 0, b: 0 },
+        aboveWash: 0.16, belowWash: 0.16, aboveFade: 0.34, belowFade: 0.34, rgba: (r, g, b, a) => ({ r, g, b, a }) }
+      const state = { lineJoin: "", lineCap: "", strokes: 0, lineTos: 0 }
+      const ctx = new Proxy(state, {
+        get: (t, name) => name in t ? t[name]
+          : name === "createLinearGradient" ? () => ({ addColorStop: () => {} })
+          : name === "lineTo" ? () => { t.lineTos++ }
+          : name === "stroke" ? () => { t.strokes++ }
+          : () => {},
+        set: (t, name, val) => { t[name] = val; return true }
+      })
+      Paint.paintInk(ctx, g, s)
+      return state
+    }
+    const allFull = { day: false, baselineY: 0.5, aside: null, ticks: [], points: Array.from({ length: 40 }, (_, i) => pt(i / 39, wobble(i))) }
+    const mFull = strokeLog(allFull, true)
+    const rFull = strokeLog(allFull, false)
+    expect([mFull.lineJoin, mFull.lineCap]).toEqual(["bevel", "butt"])
+    expect([rFull.lineJoin, rFull.lineCap]).toEqual(["round", "round"])
+    expect(mFull.strokes).toBe(1)
+    expect(rFull.strokes).toBe(2)
+
+    const mLunch = strokeLog(lunch, true)
+    const rLunch = strokeLog(lunch, false)
+    expect(mLunch.lineTos).toBeLessThan(rLunch.lineTos)
+    // Faint stretches join to adjacent full point and never cross a break.
+    const faint = Paint.faintRuns(lunch.points)
+    expect(faint.length).toBe(1)
+    expect(faint[0].length).toBe(5) // 4 faint points + 1 adjacent full point
+  })
+
   test("retro's wave stands each column on its own chart's dashed row, and lights the newest cell once it has passed", () => {
     const grid = g => Chart.retroGrid(g, 300, 120, 5, 1)
     const from = grid(night), to = grid(lunch)
