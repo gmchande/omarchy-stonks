@@ -20,10 +20,6 @@ trap 'rm -rf -- "$work"' EXIT
 # Warnings outside the house baseline, each file, category, and token with
 # its exact count. Fix one and lower its count here.
 declare -A listed=(
-  # Watchlist.qml: pauseRows and settleRows call functions the row delegate
-  # declares, which qmllint cannot see through Repeater.itemAt.
-  ["Watchlist.qml missing-property pause"]=1
-  ["Watchlist.qml missing-property settle"]=1
   # Watchlist.qml: Omarchy's touchpad scroll factor, which shells before it
   # lack, so the list falls back to 3.
   ["Watchlist.qml missing-property touchpadScrollFactor"]=1

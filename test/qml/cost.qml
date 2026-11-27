@@ -266,10 +266,16 @@ Harness {
       // A frame drawn at the end, then a jump to the middle.
       within(1000, function() { return framesSeen > 0 })
       list.contentY = list.clampY(list.contentHeight / 2)
-      var swept = within(3000, function() { return wearing().length === service.allSymbols.length })
+      var swept = within(3000, function() {
+        var active = Object.keys(list.rowItems()).length
+        return active > 0 && active <= nearSight && wearing().length === active
+      })
       harness.onFrame = null
       body.toggleStyle()
-      within(3000, function() { return wearing().length === service.allSymbols.length })
+      within(3000, function() {
+        var active = Object.keys(list.rowItems()).length
+        return active > 0 && wearing().length === active
+      })
       harness.check("a look switch swaps at once only the lines of rows near sight, the rest soon after, and a jump straight after shows no row in the old look",
         swapped > 0 && swapped <= nearSight && swept && Object.keys(oldSeen).length === 0,
         swapped + " swapped at once of " + nearSight + " near sight; all swapped " + swept + "; old look seen on " + Object.keys(oldSeen).slice(0, 5).join(","))
@@ -288,21 +294,25 @@ Harness {
         seen.filter(function(s) { return answered[s] === 1 }).length + " of " + seen.length + " rows in sight worked it out once; "
           + unseen.length + " out of sight did")
 
-      // To a list of ten and back: the rows out of sight keep the line they
-      // drew, and those in sight show the latest.
-      var rows = list.rowItems()
-      var lines = {}
-      for (var s in rows) lines[s] = rows[s].geometry
+      // To a list of ten and back: the recycled pool allocates no extra row
+      // items, keeps only near-sight rows active, and every row in sight shows
+      // its latest.
+      var poolBefore = built()
       service.switchList("Ten")
       tryVerify(function() { return list.displayedSymbols.length === 10 }, 3000)
+      var poolInTen = built()
       service.switchList("")
       tryVerify(function() { return list.displayedSymbols.length === 154 }, 3000)
       rested()
-      var redrawn = Object.keys(rows).filter(function(s) { return !rows[s].inSight && rows[s].geometry !== lines[s] })
+      var poolAfter = built()
+      var rows = list.rowItems()
+      var activeCount = Object.keys(rows).length
       var stale = Object.keys(rows).filter(function(s) { return rows[s].inSight && (rows[s].quote !== service.quotes[s] || !rows[s].day) })
-      harness.check("a switch to a list and back redraws no row out of sight, and every row in sight shows its latest",
-        redrawn.length === 0 && stale.length === 0,
-        redrawn.length + " rows out of sight redrawn; in sight without their latest: " + stale.slice(0, 5).join(","))
+      harness.check("a switch to a list and back recycles its row pool without allocating extra rows, and every row in sight shows its latest",
+        poolBefore > 0 && poolBefore <= nearSight && poolInTen === poolBefore && poolAfter === poolBefore
+          && activeCount <= nearSight && stale.length === 0,
+        "pool=" + [poolBefore, poolInTen, poolAfter].join("/") + " active=" + activeCount + "/" + nearSight
+          + "; in sight without their latest: " + stale.slice(0, 5).join(","))
 
       // Returning to a scrolled list asks Robinhood only for the rows visible
       // at the restored scroll position, never for the top rows of that list.
@@ -346,7 +356,7 @@ Harness {
       // out its figures again, the clicked stock's chart answer landing too.
       rows = list.rowItems()
       var figures = {}
-      for (s in rows) figures[s] = rows[s].view
+      for (var fs in rows) figures[fs] = rows[fs].view
       var fed = service.feeds.quotes.symbols
       var clicked = rowsInSight()[1]
       var answer = service.entries[clicked]

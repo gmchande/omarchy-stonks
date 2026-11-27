@@ -3300,3 +3300,20 @@ test("a chart of one trade grows out of the other's line into its own dot, and s
   expect(Morph.frame(out, 1e-9).lone[0].share).toBeCloseTo(1, 6)
   expect(Morph.frame(out, 1 - 1e-9).lone[0].share).toBeCloseTo(0, 6)
 })
+
+test("row pool assignment keeps wanted and pinned symbols on their slots, reuses freed slots, and grows only when needed", () => {
+  const Rows = load("Rows.js")
+  const first = Rows.assignPool([], ["A", "B", "C", "D"], {})
+  expect(first).toEqual({ slots: ["A", "B", "C", "D"], grew: 4, changed: true })
+  // Unchanged wanted set is a no-op.
+  expect(Rows.assignPool(first.slots, ["A", "B", "C", "D"], {}).changed).toBe(false)
+  // Scrolling down keeps C and D sticky on slots 2 and 3, recycling slots 0 and 1 for E and F.
+  const scrolled = Rows.assignPool(first.slots, ["C", "D", "E", "F"], {})
+  expect(scrolled).toEqual({ slots: ["E", "F", "C", "D"], grew: 0, changed: true })
+  // Pinning a lifted or folding row (E) keeps it on slot 0 even when off-screen, growing by 1.
+  const pinned = Rows.assignPool(scrolled.slots, ["C", "D", "G", "H"], { E: true })
+  expect(pinned).toEqual({ slots: ["E", "G", "C", "D", "H"], grew: 1, changed: true })
+  // Switching to a shorter list frees unused slots without shrinking the pool.
+  const shorter = Rows.assignPool(pinned.slots, ["X", "Y"], {})
+  expect(shorter).toEqual({ slots: ["X", "Y", "", "", ""], grew: 0, changed: true })
+})

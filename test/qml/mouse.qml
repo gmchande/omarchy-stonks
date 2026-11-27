@@ -136,7 +136,7 @@ Harness {
       list.takeOver()
       list.contentY = Math.max(0, list.contentHeight - list.sightHeight)
       rest()
-      var offScreen = !row(rows[0]).inSight
+      var offScreen = !row(rows[0]) || !row(rows[0]).inSight
       var farPeak = 0
       var trackFar = function() { farPeak = Math.max(farPeak, Math.abs(list.highlightShift)) }
       list.highlightShiftChanged.connect(trackFar)
@@ -684,17 +684,27 @@ Harness {
       })[0]
       var repeatReplayed = false
       var repeatRow = repeatTarget ? row(repeatTarget) : null
-      var watchRepeatReveal = function() { if (repeatRow && repeatRow.reveal < 1) repeatReplayed = true }
       if (repeatRow) {
         service.createList("OtherTmp")
         service.setMembership(body.watchlist.displayedSymbols[body.watchlist.displayedSymbols.length - 1], "OtherTmp", true)
         service.switchList("OtherTmp")
         within(1500, function() { return service.listName === "OtherTmp" })
-        repeatRow.revealChanged.connect(watchRepeatReveal)
+        var watchedRows = []
+        var allNow = body.watchlist.rowItems()
+        for (var rs in allNow) {
+          var item = allNow[rs]
+          var watchFn = (function(it) { return function() { if (it.symbol === repeatTarget && it.reveal < 1) repeatReplayed = true } })(item)
+          item.revealChanged.connect(watchFn)
+          watchedRows.push([item, watchFn])
+        }
         service.switchList("")
-        within(1500, function() { return service.listName === "" && repeatRow.inSight })
+        within(1500, function() {
+          var back = row(repeatTarget)
+          return service.listName === "" && !!back && back.inSight
+        })
         waitForRendering(body)
-        repeatRow.revealChanged.disconnect(watchRepeatReveal)
+        watchedRows.forEach(function(pair) { pair[0].revealChanged.disconnect(pair[1]) })
+        repeatRow = row(repeatTarget)
         service.deleteList("OtherTmp")
         rest()
       }
@@ -1084,6 +1094,75 @@ Harness {
       harness.check("SymbolLists locks scroll while naming, scrolls New list validation errors into view, and exits naming when another list is clicked",
         listsOpen && scrollableBefore && namingOn && scrollLocked && errVisible && exitedNaming,
         [listsOpen, "scrollBefore:" + scrollableBefore, namingOn, "locked:" + scrollLocked, "errVis:" + errVisible, "exited:" + exitedNaming, symDiag].join(" | "))
+
+      // Recycled row pool: (1) press + wheel scroll + release never activates
+      // a recycled symbol; (2) fast scroll onto an unseen cached symbol draws
+      // its sparkline in; (3) a live reorder pins a sliding row while it moves;
+      // (4) releaseDragInPlace keeps an edge-dragged row pinned across turns.
+      var pSyms = []
+      var baseQ = service.feeds.quotes.quotes
+      var sampleQ = baseQ[body.chartSymbol] || baseQ[service.symbols[0]]
+      var nextQ = Object.assign({}, baseQ)
+      for (var pi = 1; pi <= 24; pi++) {
+        var ps = "POOL" + (pi < 10 ? "0" : "") + pi + "-USD"
+        pSyms.push(ps)
+        nextQ[ps] = Object.assign({}, sampleQ, { symbol: ps, name: "Pool " + pi, crypto: true, exchange: "CCC", instrumentType: "CRYPTOCURRENCY" })
+        service.addSymbol(ps)
+      }
+      service.feeds.quotes.quotes = nextQ
+      within(2000, function() { return list.displayedSymbols.indexOf("POOL24-USD") >= 0 })
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      // 1: press row 1 (not featured), scroll 6 notches so its slot recycles, release.
+      var pressSym = list.displayedSymbols[1] === service.featuredSymbol ? list.displayedSymbols[2] : list.displayedSymbols[1]
+      var featBefore = service.featuredSymbol
+      var pressRow = row(pressSym)
+      var pt = pressRow.mapToItem(body, pressRow.width / 2, pressRow.height / 2)
+      mousePress(body, pt.x, pt.y)
+      for (var wn = 0; wn < 6; wn++) list.wheelEvent(Qt.NoScrollPhase, 0, -120)
+      mouseRelease(body, pt.x, pt.y)
+      waitForRendering(body)
+      var noGhostClick = service.featuredSymbol === featBefore
+      // 2: fast jump onto an unseen cached symbol starts drawLineIn (reveal < 1).
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      var jumpSym = "POOL22-USD"
+      var jumpIdx = list.displayedSymbols.indexOf(jumpSym)
+      var jumpMinReveal = 1
+      list.contentY = list.clampY(jumpIdx * list.rowPitch)
+      var jumpRow = row(jumpSym)
+      if (jumpRow) jumpMinReveal = jumpRow.reveal
+      var fastDrewIn = !!jumpRow && jumpMinReveal < 1
+      rest()
+      // 3: live display() reorder keeps a visible row sliding instead of evicting it.
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      var slideSym = list.displayedSymbols[1]
+      var reordered = list.displayedSymbols.slice()
+      reordered.splice(1, 1)
+      reordered.push(slideSym)
+      list.display(reordered, true)
+      var slideRow = row(slideSym)
+      var keptSliding = !!slideRow && slideRow.moving
+      list.display(service.view.shown.slice(), false)
+      list.settleRows()
+      // 4: releaseDragInPlace keeps a lifted row scrolled past its slot pinned across a turn.
+      var dragSym = list.displayedSymbols[0]
+      list.beginDrag(dragSym, 10)
+      list.contentY = list.clampY(list.contentHeight)
+      list.reorder.moveTo(list.contentY + list.sightHeight - 10)
+      var heldAtY = row(dragSym) ? row(dragSym).y : -1
+      list.releaseDragInPlace()
+      waitForRendering(body)
+      var stayedPinned = !!row(dragSym) && Math.abs(row(dragSym).y - heldAtY) < 0.5
+      list.reopen()
+      harness.check("recycled pool blocks ghost clicks on scroll, draws in on fast scroll, keeps sliding rows and held close-drag rows pinned",
+        noGhostClick && fastDrewIn && keptSliding && stayedPinned,
+        JSON.stringify({ noGhostClick: noGhostClick, featBefore: featBefore, featAfter: service.featuredSymbol,
+          fastDrewIn: fastDrewIn, jumpMinReveal: jumpMinReveal, keptSliding: keptSliding, stayedPinned: stayedPinned }))
 
       app.close()
       harness.finish()
