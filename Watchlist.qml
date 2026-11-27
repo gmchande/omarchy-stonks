@@ -879,6 +879,11 @@ Flickable {
           when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
+        Binding on newestOld {
+          value: rowDelegate.inSight ? Figures.newestStale(rowDelegate.view ? rowDelegate.view.newest : null, root.now) : false
+          when: rowDelegate.inSight && !rowDelegate.folding
+          restoreMode: Binding.RestoreNone
+        }
         sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow

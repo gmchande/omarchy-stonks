@@ -244,6 +244,7 @@ Rectangle {
   readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
 
   readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
+  property bool newestOld: false
   property var freshness: null
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
@@ -445,7 +446,8 @@ Rectangle {
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
           text: row.view ? row.view.priceText : ""
-          color: row.look.foreground
+          // An old night's price dims, as on the hero (`Hero.newestOld`).
+          color: row.newestOld ? row.look.dim : row.look.foreground
           font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
         }
@@ -458,7 +460,7 @@ Rectangle {
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
           text: row.view ? Format.lookSigns(row.view.changeLine, row.look.retro) : ""
-          color: row.trend
+          color: row.newestOld ? row.look.dim : row.trend
           font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
           font.bold: true

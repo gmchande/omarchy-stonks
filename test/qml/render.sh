@@ -226,7 +226,7 @@ every_state() (
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
   # at 21:55, Nebius's day with tonight bright at its end and the close it
   # counts from named, at text size 16 too; J&J's thin night; Power
-  # solutions' finished day, edge to edge; bitcoin's two-day answer, its
+  # Solutions' finished day, edge to edge; bitcoin's two-day answer, its
   # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
   # and its night, dashed at Monday's close, Monday faint, the rows matching
   # the panel; Tuesday 03:50 and 04:05, the count carrying on; Monday 07:00, Friday with the night and the

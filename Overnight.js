@@ -516,8 +516,8 @@ function beside(quote, t) {
 // `stepped`: the trade joined the day that closed, tonight's or then the
 // pre-market's (`Day.dayChart`). Such trades belong to the day ahead, so
 // they count from the close just gone, with no open yet, and so does a
-// `joined`: tonight's, which the pill keeps the day's close beside
-// (`keepsDay`). `own`: the day drawn is Yahoo's quote's, whose open the
+// scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's,
+// which the pill keeps the day's close beside (`keepsDay`). `own`: the day
 // move may count from. `dayStart` names the day the move is of: the day
 // drawn, or the pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
