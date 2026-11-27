@@ -2,8 +2,8 @@
 # Boundaries in the production source that no flow can see: who may run a
 # command, read or write a file, or make a request, as the README's "What it
 # runs" says; that the rule files stay pure; that colours come from the
-# theme; that the bar entry holds only the pill's forms; and that no file
-# takes QtQuick's Sprite name.
+# theme; that every animation keeps the shell's timing; that the bar entry
+# holds only the pill's forms; and that no file takes QtQuick's Sprite name.
 # And three in the tests: a harness ends Quickshell only through
 # HarnessExit.qml, one that builds the whole plugin hands it a stand-in
 # for Hyprland, and GitHub's checks name only files a clone holds.
@@ -49,6 +49,12 @@ none() {
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml Field.qml FileRead.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
+# Every animation's length goes through the shell's timing (`Motion.duration`
+# or `Style.duration`), so nothing moves while Omarchy's animations are off.
+# The one length of its own is the replay the reader starts, which plays
+# as a press of play would (ChartMotion).
+only '\bduration:[ \t]*+(?!Motion\.duration\(|Style\.duration\()' ChartMotion.qml
+
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification; only the text field reads the clipboard, by its
 # bounded paste, and puts a selection in the primary selection; only the
