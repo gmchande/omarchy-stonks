@@ -55,11 +55,37 @@ function answerKind(status, exit) {
   return status === 200 ? "ok" : "bad"
 }
 
-// `now`, in seconds, turns a Retry-After given as a date into seconds. The
-// exit code is curl's, at most three digits: unbounded, a line that starts
-// like a mark and runs on in digits has the pattern try every split of
-// them, which holds the shell's thread for as long as the square of their
-// count.
+// Matches one curl `-w` line emitted by SplitParser (`\n`-split), including
+// any leading `\n`s SplitParser folds from adjacent blank lines. The exit code
+// is curl's, at most three digits: unbounded, a line starting like a mark and
+// running on in digits has the pattern try every split of them.
+var MARK_LINE = new RegExp("^(\\n*)" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d{1,3}) ?([^\\n]*)$")
+
+function parseMarkLine(line) {
+  var match = MARK_LINE.exec(line)
+  if (!match) return null
+  return {
+    leading: match[1].length,
+    index: Number(match[2]),
+    status: Number(match[3]),
+    exit: Number(match[4]),
+    retryHeader: match[5]
+  }
+}
+
+function makeAnswer(body, mark, now, end) {
+  var out = {
+    index: mark.index,
+    status: mark.status,
+    kind: answerKind(mark.status, mark.exit),
+    body: body,
+    retryAfter: retrySeconds(mark.retryHeader, now)
+  }
+  if (end !== undefined) out.end = end
+  return out
+}
+
+// `now`, in seconds, turns a Retry-After given as a date into seconds.
 function answers(text, from, now) {
   var out = []
   var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d{1,3}) ?([^\\n]*)\\n", "g")
@@ -67,17 +93,12 @@ function answers(text, from, now) {
   pattern.lastIndex = from
   var match
   while ((match = pattern.exec(text)) !== null) {
-    var status = Number(match[2])
-    var exit = Number(match[3])
-    var retryAfter = retrySeconds(match[4], now)
-    out.push({
+    out.push(makeAnswer(text.slice(from, match.index), {
       index: Number(match[1]),
-      status: status,
-      kind: answerKind(status, exit),
-      body: text.slice(from, match.index),
-      retryAfter: retryAfter,
-      end: pattern.lastIndex
-    })
+      status: Number(match[2]),
+      exit: Number(match[3]),
+      retryHeader: match[4]
+    }, now, pattern.lastIndex))
     from = pattern.lastIndex
   }
   return out

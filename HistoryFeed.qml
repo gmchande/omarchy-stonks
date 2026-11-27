@@ -1,6 +1,7 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "History.js" as History
+import "Market.js" as Market
 import "Quote.js" as Quote
 // History for the charts on show and those fetched ahead of a click.
 // Charts fetched ahead go as one curl run, so a slow network makes them
@@ -46,8 +47,16 @@ Item {
   // How many charts it holds, and those in use (`History.historiesKept`).
   readonly property int keep: 40
   property var inUse: []
+  property var quoteFor: null
+  property var calendars: null
+  // Non-reactive LRU counter: mutated in place on hits so reads fire no signals.
+  property var lru: ({ seq: 0, at: {} })
+  function touch(key) { lru.at[key] = ++lru.seq }
   function setEntries(values) {
-    root.entries = History.historiesKept(entries, values, inUse, keep)
+    for (var k in values) touch(k)
+    var next = History.historiesKept(entries, values, inUse, keep, lru.at)
+    for (var old in lru.at) if (!(old in next)) delete lru.at[old]
+    root.entries = next
   }
 
   // `force` is a user's refresh.
@@ -59,7 +68,11 @@ Item {
     }
     var key = keyFor(normalizedSymbol, range)
     if (wanted && !wanted.ahead && wanted.charts[0].key === key) return
-    if (!force && History.historyFresh(entries[key], root.stamp())) {
+    var now = root.stamp()
+    var quote = quoteFor ? quoteFor(normalizedSymbol) : null
+    var trading = !!quote && (quote.crypto || Market.inRegularSession(quote, now, calendars))
+    if (!force && History.historyFresh(entries[key], now, quote, range, trading)) {
+      touch(key)
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
     }
@@ -147,7 +160,9 @@ Item {
 
   function parse(answer, range) {
     if (!answer || answer.kind !== "ok") return null
-    try { return History.parseHistory(JSON.parse(answer.body), range, root.centExchanges) } catch (e) { return null }
+    var body = answer.body
+    answer.body = null
+    try { return History.parseHistory(JSON.parse(body), range, root.centExchanges) } catch (e) { return null }
   }
 
   // Answers are read about 8 ms a turn, a two-year chart's in under 1 ms,

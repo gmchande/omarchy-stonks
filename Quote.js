@@ -64,9 +64,10 @@ function sparkResults(json) {
 // Spark has no opens, so the stray filter can't judge it: the last chart
 // answer's verdict stands in for its strays and its open. `unjudged` when
 // spark shows what that verdict didn't see: a jump past its settled bars once
-// a new bar is whole, a bar changed or filled in, or the session opened since.
+// a new bar is whole, a bar changed or filled in, an IPO's first-day offer
+// bars, or (when `needOpen` isn't false) the session opened since.
 // Only a chart answer can say whether that is a stray, or what the open was.
-function sparkQuote(day, verdict, centExchanges, receivedAt, nightOf) {
+function sparkQuote(day, verdict, centExchanges, receivedAt, nightOf, needOpen) {
   var quote = parseChart({ chart: { result: [day] } }, centExchanges, receivedAt, nightOf)
   if (!quote) return null
   var pts = quote.points
@@ -79,9 +80,10 @@ function sparkQuote(day, verdict, centExchanges, receivedAt, nightOf) {
     while (k < verdict.times.length && verdict.times[k] < pts[j].t) k++
     unjudged = verdict.times[k] !== pts[j].t || !sameClose(pts[j].p, verdict.closes[k])
   }
+  if (day.meta && day.meta.firstTradeDate === null && !quote.untraded && !verdict) unjudged = true
   if (quote.openSession !== null) {
     if (verdict && verdict.openSession === quote.openSession) quote.dayOpen = verdict.open
-    else unjudged = true
+    else if (needOpen !== false) unjudged = true
   }
   var dropped = verdict ? verdict.dropped : []
   quote.points = pts.filter(function(p) { return dropped.indexOf(p.t) < 0 })
@@ -497,15 +499,20 @@ function nextDayHasBegun(index, next, regular, current, receivedAt) {
 // For a later spark answer (`sparkQuote`), which leaves out the bars this
 // answer did: its strays and a new listing's bars before its first shares
 // (`offered`). Null without opens, when the filter judged nothing. A stray
-// run reaches at most MIXED_RUN bars on, so no later bar can change the
-// verdict before that. The newest bar is the live moment.
+// run reaches at most MIXED_RUN bars on and never crosses a bar with shares
+// traded (`traded`), so no later bar can change the verdict at or before
+// either boundary. The newest bar is the live moment.
 function chartVerdict(bars, opens, filtered, offered, firstRegular, regular) {
   if (!opens.length) return null
   var whole = bars.slice(0, Math.max(0, bars.length - 1))
-  var settled = bars.slice(0, Math.max(0, bars.length - MIXED_RUN))
+  var floor = Math.max(0, bars.length - MIXED_RUN)
+  var settledIndex = floor - 1
+  for (var i = whole.length - 1; i >= floor; i--) {
+    if (traded(whole[i])) { settledIndex = i; break }
+  }
   return {
     newest: whole.length ? whole[whole.length - 1].t : 0,
-    settled: settled.length ? settled[settled.length - 1].t : 0,
+    settled: settledIndex >= 0 ? whole[settledIndex].t : 0,
     times: whole.map(function(b) { return b.t }),
     closes: whole.map(function(b) { return b.c }),
     dropped: offered.concat(filtered.droppedTimes),

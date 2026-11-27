@@ -157,6 +157,46 @@ test("across every saved intraday response the filter drops only those eleven ba
   const toy = M.parseChart(fixture("moments/live-2026-10-05/toy.json"))
   expect(toy.points.filter(p => p.t >= 1790946900 && p.t <= 1790947800).map(p => p.t))
     .toEqual([1790946900, 1790947200, 1790947800])
+  // Progressive bar-by-bar replay across every saved intraday response with
+  // `needOpen = false` and traded-bar `settled`: every stray bar is still
+  // caught identically to full-day `parseChart`.
+  const allDays = days.concat([["moments/live-2026-10-05/toy.json", [1790971500, 1790971800]]])
+  for (const [name, expected] of allDays) {
+    const json = fixture(name)
+    const full = json.chart.result[0]
+    const ts = full.timestamp || []
+    const q = (full.indicators && full.indicators.quote && full.indicators.quote[0]) || {}
+    let verdict = null
+    let lastQuote = null
+    for (let n = 2; n <= ts.length; n++) {
+      const slice = {
+        meta: full.meta,
+        timestamp: ts.slice(0, n),
+        indicators: { quote: [{ close: (q.close || []).slice(0, n) }] }
+      }
+      const sparked = M.sparkQuote(slice, verdict, cents, undefined, undefined, false)
+      lastQuote = sparked.quote
+      if (sparked.unjudged) {
+        const chartSlice = {
+          chart: { result: [{
+            meta: full.meta,
+            timestamp: ts.slice(0, n),
+            indicators: { quote: [{
+              close: (q.close || []).slice(0, n),
+              open: (q.open || []).slice(0, n),
+              volume: q.volume ? q.volume.slice(0, n) : undefined,
+              high: q.high ? q.high.slice(0, n) : undefined,
+              low: q.low ? q.low.slice(0, n) : undefined
+            }] }
+          }] }
+        }
+        const judged = M.parseChart(chartSlice, cents)
+        verdict = judged.verdict
+        lastQuote = judged
+      }
+    }
+    expect([name, lastQuote.droppedTimes]).toEqual([name, expected])
+  }
 })
 
 test("a bar with shares traded in it is a trade, never stray", () => {
@@ -217,8 +257,11 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   const friday = { t: M.epochAt(US, "2026-11-20", "04:05"), p: 102, phase: "pre", base: M.regularClose(evening), stepped: true }
   expect(note(evening, "pct", friday)).toBe("")
   // A row's spark answer sends no shares: the chart answer's verdict leaves
-  // the IPO price's bar out of its line too.
-  const spark = M.sparkQuote(M.sparkResults(ipo("1152", "spark")).ANT, after.verdict, cents)
+  // the IPO price's bar out of its line too, and an unjudged IPO spark still
+  // requests a chart even with `needOpen` off.
+  const antSpark = M.sparkResults(ipo("1152", "spark")).ANT
+  expect(M.sparkQuote(antSpark, null, cents, undefined, undefined, false).unjudged).toBe(true)
+  const spark = M.sparkQuote(antSpark, after.verdict, cents)
   expect([spark.quote.points.length > 0, spark.quote.points.some(p => p.p === 83)]).toEqual([true, false])
   // A day that isn't its listing day names its close as any listing's.
   expect(lines(listed("1152", "2026-11-18"), "11:52").close.label).toBe("WED CLOSE")

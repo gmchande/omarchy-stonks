@@ -36,21 +36,41 @@ function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
 
-function historyFresh(entry, now) {
-  return !!entry && entry.status === "ok" && !!entry.receivedAt && now - entry.receivedAt < HISTORY_FRESH
+// A range holds regular hours only. Fresh within HISTORY_FRESH, or outside a
+// regular session once answered at least HISTORY_FRESH after the last regular
+// close (so Yahoo's official closing print has settled).
+function historyFresh(entry, now, quote, range, trading) {
+  if (!entry || entry.status !== "ok" || !entry.receivedAt) return false
+  if (now - entry.receivedAt < HISTORY_FRESH) return true
+  if (!quote || !range || !HISTORY_RANGES[range] || trading) return false
+  var regular = quote.session && quote.session.regular
+  return !!regular && entry.receivedAt >= regular.end + HISTORY_FRESH && now >= regular.end + HISTORY_FRESH
 }
 
-// The charts held once `values` land, by key: at most `keep`, the oldest
-// going first, but never one in use (on show, or a row's fetched ahead):
-// pushed out, it would be asked for again at once, and push out the next.
-function historiesKept(entries, values, inUse, keep) {
+// The charts held once `values` land, by key: at most `keep`, the least
+// recently used (when `usedAt` is given) or oldest going first, never one in
+// use (on show, or a row's fetched ahead): pushed out, it would be asked for
+// again at once, and push out the next.
+function historiesKept(entries, values, inUse, keep, usedAt) {
   var keys = Object.keys(values)
   var next = {}
   var others = Object.keys(entries).filter(function(k) { return keys.indexOf(k) < 0 })
   var over = others.length - (keep - keys.length)
+  var drop = null
+  if (over > 0 && usedAt) {
+    var evictable = others.filter(function(k) { return inUse.indexOf(k) < 0 })
+    evictable.sort(function(a, b) { return (usedAt[a] || 0) - (usedAt[b] || 0) })
+    drop = {}
+    for (var i = 0; i < Math.min(over, evictable.length); i++) drop[evictable[i]] = true
+  }
   others.forEach(function(k) {
-    if (over > 0 && inUse.indexOf(k) < 0) over--
-    else next[k] = entries[k]
+    if (drop) {
+      if (!drop[k]) next[k] = entries[k]
+    } else if (over > 0 && inUse.indexOf(k) < 0) {
+      over--
+    } else {
+      next[k] = entries[k]
+    }
   })
   keys.forEach(function(k) { next[k] = Object.assign({ history: null, receivedAt: 0 }, entries[k], values[k]) })
   return next

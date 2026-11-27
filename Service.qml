@@ -546,6 +546,7 @@ Item {
     centExchanges: root.centExchanges
     calendars: root.calendars
     listDates: listDateFeed.entries
+    needOpen: root.changeMode === "open"
   }
   readonly property var quotes: feed.quotes
   readonly property var entries: feed.entries
@@ -562,6 +563,8 @@ Item {
     clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
+    quoteFor: function(s) { return feed.quotes[s] || previewFeed.quotes[s] || null }
+    calendars: root.calendars
     holding: root.drawing.length > 0
     onEntriesChanged: {
       var next = Asks.nextHistory(root.historyCharts(), root.view.range, historyFeed.entries, root.historyOwed)
@@ -919,7 +922,7 @@ Item {
       if (dropped) cache.entries = next
     }
     prune(fundamentalsFeed, function() { return false })
-    prune(listDateFeed, function(entry) { return !Overnight.listDateDue(entry, now) })
+    prune(listDateFeed, function(entry) { return !!entry.at && now - entry.at < Overnight.LIST_DATE_INTERVAL })
     prune(overnightFeed, function(entry) { return !!entry.at && now - entry.at < Overnight.OVERNIGHT_INTERVAL })
     prune(lastTradeFeed, function(entry) { return now - entry.at < root.refreshIntervalSec })
   }
@@ -1015,7 +1018,13 @@ Item {
     if (next.length === 0 && root.sights.length === 0) return
     root.sights = next
     root.askOvernight()
-    root.fetchAhead()
+    if (next.length > 0) aheadDebounce.restart()
+    else aheadDebounce.stop()
+  }
+  Timer {
+    id: aheadDebounce
+    interval: 150
+    onTriggered: root.fetchAhead()
   }
   function rowsInSight() {
     var rows = []
@@ -1034,6 +1043,7 @@ Item {
 
   // What a run leaves goes when the feed is idle again, or on the clock.
   function fetchAhead() {
+    aheadDebounce.stop()
     if (!root.ready || historyFeed.busy || root.screensOff || !yahooGate.spare()) return
     var range = root.view.range
     var charts = Asks.aheadCharts(root.aheadRows(), range, historyFeed.entries, root.aheadMissed)

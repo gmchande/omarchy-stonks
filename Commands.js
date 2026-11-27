@@ -17,8 +17,9 @@ function bounded(seconds, argv) {
     "read -r _ _ _ parent group _ < /proc/$$/stat && [ \"$parent\" = \"$group\" ] || exit 125\n"
     + "trap 'kill -KILL 0' USR1\n"
     + "exec 3<&0\n"
-    + "\"$@\" <&3 3<&- &\n"
-    + "wait $!", "sh"].concat(argv)
+    + (argv[0] === "sh" && argv[1] === "-c" ? "(\n" + argv[2] + "\n) <&3 3<&- &\n" : "\"$@\" <&3 3<&- &\n")
+    + "wait $!", argv[0] === "sh" && argv[1] === "-c" ? (argv[3] || "sh") : "sh"]
+    .concat(argv[0] === "sh" && argv[1] === "-c" ? argv.slice(4) : argv)
 }
 
 // The camera's: the editor, then the file, printed once its folder can take

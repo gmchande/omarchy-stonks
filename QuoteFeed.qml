@@ -254,6 +254,20 @@ Item {
     ;(first ? firstFetch : refreshFetch).send(urls, spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
   }
 
+  // Non-charted rows need `dayOpen` only while the list shows moves since
+  // the open (`changeMode === "open"`). Charted stocks always fetch a chart.
+  property bool needOpen: true
+  onNeedOpenChanged: {
+    if (!needOpen) return
+    var missing = symbols.filter(function(s) {
+      var q = quotes[s]
+      return !!q && q.closesOnly && q.openSession !== null && q.dayOpen === null && toJudge.indexOf(s) < 0
+    })
+    if (missing.length > 0) {
+      root.toJudge = toJudge.concat(missing)
+      sendWaiting()
+    }
+  }
   // Symbols whose spark day holds a jump no chart verdict speaks for.
   property var toJudge: []
 
@@ -334,7 +348,7 @@ Item {
     var outcome = null
     try {
       outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
-        : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp(), root.nightOf)
+        : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp(), root.nightOf, root.needOpen)
     } catch (e) { outcome = null }
     answer.outcomes[symbol] = outcome
     if (answer.done < request.symbols.length) return false
