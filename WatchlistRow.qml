@@ -4,10 +4,10 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Chart.js" as Chart
+import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Motion.js" as Motion
-import "Tones.js" as Tones
 // A row, set as Apple's Stocks sets one: symbol over name, price over
 // change, the day line between.
 Rectangle {
@@ -241,14 +241,7 @@ Rectangle {
   // minutes that slide its start, never with each second, the change mode,
   // or another symbol's quote.
   property var day: null
-  // Whether the row keeps the day's move (`Overnight.keepsDay`), so its line
-  // draws tonight faint.
-  property bool keepsDay: false
-  readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars, keepsDay) : null
-  // The line's grey, as the name's dim reads on the row's own ground, the
-  // selected row's fill too. A line with no grey keeps one colour, so a hover
-  // repaints none.
-  readonly property color lineGrey: geometry && geometry.aside ? Tones.dim(look.foreground, Qt.tint(look.ground, fill)) : look.dim
+  readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
 
   readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
   property var freshness: null
@@ -256,9 +249,12 @@ Rectangle {
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
   readonly property bool warns: Freshness.freshnessWarns(shownFreshness)
   readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
+  readonly property string rowNote: Figures.rowNote(view)
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : (view ? view.name : ""))
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
+  readonly property string detailTag: quote && freshnessNote === "" && rowNote !== ""
+    ? (detail !== "" ? " · " : "") + rowNote : ""
 
   readonly property int sparkWidth: Style.space(72)
   readonly property int priceWidth: Style.space(96)
@@ -313,7 +309,6 @@ Rectangle {
       downColor: row.look.downColor
       lineColor: row.look.dim
       baselineColor: row.look.dimmer
-      greyColor: row.lineGrey
       cursorX: row.scrubX
       reveal: row.reveal
     }
@@ -328,8 +323,6 @@ Rectangle {
       upColor: row.look.upColor
       downColor: row.look.downColor
       baselineColor: row.look.dimmer
-      greyAside: true
-      greyColor: row.lineGrey
       hairlineColor: row.look.foreground
       ground: Qt.tint(row.look.ground, row.fill)
       pixel: 2
@@ -359,14 +352,31 @@ Rectangle {
           font.bold: true
         }
 
+        TextMetrics {
+          id: tagMetrics
+          font: detailText.font
+          text: row.detailTag
+        }
+
+        TextMetrics {
+          id: nameMetrics
+          font: detailText.font
+          text: row.detailTag !== "" ? row.detail : ""
+          elide: Text.ElideRight
+          elideWidth: Math.max(0, detailText.width - Math.ceil(tagMetrics.advanceWidth))
+        }
+
         Text {
+          id: detailText
           visible: y >= row.menuCovers
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
           width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
           textFormat: Text.PlainText
-          text: row.detail
+          // The name gives way to Overnight, so Overnight stays whole.
+          text: row.detailTag === "" ? row.detail
+            : (row.detail === "" ? "" : nameMetrics.elidedText.replace(/ (\u2026|\.\.\.)$/, "$1")) + row.detailTag
           color: row.warns ? row.look.foreground : row.look.dim
           font.family: row.look.fontFamily
           font.pixelSize: Style.font.bodySmall

@@ -656,7 +656,7 @@ test("a spark day takes its open from the chart of the same session, and waits f
   expect(M.sparkQuote(volDay([100, 102, 102.1, 102.2], false), tradedVerdict, [], undefined, undefined, false).unjudged).toBe(false)
 })
 
-test("a price Yahoo stamps in a US stock's night is set aside as its answer is read, so the night stays Robinhood's and the rows keep the day", () => {
+test("a price Yahoo stamps in a US stock's night is set aside as its answer is read, so the night stays Robinhood's and the pill keeps the day", () => {
   // Yahoo sends none today; from 6 December 2026 its answers may. Monday
   // 30 November: a pre-market from 04:00, a session, an after hours whose
   // last bar, 19:55's, the night's first opens back from, then the night's
@@ -687,8 +687,8 @@ test("a price Yahoo stamps in a US stock's night is set aside as its answer is r
   const robinhood = [{ t: mon("20:00"), p: 100.1, s: "overnight" }, { t: mon("20:05"), p: 100.3, s: "overnight" }]
   const { day: drawn, latest } = M.dayChart(evening, { bars: robinhood, through: mon("20:05") }, calendars, mon("21:05"))
   expect(drawn.points.filter(p => p.t >= mon("19:55")).map(p => [p.t, p.p, p.s])).toEqual([[mon("19:55"), 101, "post"]].concat(robinhood.map(b => [b.t, b.p, b.s])))
-  // The newest price is Robinhood's night trade, so the rows and the pill
-  // keep Monday's close and move until 04:00.
+  // The newest price is Robinhood's night trade, so the pill keeps Monday's
+  // close and move until 04:00.
   const newest = M.newestTrade(evening, latest, calendars, drawn)
   expect([newest.p, newest.phase, M.keepsDay(newest)]).toEqual([100.3, "overnight", true])
   // The rows' spark answer reads the same.

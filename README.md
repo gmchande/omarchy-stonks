@@ -144,12 +144,11 @@ right at it.
 Stonks shows a US stock's night once Robinhood's prices hold a trade of it
 from 20:00 to 04:00, tonight or the night before. For such a stock, once
 tonight has traded, the chart brightens the session trading now, such as
-tonight or the pre-market. The rows, like the pill, keep the day's close
-and move until the pre-market's first prices arrive, soon after 04:00.
-Their line draws tonight thinner and fainter in the same green and red, or
-in retro as grey columns. Where Yahoo has no prices for half an hour or
-more of the pre-market or after hours, the chart draws Robinhood's trades
-there, never in place of Yahoo's.
+tonight or the pre-market. Each row shows the same price, move and chart in
+small, with "Overnight" after its name while the list's header keeps naming
+the day. Where Yahoo has no prices for half an hour or more of the
+pre-market or after hours, the chart draws Robinhood's trades there, never
+in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
 while its market trades, or saved from before and not yet refreshed.

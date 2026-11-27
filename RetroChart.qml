@@ -28,10 +28,9 @@ Item {
   // What the number beside the chart doesn't count (`geometry.aside`) stands
   // on the dashed line too, at a fainter share than the dim hours', and with
   // every other cell of its stems: fainter alone, it runs into tonight's dim
-  // hours on a dark ground. With `greyAside`, as on a row, whose counted day
-  // is already dim, it takes `greyColor`, a step stronger than the
-  // baseline's ink, its caps whole: at a fainter share they'd read as the
-  // baseline's.
+  // hours on a dark ground. With `greyAside`, as on the pill, it takes
+  // `greyColor`, a step stronger than the baseline's ink, its caps whole: at
+  // a fainter share they'd read as the baseline's.
   property bool greyAside: false
   property color greyColor: Tones.dim(Commons.Color.foreground, ground)
   readonly property real asideShare: greyAside ? 0.45 : 0.4

@@ -516,10 +516,10 @@ function beside(quote, t) {
 // `stepped`: the trade joined the day that closed, tonight's or then the
 // pre-market's (`Day.dayChart`). Such trades belong to the day ahead, so
 // they count from the close just gone, with no open yet, and so does a
-// scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's,
-// which the rows keep the day's close beside (`keepsDay`). `own`: the day
-// drawn is Yahoo's quote's, whose open the move may count from. `dayStart`
-// names the day the move is of: the day drawn, or the pre-market's own.
+// `joined`: tonight's, which the pill keeps the day's close beside
+// (`keepsDay`). `own`: the day drawn is Yahoo's quote's, whose open the
+// move may count from. `dayStart` names the day the move is of: the day
+// drawn, or the pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
   var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
   if (!trade) return null
@@ -531,16 +531,16 @@ function newestTrade(quote, latest, calendars, day) {
     dayStart: stepped && !joined ? trade.t : day.session.regular.start }
 }
 
-// The newest trade as the rows and the pill read it at rest: none while
-// they keep the day (`keepsDay`). The panel's price on top is tonight's.
+// The newest trade as the pill reads it at rest: none while it keeps the
+// day (`keepsDay`). The panel and the rows show tonight's.
 function restingNewest(newest) {
   return keepsDay(newest) ? null : newest
 }
 
-// Whether the rows and the pill keep the day's close and move: once tonight
-// has traded, until the pre-market's first prices arrive, soon after 04:00,
-// though the 1D chart keeps the day until the open. Their line then draws
-// tonight faint (`Chart.chartGeometry`).
+// Whether the pill keeps the day's close and move: once tonight has traded,
+// until the pre-market's first prices arrive, soon after 04:00, though the
+// 1D chart keeps the day until the open. Its line then draws tonight grey
+// (`Chart.chartGeometry`).
 function keepsDay(newest) {
   return !!newest && !!newest.joined
 }

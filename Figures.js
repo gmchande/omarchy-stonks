@@ -165,9 +165,9 @@ function dayTitles() {
 // exchange's midnight.
 // Only US stocks and ETFs, which trade at night, share one day here;
 // listings abroad and coins name their own on their rows. A row with no
-// time names no day: its freshness says so. Tonight's trades name the day
-// they joined, which the rows keep until 04:00 (`listRow`). Null where no
-// row names a day or two name different ones.
+// time names no day: its freshness says so. A row whose move is tonight's
+// says so itself (`rowNote`), so the header keeps naming the day. Null
+// where no row names a day or two name different ones.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
   var shared = null
   for (var i = 0; i < symbols.length; i++) {
@@ -233,7 +233,7 @@ function listBreadth(symbols, quotes, lines, scrubT, mode, newest) {
     var quote = quotes[symbols[i]]
     var line = lines ? scrubbedLine(lines[symbols[i]] || null, scrubT) : null
     var trade = newest ? newest[symbols[i]] || null : null
-    var read = !quote ? null : line ? reading(line, scrubT, trade) : reading(quote, 0, Overnight.restingNewest(trade))
+    var read = !quote ? null : line ? reading(line, scrubT, trade) : reading(quote, 0, trade)
     var chg = read ? Quote.change(read.base, read.price, mode, quote.priceDigits) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
@@ -241,15 +241,26 @@ function listBreadth(symbols, quotes, lines, scrubT, mode, newest) {
   return out
 }
 
-// A row, and the pill, which shows its row: at rest, once tonight has
-// traded, the day's close and move until 04:00, as the panel's line under
-// the price says them (`closeLine`), while the panel's price on top is
-// tonight's. Scrubbed at `scrubT`, a row reads its own line, `line`, the
-// day it draws (`Chart.lineDay`), as the panel reads the stock's chart
-// (`scrubbedLine`).
+// A row, matching what the panel shows on 1D: at rest its newest trade,
+// overnight included; scrubbed at `scrubT`, its own line (`Chart.lineDay`),
+// once it has a trade at or before `scrubT` (`scrubbedLine`).
 function listRow(quote, mode, newest, line, scrubT) {
   var scrubbed = scrubbedLine(line, scrubT)
-  return scrubbed ? rowModel(scrubbed, scrubT, mode, newest) : rowModel(quote, 0, mode, Overnight.restingNewest(newest))
+  return scrubbed ? rowModel(scrubbed, scrubT, mode, newest) : rowModel(quote, 0, mode, newest)
+}
+
+// The pill: at night it keeps the day's close and move until the pre-market's
+// first prices arrive, soon after 04:00 (`Overnight.restingNewest`), with
+// tonight's move in its hover (`pillNote`).
+function pillRow(quote, mode, newest) {
+  return rowModel(quote, 0, mode, Overnight.restingNewest(newest))
+}
+
+// A row's note after its name: "Overnight" while its move is tonight's,
+// counted from the close just gone, since the list's header keeps naming
+// the day (`rowsSharedDay`).
+function rowNote(view) {
+  return view && view.newest && view.newest.joined && view.newest.closed ? Market.phaseLabel("overnight") : ""
 }
 
 // The line a row reads a scrub at `t` from: its own, once it has a trade at
@@ -483,7 +494,7 @@ function moveAwaited(quote, view) {
 
 // The pill's hover on a listing's first day: before its first trade, that
 // there is none yet, with the IPO price the pill shows; after it, the IPO
-// price, while the pill's move (`row`, `listRow`) counts from it: not since
+// price, while the pill's move (`row`, `pillRow`) counts from it: not since
 // the open, nor from the close just gone once the next day's pre-market
 // trades.
 function listingNote(quote, row, mode) {
@@ -494,7 +505,7 @@ function listingNote(quote, row, mode) {
 }
 
 // The pill's hover past its symbol and move: only what the pill can't
-// show. While it keeps the day (`listRow`), tonight's move, "tonight
+// show. While it keeps the day (`pillRow`), tonight's move, "tonight
 // −3.54%", and nothing since the open, which tonight has no open to count
 // from. Else the session of a price from outside the regular one, "after
 // hours", unless a warning names it. Either ends "as of 23:12" once its
@@ -522,7 +533,7 @@ function newestStale(newest, now) {
   return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
 }
 
-// The header reads the panel's move, the pill its row's (`listRow`), so at
+// The header reads the panel's move, the pill its own (`pillRow`), so at
 // night the two can differ.
 function animalKind(row) {
   return !row || row.dayTone === "flat" ? "" : row.dayTone === "up" ? "bull" : "bear"

@@ -14,7 +14,8 @@ import "Release.js" as Release
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The pill: the stock you last looked at, with its day's line and change
-// whatever range the panel or the window shows, as its row shows them.
+// whatever range the panel or the window shows. At night it keeps the
+// closed day until 04:00, with tonight's move in its hover.
 BarWidget {
   id: root
   // `moduleName` is the bar entry's id, which the bar sets: the plugin's
@@ -31,10 +32,10 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
-  // As its row shows it (`Figures.listRow`): at night the day's close and
-  // move until the new day's first prices arrive, soon after 04:00.
+  // At night the pill keeps the day's close and move until the new day's
+  // first prices arrive, soon after 04:00 (`Figures.pillRow`).
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
-  readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, service.changeMode, newest) : null
+  readonly property var featured: featuredQuote ? Figures.pillRow(featuredQuote, service.changeMode, newest) : null
   // What the pill has no room for: at night tonight's move, else a price's
   // session outside the regular one, and the time of a late price.
   readonly property string pillNote: featuredQuote && freshness

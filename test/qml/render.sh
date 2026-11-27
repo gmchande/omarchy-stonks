@@ -226,11 +226,10 @@ every_state() (
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
   # at 21:55, Nebius's day with tonight bright at its end and the close it
   # counts from named, at text size 16 too; J&J's thin night; Power
-  # Solutions' finished day, edge to edge; bitcoin's two-day answer, its
+  # solutions' finished day, edge to edge; bitcoin's two-day answer, its
   # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
-  # and its night, dashed at Monday's close, Monday faint, the rows keeping
-  # Monday's move and drawing tonight faint; Tuesday 03:50 and 04:05, the
-  # count carrying on; Monday 07:00, Friday with the night and the
+  # and its night, dashed at Monday's close, Monday faint, the rows matching
+  # the panel; Tuesday 03:50 and 04:05, the count carrying on; Monday 07:00, Friday with the night and the
   # pre-market joined, the pre-market bright; and at noon Monday's move as
   # an amount, its currency named. The faint day on the faintest light
   # theme and on Catppuccin Latte, the selected row's too, and at 04:05

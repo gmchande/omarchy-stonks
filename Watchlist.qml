@@ -7,7 +7,6 @@ import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
-import "Overnight.js" as Overnight
 import "Settings.js" as Settings
 import "Rows.js" as Rows
 import "Motion.js" as Motion
@@ -233,7 +232,7 @@ Flickable {
     var q = quote !== undefined ? quote : (quotes[symbol] || null)
     var nt = newestTrade !== undefined ? newestTrade : (newestTrades[symbol] || null)
     return Freshness.freshness(entryOf(symbol), q, now, owed[symbol] || 0, !!asking[symbol],
-      Overnight.restingNewest(nt), !!nightFailed[symbol])
+      nt, !!nightFailed[symbol])
   }
 
   function moveCursor(delta) {
@@ -857,7 +856,6 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         readonly property var newestTrade: sightNewestTrade
-        keepsDay: Overnight.keepsDay(newestTrade)
         // Only rows in sight follow the scrub, or each step repaints every
         // row; each reads its own line, where its dot sits. At rest a new
         // line, as a refresh brings, leaves the figures be.
