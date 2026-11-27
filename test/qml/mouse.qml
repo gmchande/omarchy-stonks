@@ -136,7 +136,7 @@ Harness {
       list.takeOver()
       list.contentY = Math.max(0, list.contentHeight - list.sightHeight)
       rest()
-      var offScreen = !row(rows[0]).inSight
+      var offScreen = !row(rows[0]) || !row(rows[0]).inSight
       var farPeak = 0
       var trackFar = function() { farPeak = Math.max(farPeak, Math.abs(list.highlightShift)) }
       list.highlightShiftChanged.connect(trackFar)
@@ -684,17 +684,27 @@ Harness {
       })[0]
       var repeatReplayed = false
       var repeatRow = repeatTarget ? row(repeatTarget) : null
-      var watchRepeatReveal = function() { if (repeatRow && repeatRow.reveal < 1) repeatReplayed = true }
       if (repeatRow) {
         service.createList("OtherTmp")
         service.setMembership(body.watchlist.displayedSymbols[body.watchlist.displayedSymbols.length - 1], "OtherTmp", true)
         service.switchList("OtherTmp")
         within(1500, function() { return service.listName === "OtherTmp" })
-        repeatRow.revealChanged.connect(watchRepeatReveal)
+        var watchedRows = []
+        var allNow = body.watchlist.rowItems()
+        for (var rs in allNow) {
+          var item = allNow[rs]
+          var watchFn = (function(it) { return function() { if (it.symbol === repeatTarget && it.reveal < 1) repeatReplayed = true } })(item)
+          item.revealChanged.connect(watchFn)
+          watchedRows.push([item, watchFn])
+        }
         service.switchList("")
-        within(1500, function() { return service.listName === "" && repeatRow.inSight })
+        within(1500, function() {
+          var back = row(repeatTarget)
+          return service.listName === "" && !!back && back.inSight
+        })
         waitForRendering(body)
-        repeatRow.revealChanged.disconnect(watchRepeatReveal)
+        watchedRows.forEach(function(pair) { pair[0].revealChanged.disconnect(pair[1]) })
+        repeatRow = row(repeatTarget)
         service.deleteList("OtherTmp")
         rest()
       }

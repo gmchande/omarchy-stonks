@@ -97,6 +97,42 @@ function syncModel(model, role, keys) {
   }
 }
 
+// Sticky assignment of `wanted` symbols to recycled pool slots (`current`).
+// Symbols already in a slot that remain wanted or `pinned` (lifted/folding)
+// keep their exact slot; newly wanted symbols take freed slots before growing.
+function assignPool(current, wanted, pinned) {
+  var wantSet = {}
+  for (var w = 0; w < wanted.length; w++) wantSet[wanted[w]] = true
+  var next = new Array(current.length)
+  var placed = {}
+  var free = []
+  for (var i = 0; i < current.length; i++) {
+    var s = current[i]
+    if (s !== "" && (wantSet[s] === true || (pinned && pinned[s] === true))) {
+      next[i] = s
+      placed[s] = true
+    } else {
+      next[i] = ""
+      free.push(i)
+    }
+  }
+  var fi = 0
+  for (var k = 0; k < wanted.length; k++) {
+    var sym = wanted[k]
+    if (placed[sym] === true) continue
+    placed[sym] = true
+    if (fi < free.length) next[free[fi++]] = sym
+    else next.push(sym)
+  }
+  var changed = next.length !== current.length
+  if (!changed) {
+    for (var c = 0; c < next.length; c++) {
+      if (next[c] !== current[c]) { changed = true; break }
+    }
+  }
+  return { slots: next, grew: next.length - current.length, changed: changed }
+}
+
 // ---- Sight
 //
 // A list's rows by `row`, { pitch, height }: row i runs from i * pitch, for

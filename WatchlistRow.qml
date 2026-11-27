@@ -13,7 +13,10 @@ import "Motion.js" as Motion
 Rectangle {
   id: row
 
-  required property string symbol
+  property string symbol: ""
+  property bool rebinding: false
+  property bool lineSeen: false
+  signal lineDrawn(string drawnSymbol)
   property var quote: null
   property var view: null
   property string status: "loading"
@@ -55,6 +58,10 @@ Rectangle {
   property bool sorting: false
   property int slideMs: 160
   onPlaceChanged: {
+    if (rebinding) {
+      lastPlace = place
+      return
+    }
     var from = lastPlace
     lastPlace = place
     if (folding && place < 0) return
@@ -155,6 +162,7 @@ Rectangle {
   // in, or once it's in view (`inView`), where a long list works out a row's
   // day only as it comes into sight. A newer day on a line already drawn
   // shows at once, and so does a line that arrives out of view.
+  property bool inSight: false
   property bool inView: false
   property bool hadLine: false
   function join() {
@@ -195,10 +203,41 @@ Rectangle {
     reveal = 0
     drawIn.restart()
   }
+  function beginRebind() {
+    rebinding = true
+    endFold()
+    slide.stop()
+    shift = 0
+    travel = 0
+    fadeIn.stop()
+    sortFade.stop()
+    opacity = 1
+    drawIn.stop()
+    reveal = 1
+    removeFade.stop()
+  }
+  function finishRebind(nextSymbol, nextPlace, seenLine) {
+    lastPlace = nextPlace
+    lineSeen = !!seenLine
+    hadLine = !!seenLine
+    symbol = nextSymbol
+    hadLine = !!geometry
+    if (hadLine && inView && symbol !== "") {
+      lineSeen = true
+      lineDrawn(symbol)
+    }
+    removeShown = removable ? 1 : 0
+    rebinding = false
+  }
   onGeometryChanged: {
+    if (rebinding) return
     var arrived = !!geometry && !hadLine
     hadLine = !!geometry
-    if (arrived && (inView || (fadeIn.running && !fadeIn.paused))) drawLineIn()
+    if (arrived && !lineSeen && (inView || (fadeIn.running && !fadeIn.paused))) drawLineIn()
+    if (!!geometry && inView && symbol !== "") {
+      lineSeen = true
+      lineDrawn(symbol)
+    }
   }
   // Holds the row on screen while the scroll moves `distance`, then slides
   // it home.
@@ -280,8 +319,9 @@ Rectangle {
   border.color: lifted ? Style.normalBorderFor(look.foreground, Commons.Color.accent)
     : Style.hoverBorderFor(look.foreground, Commons.Color.accent)
 
-  // The shell's hover speed (CursorSurface).
-  Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
+  // The shell's hover speed (CursorSurface); disabled while recycling a slot
+  // so a reused row never flashes the previous symbol's fill.
+  Behavior on color { enabled: !row.rebinding; ColorAnimation { duration: Motion.duration(Style, 60) } }
 
   Rectangle {
     z: -1
@@ -489,6 +529,15 @@ Rectangle {
           // Only a release on the button with no drag between removes: Qt
           // acts on a double-click's second press at mouse-down.
           property bool pressedOnRemove: false
+          Connections {
+            target: row
+            function onRebindingChanged() {
+              if (!row.rebinding) return
+              mouse.pressY = -1
+              mouse.dragged = false
+              mouse.pressedOnRemove = false
+            }
+          }
 
           function onRemove(x, y) {
             return row.removable && symbolText.visible && x >= removeButton.x && x < removeButton.x + removeButton.width
