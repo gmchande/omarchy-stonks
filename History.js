@@ -37,13 +37,14 @@ function historyKey(symbol, range) {
 }
 
 // A range holds regular hours only. Fresh within HISTORY_FRESH, or outside a
-// regular session once answered at or after the last regular close.
+// regular session once answered at least HISTORY_FRESH after the last regular
+// close (so Yahoo's official closing print has settled).
 function historyFresh(entry, now, quote, range, trading) {
   if (!entry || entry.status !== "ok" || !entry.receivedAt) return false
   if (now - entry.receivedAt < HISTORY_FRESH) return true
   if (!quote || !range || !HISTORY_RANGES[range] || trading) return false
   var regular = quote.session && quote.session.regular
-  return !!regular && entry.receivedAt >= regular.end && now >= regular.end
+  return !!regular && entry.receivedAt >= regular.end + HISTORY_FRESH && now >= regular.end + HISTORY_FRESH
 }
 
 // The charts held once `values` land, by key: at most `keep`, the least

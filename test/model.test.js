@@ -2159,12 +2159,13 @@ test("a range's chart answered under a quarter hour ago is shown as is, stays fr
   const now = 100000
   const fresh = (status, receivedAt) => M.historyFresh({ status, receivedAt }, now)
   expect([fresh("ok", now - 899), fresh("ok", now - 900), fresh("failed", now - 10), M.historyFresh(null, now)]).toEqual([true, false, false, false])
-  // Closed market: answered at or after regular close stays fresh past 15 min;
-  // answered before close expires once the close passes; trading expires at 15 min.
+  // Closed market: answered once settled (15 min after regular close) stays
+  // fresh past 15 min; answered right after close re-checks once; trading
+  // expires at 15 min.
   const q = { session: { regular: { start: now - 30000, end: now - 3600 } } }
-  expect(M.historyFresh({ status: "ok", receivedAt: now - 3600 }, now, q, "1Y", false)).toBe(true)
-  expect(M.historyFresh({ status: "ok", receivedAt: now - 3601 }, now, q, "1Y", false)).toBe(false)
-  expect(M.historyFresh({ status: "ok", receivedAt: now - 3600 }, now, q, "1Y", true)).toBe(false)
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 2700 }, now, q, "1Y", false)).toBe(true)
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 3540 }, now, q, "1Y", false)).toBe(false)
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 2700 }, now, q, "1Y", true)).toBe(false)
   // Forty held, oldest first; a forty-first lands.
   const held = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`S${i}|1M`, { status: "ok", receivedAt: i }]))
   const landed = M.historiesKept(held, { "NEW|1M": { status: "ok", history: [], receivedAt: 50 } }, [], 40)
