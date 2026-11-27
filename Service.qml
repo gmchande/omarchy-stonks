@@ -546,6 +546,7 @@ Item {
     centExchanges: root.centExchanges
     calendars: root.calendars
     listDates: listDateFeed.entries
+    needOpen: root.changeMode === "open"
   }
   readonly property var quotes: feed.quotes
   readonly property var entries: feed.entries
