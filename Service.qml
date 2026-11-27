@@ -1206,7 +1206,7 @@ Item {
         yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil,
         yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,
         Freshness.overdueAt(root.owed, root.now),
-        Freshness.staleAt(feed.quotes, visible, root.now),
+        Freshness.staleAt(feed.quotes, visible, root.now, calendars),
         root.newestStaleAt(visible, root.now),
         root.bellWindowEndAt(root.now)])
     clock.restart()

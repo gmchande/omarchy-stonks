@@ -32,14 +32,14 @@ function overdueAt(owed, now) {
 
 // Earliest future second when any shown trading listing's quote crosses
 // LIVE_QUOTE_MAX_AGE and switches from live to "As of".
-function staleAt(quotes, symbols, now) {
+function staleAt(quotes, symbols, now, calendars) {
   var at = 0
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
     if (!quote) continue
     var head = Quote.headlineQuote(quote)
     if (!head || head.t === null || head.t === undefined) continue
-    if (!Market.isTrading(Market.sessionPhase(quote, now))) continue
+    if (!Market.tradingNow(quote, now, calendars)) continue
     var due = head.t + LIVE_QUOTE_MAX_AGE + 1
     if (due > now && (!at || due < at)) at = due
   }
@@ -58,23 +58,24 @@ var ASKED_GRACE = 2
 // stays on top while Yahoo fails. `nightFailed`: Robinhood failed to say
 // whether the night trades this listing, or its trades
 // (`Service.nightFailed`), a refresh failed as Yahoo's is.
-function freshness(entry, quote, now, owedSince, inGrace, newest, nightFailed) {
+function freshness(entry, quote, now, owedSince, inGrace, newest, nightFailed, calendars) {
   var head = quote ? Quote.headlineQuote(quote) : null
+  var trading = quote ? Market.tradingNow(quote, now, calendars) : false
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
   var asOf = head ? head.t : null
   var shownAt = head && newest ? newest.t : asOf
   var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
-  var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now)
+  var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now, calendars)
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
     : !quote || (!head && !quote.untraded) ? "unavailable"
     : nightFailed ? "failed"
     : entry && entry.status === "saved" ? "saved"
-    : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
+    : asOf !== null && trading && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"
   // `now`: the words name the day when it isn't the clock's, as a trade does (`Market.tradeDay`).
   return { state: state, asOf: shownAt, session: newest ? newest.phase : "", now: now,
-    live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
+    live: asOf !== null && state === "fresh" && trading, phase: phase }
 }
 
 function freshnessText(fresh, quote, calendars) {

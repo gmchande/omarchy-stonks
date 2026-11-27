@@ -871,7 +871,9 @@ test("a weeknight after post-market leads with closed and the next open", () => 
     const now = M.epochAt(US, "2026-09-18", clock)
     expect(marketStatus(q, now, 0, calendars)).toBe("Closed · opens Fri 09:30")
   }
-  expect(marketStatus(q, nextPre, 0, calendars)).toBe("Closed · opens Fri 09:30")
+  // At 04:00 the next day's pre-market opens by the US calendar, matching
+  // `inExtendedHours` and the waking animal even while Thursday's quote is held.
+  expect(marketStatus(q, nextPre, 0, calendars)).toBe("Pre-market · opens in 5h 30m")
   const geometry = M.chartGeometry(q)
   expect(geometry.end).toBe(q.points[q.points.length - 1].t)
 })
@@ -1395,6 +1397,79 @@ test("a published closure is closed, whatever Yahoo's periods say", () => {
   // A held answer that puts the holiday in pre-market sleeps, and is asked on the slow clock.
   const fakePre = { ...sep4, session: { pre: { start: labor - 3600, end: labor + 3600 }, regular: { start: labor + 3600, end: labor + 7200 }, post: null } }
   expect([M.marketAsleep(fakePre, false, labor, calendars), quoteCadence(fakePre, labor, 60, false)]).toEqual([true, 900])
+  // Freshness agrees with the calendar on a holiday, a lunch break, a half
+  // day, and a held previous-day quote: never pulsing live or stamping false
+  // "As of" while closed, and honestly ageing a held quote past the opening
+  // minute.
+  const okAt = t => ({ status: "ok", receivedAt: t, answeredAt: t })
+  // 1. Holiday with a phantom Yahoo session (Labor Day & Thanksgiving OTC).
+  const laborFresh = M.freshness(okAt(labor - 10), fakeOpen, labor, 0, false, null, false, calendars)
+  expect([laborFresh.state, laborFresh.live, M.freshnessText(laborFresh, fakeOpen, calendars), M.staleAt({ X: fakeOpen }, ["X"], labor, calendars)])
+    .toEqual(["fresh", false, "", 0])
+  const tcehyHol = savedDay("otc-2026-11-26-1210", "tcehy")
+  const tgv = at("2026-11-26", "12:10")
+  const tcehyPhantom = { ...tcehyHol, session: { pre: null, regular: { start: at("2026-11-26", "09:30"), end: at("2026-11-26", "16:00") }, post: null } }
+  const tgvFresh = M.freshness(okAt(tgv), tcehyPhantom, tgv, 0, false, null, false, calendars)
+  expect([tgvFresh.state, tgvFresh.live, M.freshnessText(tgvFresh, tcehyPhantom, calendars), marketStatus(tcehyPhantom, tgv, 0, calendars)])
+    .toEqual(["fresh", false, "", "Thanksgiving Day · opens Fri 09:30"])
+  // 2. Lunch break (saved Hong Kong 12:35 HKT & Tokyo 11:31/11:45 JST).
+  const hkLunch = Date.UTC(2026, 10, 26, 4, 35) / 1000
+  const hkJustLunch = Date.UTC(2026, 10, 26, 4, 1) / 1000
+  for (const name of ["0700.hk", "9988.hk", "hsi"]) {
+    const q = savedDay("hongkong-2026-11-25-2335", name)
+    const fEarly = M.freshness(okAt(hkJustLunch), q, hkJustLunch, 0, false, null, false, calendars)
+    const fMid = M.freshness(okAt(hkLunch), q, hkLunch, 0, false, null, false, calendars)
+    expect([name, fEarly.state, fEarly.live, fMid.state, fMid.live, M.freshnessText(fMid, q, calendars), M.staleAt({ [q.symbol]: q }, [q.symbol], hkJustLunch, calendars)])
+      .toEqual([name, "fresh", false, "fresh", false, "", 0])
+  }
+  const tokyoDay = M.parseChart(fixture("7203-t-day.json"))
+  const jpxLunch1 = Date.UTC(2026, 9, 2, 2, 31) / 1000
+  const jpxLunch2 = Date.UTC(2026, 9, 2, 2, 45) / 1000
+  const jpxNear = { ...tokyoDay, marketTime: Date.UTC(2026, 9, 2, 2, 30) / 1000 }
+  expect([M.freshness(okAt(jpxLunch1), jpxNear, jpxLunch1, 0, false, null, false, calendars).live,
+    M.freshness(okAt(jpxLunch2), jpxNear, jpxLunch2, 0, false, null, false, calendars).state,
+    M.staleAt({ "7203.T": jpxNear }, ["7203.T"], jpxLunch1, calendars)]).toEqual([false, "fresh", 0])
+  // 3. Half day where Yahoo still sends a full-day regular end: US Black Friday
+  // (13:00 close, 17:00 post), OTC Black Friday (13:00 close, no post), and
+  // Frankfurt Ascension Day (20:00 close, Yahoo 22:00).
+  const bf = clock => at("2026-11-27", clock)
+  const bfFull = { pre: { start: bf("04:00"), end: bf("09:30") }, regular: { start: bf("09:30"), end: bf("16:00") }, post: { start: bf("16:00"), end: bf("20:00") } }
+  const nestBf = { ...savedDay("listings-2026-10-07-1455", "nest"), marketTime: bf("13:00"), session: bfFull, current: bfFull }
+  expect(marketStatus(nestBf, bf("12:30"), 0, calendars)).toBe("Power hour · closes in 30m")
+  expect(marketStatus(nestBf, bf("13:30"), 0, calendars)).toBe("After hours · closed at 13:00")
+  expect([M.inRegularSession(nestBf, bf("13:30"), calendars), M.inExtendedHours(nestBf, bf("13:30"), calendars),
+    M.freshness(okAt(bf("13:30")), nestBf, bf("13:30"), 0, false, null, false, calendars).state,
+    quoteCadence(nestBf, bf("13:30"), 60, false)]).toEqual([false, true, "fresh", 300])
+  expect([marketStatus(nestBf, bf("17:30"), 0, calendars), M.inExtendedHours(nestBf, bf("17:30"), calendars),
+    M.marketAsleep(nestBf, false, bf("17:30"), calendars), quoteCadence(nestBf, bf("17:30"), 60, false),
+    M.quietUntil(nestBf, bf("17:20"), bf("17:30"), US, M.tradingDays())])
+    .toEqual(["Closed · opens Mon 09:30", false, true, 900, at("2026-11-30", "04:00")])
+  const bfDay = M.dayChart(nestBf, { bars: [], through: bf("13:30") }, calendars, bf("13:30")).day
+  expect([bfDay.axis.ticks.includes(bf("13:00")), bfDay.axis.ticks.includes(bf("16:00"))]).toEqual([true, false])
+  const tcehyBf = { ...savedDay("otc-2026-11-25-1641", "tcehy"), marketTime: bf("13:00"),
+    session: { pre: null, regular: { start: bf("09:30"), end: bf("16:00") }, post: null }, current: null }
+  expect([marketStatus(tcehyBf, bf("13:30"), 0, calendars), M.marketAsleep(tcehyBf, false, bf("13:30"), calendars),
+    M.freshness(okAt(bf("13:30")), tcehyBf, bf("13:30"), 0, false, null, false, calendars).state,
+    quoteCadence(tcehyBf, bf("13:30"), 60, false)]).toEqual(["Closed · opens Mon 09:30", true, "fresh", 900])
+  const FRA = calendars.calendars.FRA
+  const asc = hm => M.epochAt(FRA, "2026-05-14", hm)
+  const sapAsc = { ...savedDay("frankfurt-2026-11-26-0435", "sap.f"), marketTime: asc("20:00"),
+    session: { pre: null, regular: { start: asc("08:00"), end: asc("22:00") }, post: null }, current: null }
+  expect([marketStatus(sapAsc, asc("20:30"), 0, calendars), M.marketAsleep(sapAsc, false, asc("20:30"), calendars),
+    M.freshness(okAt(asc("20:30")), sapAsc, asc("20:30"), 0, false, null, false, calendars).state,
+    quoteCadence(sapAsc, asc("20:30"), 60, false)]).toEqual(["Closed · opens Fri 08:00 CEST", true, "fresh", 900])
+  // 4. Held previous-day "ok" quote waking on the next trading day: opening
+  // minute awaits open, past that ages honestly, and US pre/post header matches
+  // the awake animal.
+  const heldNest = savedDay("listings-2026-10-07-1455", "nest")
+  const thuOpen10 = at("2026-10-08", "09:30") + 10
+  const thuOpen5m = at("2026-10-08", "09:35")
+  const fWait = M.freshness(okAt(at("2026-10-07", "14:55")), heldNest, thuOpen10, 0, false, null, false, calendars)
+  const fLate = M.freshness(okAt(at("2026-10-07", "14:55")), heldNest, thuOpen5m, 0, false, null, false, calendars)
+  expect([fWait.state, fLate.state, M.freshnessText(fLate, heldNest, calendars)])
+    .toEqual(["asking", "aged", "AS OF WED 14:55"])
+  expect([marketStatus(heldNest, at("2026-10-08", "07:00"), 0, calendars), marketStatus(heldNest, at("2026-10-08", "17:00"), 0, calendars)])
+    .toEqual(["Pre-market · opens in 2h 30m", "After hours · closed at 16:00"])
 })
 
 test("the bell rings once at a market's open and once at its close, never late, on a holiday, or for a coin", () => {

@@ -93,7 +93,9 @@ function windowSession(cal, quote, win) {
 function windowTicks(cal, win, session, joined) {
   var ticks = [win.open]
   var segs = Calendar.segmentsOn(cal, win.date)
-  if (segs.length && segs[0].start === session.regular.start) ticks.push(session.regular.end)
+  var early = cal.earlyCloses && cal.earlyCloses[win.date]
+  if (segs.length && segs[0].start === session.regular.start)
+    ticks.push(early ? Math.min(session.regular.end, segs[segs.length - 1].end) : session.regular.end)
   else for (var i = 0; i < segs.length; i++) ticks.push(segs[i].end)
   if (joined) ticks.push(joined.from, Calendar.epochAt(cal, joined.date, "00:00"), Calendar.epochAt(cal, joined.date, cal.overnight.close), joined.opens)
   return ticks

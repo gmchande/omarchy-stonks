@@ -307,10 +307,12 @@ Harness {
       return harness.requests().slice(from)
     }
 
-    // The clock to `t`, everything due there asked: a window's start.
+    // The clock to `t`, everything due there asked (waiting on any expired
+    // screen check so queued refreshes start before the window opens).
     function startAt(t) {
       return function() {
         harness.clockTo(t)
+        answerScreens()
         settle()
       }
     }
@@ -1033,6 +1035,8 @@ Harness {
       openWindow()
       var added = within(3000, function() { return !!service.quotes["TCEHY"] })
       var holiday = hourFrom(at(harness.thu26, 12, 15))
+      // Expire the 1 s screen trust so startAt exercises the async screen check.
+      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
       var saturday = hourFrom(at(harness.sat28, 12, 15))
       harness.check("a holiday asks as a closed day does: an over-the-counter stock through Thanksgiving's hour from 12:15 as through the Saturday's",
         added && holiday === saturday, [added, "Thanksgiving " + holiday, "Saturday " + saturday].join(" | "))

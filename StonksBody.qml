@@ -295,7 +295,7 @@ Item {
   // The day the 1D chart draws; its baseline is `prevClose`.
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Freshness.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest, !!nightFailed[chartSymbol || featuredSymbol])
+    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest, !!nightFailed[chartSymbol || featuredSymbol], calendars)
   readonly property var featuredGeometry: motion.geometry
   readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestTrade(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote

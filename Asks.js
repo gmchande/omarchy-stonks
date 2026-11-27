@@ -215,9 +215,9 @@ function quotesLanded(held, requests, got, symbols, calendars, now) {
 // calendar and Yahoo's current period both have a say.
 function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!quote || quote.crypto || !receivedAt) return 0
-  var s = quote.session
+  var s = Market.clampedSession(quote.session, cal)
   if (!s || !s.regular || receivedAt < (s.post || s.regular).end + Quote.SETTLED) return 0
-  var c = quote.current
+  var c = Market.clampedSession(quote.current, cal)
   if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + Quote.SETTLED) return 0
   var starts = []
   if (cal) {
@@ -265,9 +265,10 @@ var OPENING_ASK = 15
 // stock keeps the interval.
 function quoteCadence(quote, now, interval, charted, calNow) {
   if (!quote) return 15 * 60
-  if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now) ? Math.min(OPENING_ASK, interval) : interval
+  var cal = calNow ? calNow.cal : null
+  if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now, cal) ? Math.min(OPENING_ASK, interval) : interval
   if (calNow.quiet || calNow.breakEnd) return 15 * 60
-  var phase = Market.sessionPhase(quote, now)
+  var phase = Market.sessionPhase(quote, now, cal)
   if (phase === "pre" || phase === "post") return charted ? interval : Math.max(5 * 60, interval)
   return 15 * 60
 }

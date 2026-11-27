@@ -93,7 +93,7 @@ BarWidget {
   // Its time is the price's the pill shows, as its row's.
   readonly property var freshness: service && featuredSymbol
     ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      newest, !!service.nightFailed[featuredSymbol]) : null
+      newest, !!service.nightFailed[featuredSymbol], service.calendars) : null
   readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.
