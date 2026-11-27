@@ -148,6 +148,7 @@ function heldDay(quote, bars, pre) {
     dayOpen: quote.before.dayOpen,
     openSession: quote.before.openSession,
     nextOpen: quote.dayOpen,
+    nextOpenAt: quote.session && quote.session.regular ? quote.session.regular.start : null,
     figuresDay: quote.before.session.regular ? quote.before.session.regular.start : null,
     dayLow: Format.isFiniteNumber(quote.before.dayLow) ? quote.before.dayLow : null,
     dayHigh: Format.isFiniteNumber(quote.before.dayHigh) ? quote.before.dayHigh : null,

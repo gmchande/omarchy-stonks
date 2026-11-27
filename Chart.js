@@ -21,7 +21,7 @@
 // one fails. A failed first fetch is an answer: a quote's shows the symbol
 // alone, and a range's has the day stand in (`failed`). `latest` is the
 // newest trade of all, or null where the quote's own last trade is it.
-function viewChart(symbol, range, quotes, entries, histories, nights, calendars, dayClock) {
+function viewChart(symbol, range, quotes, entries, histories, nights, calendars, dayClock, lastTrades) {
   if (!symbol) return null
   var quote = quotes[symbol] || null
   var quoteFailed = !quote && !!entries[symbol] && entries[symbol].status === "failed"
@@ -30,6 +30,13 @@ function viewChart(symbol, range, quotes, entries, histories, nights, calendars,
   if (quote) {
     var drawn = dayDrawn(symbol, quote, nights, calendars, dayClock)
     if (drawn.waiting && range === "1D") return null
+    if (drawn.waiting && lastTrades) {
+      var quoted = Overnight.quotedNight(lastTrades[symbol], Overnight.overnightMarket(calendars))
+      if (quoted) {
+        var built = Day.dayChart(CarriedClose.heldDay(quote, null, true) || quote, quoted, calendars, dayClock)
+        drawn = { day: built.day, latest: built.latest, tradesAtNight: true, waiting: false }
+      }
+    }
     chart.day = drawn.day
     chart.latest = drawn.latest
     chart.tradesAtNight = drawn.tradesAtNight

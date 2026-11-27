@@ -135,25 +135,27 @@ Item {
   // off 1D, so a receipt for a quoted symbol on the day recomputes nothing.
   function chartOf(symbol, range, quoteFeed) {
     var quotes = quoteFeed.quotes
+    var lastTrades = range !== "1D" && (!root.nights || !root.nights[symbol]) ? lastTradeFeed.entries : null
     return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
-      range === "1D" ? ({}) : historyFeed.entries, root.nights, calendars, root.viewDayClock), root.nights)
+      range === "1D" ? ({}) : historyFeed.entries, root.nights, calendars, root.viewDayClock, lastTrades), root.nights, lastTrades)
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
   // The chart to show: `chart`, with the day built for it before while that
   // was built from the same objects, its quote and, where it trades at
-  // night, its trades and reach, and while its axis hasn't moved. So an
-  // answer for another symbol repaints nothing, nor does a clock that moves
-  // no edge, and a preview's Yahoo day never stands in once it is added.
-  // `builtDays` is kept from each chart the views show (`keepDay`); it
+  // night, its trades and reach, and while its axis and lit span haven't
+  // moved. So an answer for another symbol repaints nothing, nor does a clock
+  // that moves no edge, and a preview's Yahoo day never stands in once it is
+  // added. `builtDays` is kept from each chart the views show (`keepDay`); it
   // doesn't notify.
   readonly property var builtDays: ({})
-  function keptDay(symbol, chart, nights) {
+  function keptDay(symbol, chart, nights, lastTrades) {
     if (!chart || !chart.quote || chart.day === chart.quote) return chart
-    var made = root.dayMadeFrom(symbol, chart, nights)
+    var made = root.dayMadeFrom(symbol, chart, nights, lastTrades)
     var built = builtDays[symbol]
-    if (built && built.quote === made.quote && built.bars === made.bars && built.through === made.through && built.start === made.start
-        && built.end === made.end)
+    if (built && built.quote === made.quote && built.bars === made.bars && built.through === made.through
+        && built.lastTrade === made.lastTrade && built.start === made.start && built.end === made.end
+        && built.tonight === made.tonight && built.litFrom === made.litFrom)
       return Object.assign({}, chart, { day: built.day, latest: built.latest })
     return chart
   }
@@ -162,12 +164,15 @@ Item {
     if (builtDays[symbol] && builtDays[symbol].day === chart.day) return
     var keys = Object.keys(builtDays)
     if (keys.length >= 24 && !(symbol in builtDays)) delete builtDays[keys[0]]
-    builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, root.nights), { day: chart.day, latest: chart.latest })
+    builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, root.nights, lastTradeFeed.entries), { day: chart.day, latest: chart.latest })
   }
-  function dayMadeFrom(symbol, chart, nights) {
+  function dayMadeFrom(symbol, chart, nights, lastTrades) {
     var night = chart.tradesAtNight ? nights[symbol] : null
-    return { quote: chart.quote, bars: night ? night.bars : null, through: night ? night.through : null,
-      start: chart.day.axis ? chart.day.axis.start : null, end: chart.day.axis ? chart.day.axis.end : null }
+    var lastTrade = !night && chart.tradesAtNight && lastTrades && lastTrades[symbol] ? lastTrades[symbol].trade : null
+    return { quote: chart.quote, bars: night ? night.bars : null, through: night ? night.through : null, lastTrade: lastTrade,
+      start: chart.day.axis ? chart.day.axis.start : null, end: chart.day.axis ? chart.day.axis.end : null,
+      tonight: chart.day.tonight !== undefined ? chart.day.tonight : null,
+      litFrom: chart.day.litFrom !== undefined ? chart.day.litFrom : null }
   }
   onPreviewViewChanged: keepDay(previewView.featured, previewView.chart)
 
@@ -1201,7 +1206,7 @@ Item {
         yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil,
         yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,
         Freshness.overdueAt(root.owed, root.now),
-        Freshness.staleAt(feed.quotes, visible, root.now),
+        Freshness.staleAt(feed.quotes, visible, root.now, calendars),
         root.newestStaleAt(visible, root.now),
         root.bellWindowEndAt(root.now)])
     clock.restart()

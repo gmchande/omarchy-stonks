@@ -630,6 +630,29 @@ Harness {
       rest()
       fillFollows("returning to manual order")
 
+      // The breadth bar fills the room beside the sort label at rest and
+      // travels smoothly to its new width when the sort label changes width.
+      var breadthBar = at("breadthRule")
+      var orderLbl = at("orderLabel")
+      var breadthTraveled = false
+      var fromW = 0, toW = 0
+      var trackBreadth = function() {
+        var w = breadthBar.width
+        if (Math.min(fromW, toW) + 1 < w && w < Math.max(fromW, toW) - 1) breadthTraveled = true
+      }
+      breadthBar.widthChanged.connect(trackBreadth)
+      var breadthFills = true
+      for (var allOrd = 0; allOrd < 4; allOrd++) {
+        var wasAllOrd = service.order
+        fromW = breadthBar.width
+        click("orderLabel")
+        within(1500, function() { return service.order !== wasAllOrd })
+        toW = orderLbl.x - 10 - breadthBar.x
+        var settled = within(1500, function() { return Math.abs(breadthBar.width - (orderLbl.x - 10 - breadthBar.x)) < 1 })
+        if (!settled) breadthFills = false
+      }
+      breadthBar.widthChanged.disconnect(trackBreadth)
+
       // A long elided list name keeps its chevron in place across every sort order.
       var longList = "Global Semiconductors, Cloud Infrastructure, Energy Transition and Long-Term Compounders Watchlist"
       service.createList(longList)
@@ -648,8 +671,10 @@ Harness {
       service.switchList("")
       service.deleteList(longList)
       rest()
-      harness.check("a long list name keeps the header chevron steady across every sort order",
-        longOn && steadyChevron, [longOn, listLabelItem.truncated].concat(chevronXs.map(function(x) { return x.toFixed(1) })).join(" "))
+      harness.check("a long list name keeps the header chevron steady, and the breadth bar travels to fill the room beside each sort label",
+        longOn && steadyChevron && breadthTraveled && breadthFills,
+        [longOn, listLabelItem.truncated, "traveled:" + breadthTraveled, "fills:" + breadthFills,
+          "chevron:" + chevronXs.map(function(x) { return x.toFixed(1) }).join(",")].join(" "))
 
       // Two of them, so one range for every click can't pass.
       var options = harness.findAll(body, "rangeOption")

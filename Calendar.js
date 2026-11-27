@@ -151,12 +151,14 @@ function calendarNow(cal, now) {
   var date = cal ? dateStringOf(localDate(now, cal)) : ""
   var kind = cal ? dayKind(cal, date).kind : ""
   var segs = cal ? segmentsOn(cal, date) : []
+  var early = cal && cal.earlyCloses ? cal.earlyCloses[date] : null
   var breakEnd = null
   for (var i = 0; i < segs.length - 1; i++) if (now >= segs[i].end && now < segs[i + 1].start) breakEnd = segs[i + 1].start
   return {
     cal: cal,
     quiet: kind === "weekend" || kind === "closure",
     breakEnd: breakEnd,
+    earlyEnd: early && segs.length ? segs[segs.length - 1].end : 0,
     segment: segs.some(function(seg) { return now >= seg.start && now < seg.end })
   }
 }

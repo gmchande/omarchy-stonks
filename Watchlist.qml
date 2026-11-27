@@ -232,7 +232,7 @@ Flickable {
     var q = quote !== undefined ? quote : (quotes[symbol] || null)
     var nt = newestTrade !== undefined ? newestTrade : (newestTrades[symbol] || null)
     return Freshness.freshness(entryOf(symbol), q, now, owed[symbol] || 0, !!asking[symbol],
-      nt, !!nightFailed[symbol])
+      nt, !!nightFailed[symbol], calendars)
   }
 
   function moveCursor(delta) {

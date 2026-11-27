@@ -53,7 +53,7 @@ BarWidget {
   // weekend never repaints the pill's canvas every five minutes.
   // Built only for the form that draws it, and handed only to the look on
   // show.
-  readonly property var lineDayCache: ({ symbol: "", quote: null, bars: null, through: null, start: null, end: null, day: null })
+  readonly property var lineDayCache: ({ symbol: "", quote: null, bars: null, through: null, start: null, end: null, tonight: null, litFrom: null, day: null })
   readonly property var lineDay: {
     if (!featuredQuote || barStyle !== "sparkline" || barHidden) return null
     var next = Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.calendars, service.dayClock)
@@ -63,12 +63,15 @@ BarWidget {
     var through = night ? night.through : null
     var start = next.axis ? next.axis.start : null
     var end = next.axis ? next.axis.end : null
+    var tonight = next.tonight !== undefined ? next.tonight : null
+    var litFrom = next.litFrom !== undefined ? next.litFrom : null
     var c = lineDayCache
     if (c.day && c.symbol === featuredSymbol && c.quote === featuredQuote && c.bars === bars
-        && c.through === through && c.start === start && c.end === end)
+        && c.through === through && c.start === start && c.end === end
+        && c.tonight === tonight && c.litFrom === litFrom)
       return c.day
     c.symbol = featuredSymbol; c.quote = featuredQuote; c.bars = bars
-    c.through = through; c.start = start; c.end = end; c.day = next
+    c.through = through; c.start = start; c.end = end; c.tonight = tonight; c.litFrom = litFrom; c.day = next
     return next
   }
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
@@ -90,7 +93,7 @@ BarWidget {
   // Its time is the price's the pill shows, as its row's.
   readonly property var freshness: service && featuredSymbol
     ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      newest, !!service.nightFailed[featuredSymbol]) : null
+      newest, !!service.nightFailed[featuredSymbol], service.calendars) : null
   readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.
@@ -120,6 +123,7 @@ BarWidget {
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
   readonly property color downColor: plugin && plugin.trendColors ? plugin.trendColors.downOn(barGround) : Commons.Color.urgent
   readonly property color trendColor: toneColor(featured ? featured.tone : "")
+  readonly property color dayTrendColor: toneColor(featured ? featured.dayTone : "")
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
   // The animal turns only for a price crossing on the same symbol's day
   // (`BarAnimal.turnTo`), never for another symbol, day or change mode. Read
@@ -338,7 +342,7 @@ BarWidget {
         id: pillSmoothChart
         Sparkline {
           geometry: root.lineGeometry
-          lineColor: root.trendColor
+          lineColor: root.dayTrendColor
           baselineColor: Util.alpha(button.foreground, 0.25)
           greyColor: root.dimColor
           lineWidth: 1.5
@@ -351,8 +355,8 @@ BarWidget {
         id: pillRetroChart
         RetroChart {
           geometry: root.lineGeometry
-          upColor: root.trendColor
-          downColor: root.trendColor
+          upColor: root.dayTrendColor
+          downColor: root.dayTrendColor
           baselineColor: Util.alpha(button.foreground, 0.25)
           greyAside: true
           greyColor: root.dimColor
@@ -367,7 +371,7 @@ BarWidget {
         visible: root.barStyle === "arrow"
         anchors.verticalCenter: parent.verticalCenter
         text: "➜"
-        color: root.trendColor
+        color: root.newestOld ? root.dimColor : root.trendColor
         font.family: button.fontFamily
         font.pixelSize: Style.font.icon
         rotation: root.featured ? -Figures.arrowAngle(root.featured.pct) : 0

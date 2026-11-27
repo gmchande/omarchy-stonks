@@ -88,11 +88,12 @@ function exchangeDay(quote, t) {
 // An end at the 52-week mark takes that direction's tone, as
 // `Fundamentals.yearLine`'s. The open keeps its slot before the first bar,
 // so the line keeps its shape.
-function dayLine(quote, today, day) {
+function dayLine(quote, today, day, newest) {
   if (!quote) return null
   // While the chart holds the day just closed, its figures are that day's.
   var q = day && day.held ? day : quote
   var drawn = day && day.session && day.session.regular ? exchangeDay(q, day.session.regular.start) : null
+  var figures = exchangeDay(q, q.figuresDay)
   var head = Quote.headlineQuote(q)
   var low = q.dayLow
   var high = q.dayHigh
@@ -101,7 +102,13 @@ function dayLine(quote, today, day) {
     if (low === null || trades[i].p < low) low = trades[i].p
     if (high === null || trades[i].p > high) high = trades[i].p
   }
-  var range = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
+  var sameDayNewest = !!newest && Format.isFiniteNumber(newest.p)
+    && (!newest.stepped || (drawn !== null && figures !== null && drawn < figures))
+  if (sameDayNewest) {
+    if (low === null || newest.p < low) low = newest.p
+    if (high === null || newest.p > high) high = newest.p
+  }
+  var range = Format.infoRange(low, high, sameDayNewest ? newest.p : (head ? head.price : null), q.priceDigits)
   if (range.high !== null && Format.isFiniteNumber(q.fiftyTwoWeekHigh) && range.high >= q.fiftyTwoWeekHigh) range.highTone = "up"
   if (range.low !== null && Format.isFiniteNumber(q.fiftyTwoWeekLow) && range.low <= q.fiftyTwoWeekLow) range.lowTone = "down"
   return {
@@ -159,33 +166,74 @@ function dayTitles() {
   return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }))
 }
 
-// The day the rows measure, "TODAY", "FRI" or "8 SEP", worked out in two
-// steps, so the clock reads only the second: the day the rows share, which
-// changes only with their prices, and its name, which changes only at the
-// exchange's midnight.
-// Only US stocks and ETFs, which trade at night, share one day here;
-// listings abroad and coins name their own on their rows. A row with no
-// time names no day: its freshness says so. A row whose move is tonight's
-// says so itself (`rowNote`), so the header keeps naming the day. Null
-// where no row names a day or two name different ones.
+// The day the rows measure, "TODAY", "FRI", "8 SEP", or "24H" for coins alone,
+// worked out in two steps, so the clock reads only the second: the day the
+// rows share, which changes only with their prices, and its name, which
+// changes only at the exchange's midnight. Any list holding US stocks keeps
+// the US rows' rule (their shared day, or "TODAY" where they disagree or none
+// has a time). A list with no US stock takes the day its own rows share,
+// "24H" for rolling coins alone, and blank where they disagree or none names
+// one. A row whose move is tonight's says so itself (`rowNote`), so the
+// header keeps naming the day.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
-  var shared = null
+  var usShared = null
+  var usMixed = false
+  var hasUs = false
+  var otherShared = null
+  var otherMixed = false
+  var rolling = false
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
-    if (!q || !Overnight.hasOvernight(q, calendars)) continue
+    if (!q) continue
+    if (Overnight.hasOvernight(q, calendars)) {
+      hasUs = true
+      var usHead = Quote.headlineQuote(q)
+      var usT = newest && newest[symbols[i]] ? newest[symbols[i]].dayStart : usHead ? usHead.t : null
+      if (usT === null) continue
+      var usDay = { quote: q, t: usT, day: exchangeDay(q, usT) }
+      if (usShared && usShared.day !== usDay.day) usMixed = true
+      else usShared = usDay
+      continue
+    }
+    if (hasUs) continue
+    if (q.rolling) {
+      rolling = true
+      if (otherShared) otherMixed = true
+      continue
+    }
+    if (rolling) otherMixed = true
     var head = Quote.headlineQuote(q)
-    var t = newest[symbols[i]] ? newest[symbols[i]].dayStart : head ? head.t : null
+    var t = head ? head.t : null
     if (t === null) continue
-    var day = { quote: q, t: t, day: exchangeDay(q, t) }
-    if (shared && shared.day !== day.day) return null
-    shared = day
+    var day = exchangeDay(q, t)
+    var offset = q.gmtoffset || 0
+    if (!otherShared) otherShared = { quote: q, t: t, day: day, minOffset: offset, maxOffset: offset }
+    else if (otherShared.day !== day) otherMixed = true
+    else {
+      if (offset < otherShared.minOffset) otherShared.minOffset = offset
+      if (offset > otherShared.maxOffset) otherShared.maxOffset = offset
+    }
   }
-  return shared
+  if (hasUs) return usMixed || !usShared ? { today: true } : usShared
+  if (otherMixed) return null
+  if (otherShared) return otherShared
+  return rolling ? { rolling: true } : null
 }
 
 function rowsDayName(shared, now) {
-  var today = shared ? exchangeDay(shared.quote, now) : null
-  return !shared || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today)
+  if (!shared) return ""
+  if (shared.today) return "TODAY"
+  if (shared.rolling) return "24H"
+  var off = shared.quote.gmtoffset || 0
+  var minToday = Math.floor((now + (shared.minOffset !== undefined ? shared.minOffset : off)) / 86400)
+  var maxToday = Math.floor((now + (shared.maxOffset !== undefined ? shared.maxOffset : off)) / 86400)
+  if (shared.day >= maxToday) return "TODAY"
+  if (shared.day < minToday) {
+    var near = maxToday - shared.day < 7
+    var far = minToday - shared.day >= 7
+    return near || far ? dayName(shared.quote, shared.t, minToday) : ""
+  }
+  return ""
 }
 
 // What the header says, by what wins: trouble, then a chart loading, a
@@ -314,7 +362,9 @@ function rowModel(quote, scrubT, mode, newest) {
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
-  var nextOpen = Format.isFiniteNumber(quote.nextOpen) ? quote.nextOpen : null
+  var nextOpenAt = Format.isFiniteNumber(quote.nextOpenAt) ? quote.nextOpenAt
+    : quote.next && quote.next.regular ? quote.next.regular.start : null
+  var nextOpen = Format.isFiniteNumber(quote.nextOpen) && (nextOpenAt === null || t >= nextOpenAt) ? quote.nextOpen : null
   if (bell === null && newest && newest.stepped && reg) bell = reg.end
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)

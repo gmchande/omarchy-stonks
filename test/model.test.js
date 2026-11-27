@@ -1534,7 +1534,7 @@ test("the close the day's move counts from is named by the trading day before, a
 
 // The rows' day is worked out from their prices, and only its name from the
 // clock, so it turns at the exchange's midnight and at no other second.
-test("the rows name the day their US stocks share, turning at the exchange's midnight, and say TODAY where they disagree or none names one", () => {
+test("the rows keep the US rule when US stocks are present, and otherwise name the day their listings share, 24H for coins alone, or blank", () => {
   const quote = (symbol, date) => ({
     symbol, instrumentType: "EQUITY", exchange: "NASDAQ", currency: "USD", gmtoffset: -14400, prevClose: 100, price: 101,
     priceDigits: 2, marketTime: at(date, "12:00"),
@@ -1545,16 +1545,39 @@ test("the rows name the day their US stocks share, turning at the exchange's mid
     },
     points: [{ t: at(date, "09:30"), p: 100.5 }, { t: at(date, "11:55"), p: 101 }]
   })
-  const quotes = { A: quote("A", "2026-09-08"), B: quote("B", "2026-09-08"), C: quote("C", "2026-09-04"),
-    T: { ...quote("7203.T", "2026-09-08"), exchange: "JPX", currency: "JPY", gmtoffset: 32400 } }
+  const quotes = {
+    A: quote("A", "2026-09-08"),
+    B: quote("B", "2026-09-08"),
+    C: quote("C", "2026-09-04"),
+    L: { ...quote("SHEL.L", "2026-09-08"), exchange: "LSE", currency: "GBp", gmtoffset: 3600 },
+    L2: { ...quote("AZN.L", "2026-09-04"), exchange: "LSE", currency: "GBp", gmtoffset: 3600 },
+    T: { ...quote("7203.T", "2026-09-08"), exchange: "JPX", currency: "JPY", gmtoffset: 32400, marketTime: Date.UTC(2026, 8, 8, 6, 0) / 1000 },
+    I: { ...quote("^GSPC", "2026-09-08"), instrumentType: "INDEX", exchange: "SNP" },
+    O: { ...quote("TCEHY", "2026-09-08"), exchange: "PNK" },
+    K: { ...quote("BTC-USD", "2026-09-08"), instrumentType: "CRYPTOCURRENCY", exchange: "CCC", rolling: true, crypto: true, gmtoffset: 0 }
+  }
   const day = (rows, now, newest = {}) => M.rowsDayName(M.rowsSharedDay(rows, quotes, newest, calendars), now)
   expect(day(["A", "B"], at("2026-09-08", "23:59") + 59)).toBe("TODAY")
   expect(day(["A", "B"], at("2026-09-09", "00:00"))).toBe("TUE")
   expect(day(["A", "B"], at("2026-09-15", "00:00"))).toBe("8 SEP")
+  // Lists holding US stocks keep the US rule (including mixed lists with foreign stocks or coins).
   expect(day(["A", "C"], at("2026-09-10", "12:00"))).toBe("TODAY")
   expect(day(["T", "C"], at("2026-09-10", "12:00"))).toBe("FRI")
-  expect(day(["T"], at("2026-09-10", "12:00"))).toBe("TODAY")
-  expect(day(["MISSING"], at("2026-09-10", "12:00"))).toBe("TODAY")
+  expect(day(["A", "K"], at("2026-09-08", "12:00"))).toBe("TODAY")
+  expect(day(["A", "K"], at("2026-09-09", "12:00"))).toBe("TUE")
+  // Lists with no US stock name their own shared day, 24H for coins alone,
+  // and blank when empty, unquoted, or disagreeing.
+  expect(day(["L"], at("2026-09-09", "02:00"))).toBe("TUE")
+  expect(day(["T"], at("2026-09-10", "12:00"))).toBe("TUE")
+  expect(day(["I"], at("2026-09-09", "02:00"))).toBe("TUE")
+  expect(day(["O"], at("2026-09-09", "02:00"))).toBe("TUE")
+  expect(day(["K"], at("2026-09-10", "12:00"))).toBe("24H")
+  expect(day([], at("2026-09-10", "12:00"))).toBe("")
+  expect(day(["MISSING"], at("2026-09-10", "12:00"))).toBe("")
+  expect(day(["L", "L2"], at("2026-09-10", "12:00"))).toBe("")
+  expect(day(["L", "K"], at("2026-09-08", "12:00"))).toBe("")
+  expect(day(["L", "T"], at("2026-09-08", "14:00"))).toBe("")
+  expect(day(["L", "T"], at("2026-09-09", "12:00"))).toBe("TUE")
   // Tonight's trades name the day they joined.
   expect(day(["C"], at("2026-09-10", "12:00"), { C: { dayStart: at("2026-09-08", "09:30") } })).toBe("TUE")
 })
