@@ -167,42 +167,62 @@ function dayTitles() {
 }
 
 // The day the rows measure, "TODAY", "FRI", "8 SEP", or "24H" for coins alone,
-// worked out in two steps, so the clock reads only the second: the day every
-// quoted row shares, which changes only with their prices, and its name, which
-// changes only at each exchange's midnight. A row with no time names no day:
-// its freshness says so. A row whose move is tonight's says so itself
-// (`rowNote`), so the header keeps naming the day. Null (blank) where no row
-// names a day, coins mix with markets, or two listings disagree.
+// worked out in two steps, so the clock reads only the second: the day the
+// rows share, which changes only with their prices, and its name, which
+// changes only at the exchange's midnight. Any list holding US stocks keeps
+// the US rows' rule (their shared day, or "TODAY" where they disagree or none
+// has a time). A list with no US stock takes the day its own rows share,
+// "24H" for rolling coins alone, and blank where they disagree or none names
+// one. A row whose move is tonight's says so itself (`rowNote`), so the
+// header keeps naming the day.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
-  var shared = null
+  var usShared = null
+  var usMixed = false
+  var hasUs = false
+  var otherShared = null
+  var otherMixed = false
   var rolling = false
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q) continue
-    if (q.rolling) {
-      rolling = true
-      if (shared) return null
+    if (Overnight.hasOvernight(q, calendars)) {
+      hasUs = true
+      var usHead = Quote.headlineQuote(q)
+      var usT = newest && newest[symbols[i]] ? newest[symbols[i]].dayStart : usHead ? usHead.t : null
+      if (usT === null) continue
+      var usDay = { quote: q, t: usT, day: exchangeDay(q, usT) }
+      if (usShared && usShared.day !== usDay.day) usMixed = true
+      else usShared = usDay
       continue
     }
-    if (rolling) return null
+    if (hasUs) continue
+    if (q.rolling) {
+      rolling = true
+      if (otherShared) otherMixed = true
+      continue
+    }
+    if (rolling) otherMixed = true
     var head = Quote.headlineQuote(q)
-    var t = newest && newest[symbols[i]] ? newest[symbols[i]].dayStart : head ? head.t : null
+    var t = head ? head.t : null
     if (t === null) continue
     var day = exchangeDay(q, t)
     var offset = q.gmtoffset || 0
-    if (!shared) shared = { quote: q, t: t, day: day, minOffset: offset, maxOffset: offset }
+    if (!otherShared) otherShared = { quote: q, t: t, day: day, minOffset: offset, maxOffset: offset }
+    else if (otherShared.day !== day) otherMixed = true
     else {
-      if (shared.day !== day) return null
-      if (offset < shared.minOffset) shared.minOffset = offset
-      if (offset > shared.maxOffset) shared.maxOffset = offset
+      if (offset < otherShared.minOffset) otherShared.minOffset = offset
+      if (offset > otherShared.maxOffset) otherShared.maxOffset = offset
     }
   }
-  if (shared) return shared
+  if (hasUs) return usMixed || !usShared ? { today: true } : usShared
+  if (otherMixed) return null
+  if (otherShared) return otherShared
   return rolling ? { rolling: true } : null
 }
 
 function rowsDayName(shared, now) {
   if (!shared) return ""
+  if (shared.today) return "TODAY"
   if (shared.rolling) return "24H"
   var off = shared.quote.gmtoffset || 0
   var minToday = Math.floor((now + (shared.minOffset !== undefined ? shared.minOffset : off)) / 86400)

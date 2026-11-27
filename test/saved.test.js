@@ -2500,29 +2500,29 @@ test("in every phase, a stock that has traded since its close shows that newest 
       M.asideAt(rowLine, rowLine.points.at(-1).x), M.asideAt(rowLine, 0)]).toEqual([true, "+0.11%", "Overnight", "263.81", false, true])
     expect(at.pill("JNJ")).toBe("264.11 +0.11% bull | overnight as of 23:25 · Fri \u22121.42%")
   }
-  // The list's header names the day every row shares: Friday all weekend,
-  // Sunday night too, today until midnight, Monday past midnight, and blank
-  // once pre-market splits the list or markets disagree across time zones.
-  const usOnly = at => at.symbols.filter(s => M.hasOvernight(at.quotes[s], calendars))
-  const header = set => { const at = topsAt(set); return rowsDay(usOnly(at), at.quotes, at.newest, at.now) }
+  // The list's header names the day the rows measure: Friday all weekend,
+  // Sunday night too, today until midnight, then Monday until the new day's
+  // first trade.
+  const header = set => { const at = topsAt(set); return rowsDay(at.symbols, at.quotes, at.newest, at.now) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
-    .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", ""])
-  // A list that mixes markets across days or mixes stocks with 24H crypto stays blank;
-  // single-market non-US, index, and crypto lists name their own shared day.
+    .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
+  // A list with no US stock names its own shared day, or stays blank when
+  // empty or when its rows disagree.
   {
     const sun = topsAt("watch-2026-10-25-1000")
-    expect(rowsDay(sun.symbols, sun.quotes, sun.newest, sun.now)).toBe("")
     expect(rowsDay(["SHEL.L"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
     expect(rowsDay(["7203.T"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
     expect(rowsDay(["^GSPC"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
     expect(rowsDay([], sun.quotes, sun.newest, sun.now)).toBe("")
+    const sunNight = topsAt("watch-2026-10-25-2335")
+    expect(rowsDay(["SHEL.L", "7203.T"], sunNight.quotes, sunNight.newest, sunNight.now)).toBe("")
   }
   // A row Yahoo sent no time for measures no day it can name: the rest
   // still name theirs.
   {
     const at = topsAt("watch-2026-10-25-1000")
     const untimed = { ...at.quotes.NBIS, symbol: "UNTIMED", marketTime: undefined }
-    expect(rowsDay(usOnly(at).concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now)).toBe("FRI")
+    expect(rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now)).toBe("FRI")
   }
   // Rows that measure tomorrow, from tonight's trades, say TODAY.
   {

@@ -39,6 +39,11 @@ Item {
   property real rowsOpacity: 1
   property string prevMode: changeMode
   property real unitSwap: 1
+  // Eased width of the sort-order label, so the breadth rule fills all room
+  // at rest and its right end travels smoothly when the sort label changes
+  // width.
+  property real orderRoom: orderText.implicitWidth
+  property string lastOrder: ""
 
   Component.onCompleted: settle()
   function settle() {
@@ -50,11 +55,48 @@ Item {
     unitSwapAnim.stop()
     prevMode = changeMode
     unitSwap = 1
+    orderRoomAnim.stop()
+    lastOrder = order
+    orderRoom = orderText.implicitWidth
   }
-  onStillChanged: if (still) {
-    if (chevronAnim.running) chevronAnim.pause()
-    if (rowsFade.running) rowsFade.pause()
-    if (unitSwapAnim.running) unitSwapAnim.pause()
+  onStillChanged: {
+    if (still) {
+      if (chevronAnim.running) chevronAnim.pause()
+      if (rowsFade.running) rowsFade.pause()
+      if (unitSwapAnim.running) unitSwapAnim.pause()
+      if (orderRoomAnim.running) orderRoomAnim.pause()
+    } else if (orderRoomAnim.paused) {
+      orderRoomAnim.stop()
+      lastOrder = order
+      orderRoom = orderText.implicitWidth
+    }
+  }
+  function moveOrderRoom() {
+    if (still) return
+    var to = orderText.implicitWidth
+    var changedOrder = lastOrder !== "" && lastOrder !== order
+    lastOrder = order
+    if (!changedOrder || !seen || !visible || rowsCovered || Motion.duration(Style, 160) <= 0) {
+      orderRoomAnim.stop()
+      orderRoom = to
+      return
+    }
+    if (Math.abs(to - (orderRoomAnim.running ? orderRoomAnim.to : orderRoom)) < 0.5) return
+    orderRoomAnim.stop()
+    orderRoomAnim.to = to
+    orderRoomAnim.start()
+  }
+  NumberAnimation {
+    id: orderRoomAnim
+    target: root
+    property: "orderRoom"
+    duration: Motion.duration(Style, 160)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Motion.curve(Style)
+  }
+  onOrderRoomChanged: if (orderRoomAnim.running && Math.abs(orderRoom - orderRoomAnim.to) < 0.5) {
+    orderRoomAnim.stop()
+    orderRoom = orderRoomAnim.to
   }
   onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
   Connections {
@@ -223,8 +265,9 @@ Item {
     font.letterSpacing: 1
   }
 
-  // The list's breadth. It rests while the rows are covered, and reserves the
-  // widest sort-order label on the right so cycling orders never resizes it.
+  // The list's breadth. It rests while the rows are covered, fills the room
+  // beside the sort label at rest, and travels smoothly as the sort label
+  // changes width.
   BreadthRule {
     id: breadthRule
     objectName: "breadthRule"
@@ -233,7 +276,7 @@ Item {
     anchors.left: todayText.right
     anchors.leftMargin: root.rowsDay !== "" ? Style.space(10) : Style.space(12)
     anchors.right: unitBox.left
-    anchors.rightMargin: root.widestOrderWidth + orderText.anchors.rightMargin + Style.space(10)
+    anchors.rightMargin: root.orderRoom + orderText.anchors.rightMargin + Style.space(10)
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     breadth: root.breadth
@@ -299,6 +342,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
     text: Rows.orderLabel(root.order, root.reversed)
+    onImplicitWidthChanged: root.moveOrderRoom()
     readonly property bool sorted: root.order !== "manual"
     // The arrow's target runs to the word's first letter, and left to make
     // the shell's 22 px, but never into the breadth rule, whose hover says
