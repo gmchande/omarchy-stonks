@@ -24,6 +24,7 @@ OverRows {
   property bool naming: false
   // Why the typed name can't be made, said under it.
   property string problem: ""
+  onProblemChanged: if (problem !== "") Qt.callLater(showProblem); else clampScroll()
   readonly property int newIndex: choices.length
 
   readonly property int itemHeight: Style.space(30)
@@ -89,6 +90,7 @@ OverRows {
   function toggle(index) {
     if (index === newIndex) return startNaming()
     if (index < 0 || index >= choices.length) return
+    if (naming) stopNaming()
     cursor = index
     showCursor()
     toggled(choices[index].name, !member(index))
@@ -116,10 +118,8 @@ OverRows {
     showCursor()
   }
 
-  function showCursor() {
+  function scrollTo(to) {
     scroll.cancelFlick()
-    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
-    var to = Rows.topShowing(cursor, rowSize(), base, scroll.height)
     if (!active || !seen || still || Motion.duration(Style, 160) <= 0 || Math.abs(to - scroll.contentY) < 0.5) {
       scrollGlide.stop()
       scroll.contentY = to
@@ -128,11 +128,32 @@ OverRows {
     scrollGlide.to = to
     scrollGlide.restart()
   }
+
+  function showCursor() {
+    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
+    scrollTo(Rows.topShowing(cursor, rowSize(), base, scroll.height))
+  }
+
+  function showProblem() {
+    if (problem === "") return
+    var bottom = (newIndex + 2) * itemHeight
+    var base = scrollGlide.running ? scrollGlide.to : scroll.contentY
+    if (bottom <= base + scroll.height) return
+    scrollTo(Math.max(0, bottom - scroll.height))
+  }
+
+  function clampScroll() {
+    var limit = Math.max(0, (newIndex + 1) * itemHeight - scroll.height)
+    if (scroll.contentY <= limit) return
+    scrollGlide.stop()
+    scroll.contentY = limit
+  }
   NumberAnimation { id: scrollGlide; target: scroll; property: "contentY"; duration: Motion.duration(Style, 160); easing.type: Easing.OutCubic }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle.
   function keepCursorInSight() {
+    if (naming) return
     cursor = Rows.cursorKeptInSight(cursor, newIndex + 1, rowSize(), scroll.contentY, scroll.height)
   }
 
@@ -243,7 +264,8 @@ OverRows {
     contentHeight: column.implicitHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    interactive: contentHeight > height
+    // Held still while naming, so the field stays in sight and keeps focus.
+    interactive: contentHeight > height && !root.naming
     // `moving` stays false for a key's scroll.
     onMovementStarted: scrollGlide.stop()
     onContentYChanged: {

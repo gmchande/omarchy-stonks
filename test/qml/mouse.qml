@@ -954,6 +954,100 @@ Harness {
       harness.check("a touchpad swipe moves the rows three times its pixels, as Omarchy's menu does",
         Math.abs(list.contentY - swipeFrom - 30) < 0.5, swipeFrom + " " + list.contentY)
 
+      // Fault 19c: the open-mode bell tooltip says "since the open", not "today's open".
+      var savedUnit = service.changeMode
+      service.persist({ changeMode: "open" })
+      within(1500, function() { return service.changeMode === "open" })
+      var unitArea = at("unitTarget")
+      var unitTip = ""
+      for (var ut = 0; unitArea && ut < unitArea.data.length; ut++) {
+        if (typeof unitArea.data[ut].text === "string" && unitArea.data[ut].text !== "") unitTip = unitArea.data[ut].text
+      }
+      harness.check("the open-mode unit tooltip says since the open, not today's open",
+        unitTip === "% change since the open", unitTip)
+      service.persist({ changeMode: savedUnit })
+      within(1500, function() { return service.changeMode === savedUnit })
+
+      // Fault 18: wide row figures stay inside priceWidth without crossing onto
+      // the sparkline, and long unmapped exchange names in Hero stay inside
+      // Hero's right edge with no dangling dot when the lead has no room.
+      var edgeSym = body.chartSymbol
+      var edgeOrig = service.feeds.quotes.quotes
+      var edgeQ = edgeOrig[edgeSym]
+      var edgeMode = service.changeMode
+      service.persist({ changeMode: "abs" })
+      within(1500, function() { return service.changeMode === "abs" })
+      var wideQ = Object.assign({}, edgeOrig)
+      wideQ[edgeSym] = Object.assign({}, edgeQ, {
+        price: 0.00000000361, prevClose: 0.00000000100, priceDigits: 11,
+        exchange: "WARSAW STOCK EXCHANGE VERY LONG UNMAPPED EXCHANGE NAME THAT EXCEEDS EVEN A WIDE DESKTOP WINDOW HERO WIDTH",
+        name: "Very Long Unmapped Exchange Company Name International Corporation"
+      })
+      service.feeds.quotes.quotes = wideQ
+      var edgeRow = row(edgeSym)
+      var wideReady = within(2000, function() {
+        return !!edgeRow && !!edgeRow.view && /0\.00000000261/.test(edgeRow.view.changeLine)
+      })
+      var rowTexts = []
+      var findTexts = function(item) {
+        if (!item) return
+        if (typeof item.paintedWidth === "number" && typeof item.text === "string" && item.text !== "") rowTexts.push(item)
+        for (var i = 0; i < item.children.length; i++) findTexts(item.children[i])
+      }
+      findTexts(edgeRow)
+      var changeItem = rowTexts.filter(function(t) { return /0\.00000000261/.test(t.text) })[0]
+      var changeFits = !!changeItem && changeItem.paintedWidth <= changeItem.width + 0.5
+      var heroMeta = at("listingMeta")
+      var heroItem = heroMeta ? heroMeta.parent : null
+      var metaFits = !!heroMeta && !!heroItem && heroMeta.x + heroMeta.width <= heroItem.width + 0.5 && heroMeta.text.indexOf(" · ") !== 0
+      var edgeDiag = [wideReady, changeFits, changeItem ? changeItem.paintedWidth.toFixed(1) + "/" + changeItem.width.toFixed(1) : "no change",
+        metaFits, heroMeta ? (heroMeta.x + heroMeta.width).toFixed(1) + "/" + (heroItem ? heroItem.width.toFixed(1) : 0) + " '" + heroMeta.text + "'" : "no meta"].join(" | ")
+      service.feeds.quotes.quotes = edgeOrig
+      service.persist({ changeMode: edgeMode })
+      within(2000, function() { return service.changeMode === edgeMode })
+      harness.check("wide row figures stay within priceWidth and long Hero exchange names stay inside Hero without a leading dot",
+        wideReady && changeFits && metaFits, edgeDiag)
+
+      // Fault 9: in SymbolLists with many lists, submitting an invalid New list…
+      // name scrolls the error into sight, scroll stays locked while naming,
+      // and clicking a list row exits naming cleanly.
+      var manyNames = []
+      for (var li = 1; li <= 12; li++) {
+        var ln = "ManyList " + (li < 10 ? "0" : "") + li
+        manyNames.push(ln)
+        service.createList(ln)
+      }
+      body.openSymbolLists(body.chartSymbol)
+      var symLists = null
+      var symScroll = null
+      var listsOpen = within(2000, function() {
+        symLists = harness.find(body, "symbolLists")
+        return !!symLists && symLists.active && symLists.choices.length >= 13
+      })
+      for (var sc = 0; symLists && sc < symLists.children.length; sc++) {
+        if (typeof symLists.children[sc].contentY === "number") symScroll = symLists.children[sc]
+      }
+      var scrollableBefore = within(1500, function() { return !!symScroll && symScroll.contentHeight > symScroll.height && symScroll.interactive })
+      if (symLists) symLists.startNaming()
+      var namingOn = within(1500, function() { return !!symLists && symLists.naming })
+      var scrollLocked = !!symScroll && !symScroll.interactive
+      if (symLists) symLists.createRequested("")
+      var errVisible = within(1500, function() {
+        if (!symLists || !symScroll || symLists.problem === "") return false
+        var errBottom = (symLists.newIndex + 2) * symLists.itemHeight
+        return errBottom <= symScroll.contentY + symScroll.height + 1
+      })
+      var symDiag = symLists && symScroll ? "contentY=" + symScroll.contentY.toFixed(1) + " h=" + symScroll.height.toFixed(1) + " ch=" + symScroll.contentHeight.toFixed(1) + " errB=" + ((symLists.newIndex + 2) * symLists.itemHeight) : ""
+      var firstListRow = symLists ? harness.findAll(symLists, "symbolListRow")[0] : null
+      if (symLists && firstListRow) symLists.toggle(0)
+      var exitedNaming = within(1500, function() { return !!symLists && !symLists.naming })
+      body.closeViews()
+      for (var ld = 0; ld < manyNames.length; ld++) service.deleteList(manyNames[ld])
+      rest()
+      harness.check("SymbolLists locks scroll while naming, scrolls New list validation errors into view, and exits naming when another list is clicked",
+        listsOpen && scrollableBefore && namingOn && scrollLocked && errVisible && exitedNaming,
+        [listsOpen, "scrollBefore:" + scrollableBefore, namingOn, "locked:" + scrollLocked, "errVis:" + errVisible, "exited:" + exitedNaming, symDiag].join(" | "))
+
       app.close()
       harness.finish()
     }

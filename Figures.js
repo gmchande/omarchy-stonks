@@ -69,7 +69,7 @@ function dayNote(day, now, calendars) {
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades today"
-  if (day.untraded) return "No trades yet"
+  if (day.untraded) return "Not traded yet"
   var head = Quote.headlineQuote(day)
   var tradedToday = !!head && head.t !== null && head.t >= regular.start
   if (now < regular.start || tradedToday) return ""

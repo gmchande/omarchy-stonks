@@ -105,8 +105,8 @@ The move beside the price counts from the close that the chart's dashed
 line marks, and the line under the price names that close, such as FRI
 CLOSE 158.74. While the large price is still the close, that line shows the
 pre-market or after-hours price instead. The line under the move names the
-move and gives it in the other unit, such as TODAY ▲4.57 USD, OVERNIGHT
-▼1.83 USD or PRE-MARKET ▼5.74 USD. A move in money always names its
+move and gives it in the other unit, such as TODAY +4.57 USD, OVERNIGHT
+−1.83 USD or PRE-MARKET −5.74 USD. A move in money always names its
 currency, except an index's, which moves in points. On a longer range, the
 move counts from the range's start. A coin never closes, so its day is its
 last 24 hours.
@@ -169,8 +169,9 @@ To find or add a stock, click "+ Find or add a symbol" or press `/`, and
 type a name or a symbol. Stocks in the list you're looking at come first,
 with today's move, then Yahoo's results. The chart shows the highlighted
 result before you add it, and Enter or a click adds it. Right after you
-start a list, search shows every stock in All first, and stays open after
-each add, listing what you've added, until you click DONE or press Esc.
+start a list, search matches stocks in All first as you type, and stays
+open after each add, listing what you've added, until you click DONE or
+press Esc.
 
 To remove a row, click the × beside its symbol, or select it and press
 Delete. It leaves the list you're looking at, and removing it from All
@@ -254,7 +255,7 @@ clipboard, with a notification that opens it in your screenshot editor.
 
 ## Keys
 
-`?` lists these keys:
+`?` opens a sheet with these keys (and closes it again):
 
 | Key | Does |
 | --- | --- |
@@ -271,7 +272,6 @@ clipboard, with a notification that opens it in your screenshot editor.
 | `s` | Switch between smooth and retro |
 | `w` | Open the list menu |
 | `o` | Change the order |
-| `?` | Show these keys |
 
 Omarchy's panel keys work too. `Esc` closes, and `Ctrl+↑` `Ctrl+↓` move
 the selected row in your own order. In Manage lists, `Ctrl+↑` `Ctrl+↓`
@@ -294,7 +294,7 @@ again.
 - **"Can't connect".** Yahoo sent nothing back. Rows keep the price they
   had, with its time. Check your internet: if other sites load, Yahoo may
   be down. Stonks retries within two minutes, and `r` retries at once.
-- **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
+- **"Server busy" or "The price server is busy".** Yahoo asked Stonks to send fewer requests. Stonks
   retries at the time shown, at most 36 minutes on, and `r` won't hurry
   it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" on the top
@@ -418,7 +418,7 @@ charts stop.
   rows in sight first: every minute while a row's market trades and every
   5 minutes before and after the session, but every minute for the stock
   on show, and never for a row whose market hasn't traded since its last
-  price. With no pill in a bar, it asks nothing until you open the panel
+  price. After that first fetch, with no pill in a bar, it asks nothing until you open the panel
   or the window. It also asks for a search result you pause on. To change
   "every minute", set `"refreshIntervalSec"` in
   `~/.config/omarchy/grvc.stonks.json` to a number of seconds from 30 to
@@ -426,9 +426,10 @@ charts stop.
 - `query2.finance.yahoo.com` for search as you type, asking for each word
   once while search is open.
 - `api.robinhood.com` for overnight prices, and for trades that fill a
-  stretch Yahoo left empty. Once a day it asks the day each US stock
-  listed, again 5 minutes later if that fails, and once for each stock the
-  pill shows. Through the night it asks about the pill's stock and, with
+  stretch Yahoo left empty. For US stocks in sight (or the stock the pill
+  shows), it asks the day each listed, again 5 minutes later if that fails,
+  and re-checks once a day until the listing is more than 30 days old.
+  Through the night it asks about the pill's stock and, with
   the panel or the window open, the stock on show and the rows in sight,
   with one past each edge, for the trades each one's chart draws every 5
   minutes, which say whether it trades at night; and for the last trade
@@ -471,8 +472,9 @@ omarchy restart shell
 Or click the footer when it says "Update to …". A terminal opens, shows
 what changes and asks. Say yes, and it updates Stonks and restarts the
 shell. If Stonks has changes it hasn't saved, or can't read your lists
-file, it updates without the restart, and the footer says "Updated to … ·
-click to restart the shell", as it does after an update run anywhere else.
+file, it updates without the restart; once that's resolved, the footer says
+"Updated to … · click to restart the shell", as it does after an update run
+anywhere else.
 Stonks never updates itself.
 
 From 1.2.1 or earlier, the terminal first stops at a page of the changes,

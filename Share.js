@@ -79,6 +79,29 @@ function barDate(history, bar) {
   return clock ? day.date + " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset)) : day.date
 }
 
+function sentenceMonths(text) {
+  return String(text || "").replace(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/g, function(m) {
+    return m.charAt(0) + m.slice(1).toLowerCase()
+  })
+}
+
+// The range bar's moment in the notification sentence, matching the card's
+// date while using natural month casing and the right preposition.
+function barSaid(history, bar) {
+  var day = History.barDay(history, bar)
+  var clock = day.clock
+  var at = clock ? " at " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset)) : ""
+  if (bar === history.start) {
+    if (bar.listed && history.offered) return "at the IPO price"
+    if (!bar.clock && !bar.listed) return "at the close before " + sentenceMonths(day.date.replace(/^CLOSE BEFORE /, ""))
+    return "on " + sentenceMonths(day.date) + at
+  }
+  if (clock) return "on " + sentenceMonths(day.date) + at
+  if (day.date.indexOf("WEEK OF ") === 0) return "for the week of " + sentenceMonths(day.date.slice(8))
+  if (history.interval === "1mo" || history.interval === "3mo") return "for " + sentenceMonths(day.date)
+  return "on " + sentenceMonths(day.date)
+}
+
 // The picture's words beyond the panel's two lines (`Figures.heroLines`),
 // which it draws as the panel does, from what the surface shows (`newest`
 // is the price on top at rest; `scrubT` is 0 at rest):
@@ -104,7 +127,7 @@ function words(o) {
   }
   if (at.bar) {
     out.foot = barDate(o.history, at.bar)
-    out.said = "on " + out.foot
+    out.said = barSaid(o.history, at.bar)
   } else if (at.t) {
     out.foot = dateOf(quote, at.t, o.calendars) + " · " + (at.close ? "CLOSE " : "") + clockOf(quote, at.t, o.calendars)
     out.said = at.close ? "at the close" : "at " + Market.tradeTime(quote, at.t, o.calendars)
@@ -121,7 +144,7 @@ function words(o) {
   return out
 }
 
-// "AAPL at the close", "AAPL 1Y on 3 AUG 2026".
+// "AAPL at the close", "AAPL 1Y on 3 Aug 2026".
 function subject(symbol, range, said) {
   return symbol + (range && range !== "1D" ? " " + range : "") + (said ? " " + said : "")
 }

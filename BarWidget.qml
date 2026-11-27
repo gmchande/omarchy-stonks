@@ -304,7 +304,7 @@ BarWidget {
     // Fri −1.42%", "after hours", "as of 23:12"), and what a "!" means. Its
     // first word takes a capital: "Overnight · Fri −1.42%", "After hours" alone.
     // None while the panel is open: the bubble would land on its header.
-    readonly property string hoverLine: [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.pillNote, root.warningText]
+    readonly property string hoverLine: [root.iconOnly ? (root.featuredSymbol || "STONKS") + (!root.featured && root.warns ? " !" : " " + root.changeText) : "", root.openNote, root.listingNote, root.pillNote, root.warningText]
       .filter(function(part) { return part !== "" }).join(" · ")
     tooltipText: root.opened ? "" : hoverLine.charAt(0).toUpperCase() + hoverLine.slice(1)
 
