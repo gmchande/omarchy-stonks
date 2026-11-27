@@ -249,13 +249,6 @@ function listRow(quote, mode, newest, line, scrubT) {
   return scrubbed ? rowModel(scrubbed, scrubT, mode, newest) : rowModel(quote, 0, mode, newest)
 }
 
-// The pill: at night it keeps the day's close and move until the pre-market's
-// first prices arrive, soon after 04:00 (`Overnight.restingNewest`), with
-// tonight's move in its hover (`pillNote`).
-function pillRow(quote, mode, newest) {
-  return rowModel(quote, 0, mode, Overnight.restingNewest(newest))
-}
-
 // A row's note after its name: "Overnight" while its move is tonight's,
 // counted from the close just gone, since the list's header keeps naming
 // the day (`rowsSharedDay`).
@@ -494,8 +487,8 @@ function moveAwaited(quote, view) {
 
 // The pill's hover on a listing's first day: before its first trade, that
 // there is none yet, with the IPO price the pill shows; after it, the IPO
-// price, while the pill's move (`row`, `pillRow`) counts from it: not since
-// the open, nor from the close just gone once the next day's pre-market
+// price, while the pill's move (`row`) counts from it: not since the open,
+// nor from the close just gone once tonight or the next day's pre-market
 // trades.
 function listingNote(quote, row, mode) {
   if (!Quote.listingDay(quote) || !Format.isFiniteNumber(quote.prevClose)) return ""
@@ -505,24 +498,29 @@ function listingNote(quote, row, mode) {
 }
 
 // The pill's hover past its symbol and move: only what the pill can't
-// show. While it keeps the day (`pillRow`), tonight's move, "tonight
-// −3.54%", and nothing since the open, which tonight has no open to count
-// from. Else the session of a price from outside the regular one, "after
-// hours", unless a warning names it. Either ends "as of 23:12" once its
-// price is late, by the rules the rows and the panel go by: a row's "As
-// of" (`Freshness.freshnessText`) and the panel's dimmed night price
-// (`newestStale`). `fresh` is the pill's own (`Freshness.freshness`).
+// show. At night, "overnight" (with "as of 23:12" once late) and how the
+// closed day ended, "today −3.45%" or "Fri −1.42%". Else the session of a
+// price from outside the regular one, "after hours", with "as of 23:12"
+// once late, by the rules the rows and the panel go by: a row's "As of"
+// (`Freshness.freshnessText`) and the panel's dimmed night price
+// (`newestStale`). Nothing while a warning names both itself. `fresh` is
+// the pill's own (`Freshness.freshness`).
 function pillNote(quote, newest, fresh, mode, calendars, retro) {
-  var now = fresh.now
-  if (Overnight.keepsDay(newest)) {
-    var tonight = rowModel(quote, 0, mode, newest)
-    if (tonight.pct === null) return ""
-    return "tonight " + Format.lookSigns(tonight.changeLine, retro) + (newestStale(newest, now) ? " " + asOfNote(quote, newest.t, now, calendars) : "")
-  }
   if (Freshness.freshnessWarns(fresh)) return ""
+  var now = fresh.now
   var late = fresh.state === "aged" || fresh.state === "saved" || newestStale(newest, now)
-  return [newest ? Market.phaseLabel(newest.phase).toLowerCase() : "", late ? asOfNote(quote, fresh.asOf, now, calendars) : ""]
+  var session = [newest ? Market.phaseLabel(newest.phase).toLowerCase() : "", late ? asOfNote(quote, fresh.asOf, now, calendars) : ""]
     .filter(function(part) { return part !== "" }).join(" ")
+  if (!newest || !newest.joined) return session
+  var closed = rowModel(quote, 0, mode === "abs" ? "abs" : "pct")
+  if (closed.pct === null) return session
+  var today = exchangeDay(quote, now)
+  var head = Quote.headlineQuote(quote)
+  var dayT = head && head.t !== null ? head.t : quote.session && quote.session.regular ? quote.session.regular.start : null
+  var named = dayT !== null ? moveDay(quote, dayT, today) : ""
+  var day = named === "TODAY" ? "today" : Format.sentenceCase(named)
+  var ended = (day ? day + " " : "") + Format.lookSigns(closed.changeText, retro)
+  return [session, ended].filter(function(part) { return part !== "" }).join(" · ")
 }
 
 function asOfNote(quote, t, now, calendars) {
@@ -533,8 +531,7 @@ function newestStale(newest, now) {
   return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
 }
 
-// The header reads the panel's move, the pill its own (`pillRow`), so at
-// night the two can differ.
+// The bull or bear for a stock's day move, shared by the header and the pill.
 function animalKind(row) {
   return !row || row.dayTone === "flat" ? "" : row.dayTone === "up" ? "bull" : "bear"
 }

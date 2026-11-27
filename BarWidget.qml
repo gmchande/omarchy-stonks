@@ -9,13 +9,12 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Format.js" as Format
-import "Overnight.js" as Overnight
 import "Release.js" as Release
 import "Tones.js" as Tones
 import "Motion.js" as Motion
-// The pill: the stock you last looked at, with its day's line and change
-// whatever range the panel or the window shows. At night it keeps the
-// closed day until 04:00, with tonight's move in its hover.
+// The pill: the stock you last looked at, with what the panel shows on 1D at
+// every hour, whatever range the panel or the window shows. At night, how the
+// closed day ended sits in its hover.
 BarWidget {
   id: root
   // `moduleName` is the bar entry's id, which the bar sets: the plugin's
@@ -32,12 +31,13 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
-  // At night the pill keeps the day's close and move until the new day's
-  // first prices arrive, soon after 04:00 (`Figures.pillRow`).
+  // Matches what the panel shows on 1D, tonight's move included.
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
-  readonly property var featured: featuredQuote ? Figures.pillRow(featuredQuote, service.changeMode, newest) : null
-  // What the pill has no room for: at night tonight's move, else a price's
-  // session outside the regular one, and the time of a late price.
+  readonly property bool newestOld: service ? Figures.newestStale(newest, service.now) : false
+  readonly property var featured: featuredQuote ? Figures.rowModel(featuredQuote, 0, service.changeMode, newest) : null
+  // What the pill has no room for: at night "overnight" and how the closed
+  // day ended, else a price's session outside the regular one, and the time
+  // of a late price.
   readonly property string pillNote: featuredQuote && freshness
     ? Figures.pillNote(featuredQuote, newest, freshness, service.changeMode, service.calendars, retro) : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
@@ -71,7 +71,7 @@ BarWidget {
     c.through = through; c.start = start; c.end = end; c.day = next
     return next
   }
-  readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars, Overnight.keepsDay(newest)) : null
+  readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a right-click picks another, as the
   // clock keeps verticalFormat beside format: a move brings each one's back.
@@ -90,7 +90,7 @@ BarWidget {
   // Its time is the price's the pill shows, as its row's.
   readonly property var freshness: service && featuredSymbol
     ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      Overnight.restingNewest(newest), !!service.nightFailed[featuredSymbol]) : null
+      newest, !!service.nightFailed[featuredSymbol]) : null
   readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.
@@ -296,9 +296,9 @@ BarWidget {
       : root.stackedHeight) + root.markRoom : -1
     // Only what the pill can't say, on one line: the icon form's symbol and
     // change, that the stacked form's move counts from the open, or on a
-    // listing's first day from its IPO price, the pill's note ("tonight
-    // −3.54%", "after hours", "as of 23:12"), and what a "!" means. Its
-    // first word takes a capital: "Tonight −3.54%", "After hours" alone.
+    // listing's first day from its IPO price, the pill's note ("overnight ·
+    // Fri −1.42%", "after hours", "as of 23:12"), and what a "!" means. Its
+    // first word takes a capital: "Overnight · Fri −1.42%", "After hours" alone.
     // None while the panel is open: the bubble would land on its header.
     readonly property string hoverLine: [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.listingNote, root.pillNote, root.warningText]
       .filter(function(part) { return part !== "" }).join(" · ")
@@ -446,13 +446,14 @@ BarWidget {
         font.bold: true
       }
 
-      // The text form says the price too, as a ticker does.
+      // The text form says the price too, as a ticker does. An old night's
+      // price and move dim, as on the panel and rows (`Hero.newestOld`).
       Text {
         visible: root.barStyle === "text" && !!root.featured
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: root.featured ? root.featured.priceText : ""
-        color: button.foreground
+        color: root.newestOld ? root.dimColor : button.foreground
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
@@ -463,7 +464,7 @@ BarWidget {
         textFormat: Text.PlainText
         text: root.changeText
         // With no price, trouble is in the bar's ink, as the header says it.
-        color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
+        color: root.featured ? (root.newestOld ? root.dimColor : root.trendColor) : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
@@ -514,7 +515,7 @@ BarWidget {
           text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text
           fontFamily: button.fontFamily
           fontSize: modelData.text.length > 3 ? button.fontSize * 0.9 : button.fontSize
-          color: !modelData.move ? button.foreground : root.stackedMove.sign > 0 ? root.upColor
+          color: !modelData.move ? button.foreground : root.newestOld ? root.dimColor : root.stackedMove.sign > 0 ? root.upColor
             : root.stackedMove.sign < 0 ? root.downColor : root.dimColor
         }
       }

@@ -492,8 +492,9 @@ Harness {
         root.pillQuote = Object.assign({}, nestDay, { marketTime: root.now - 60 })
       }
       // pill-sheet-night: JNJ on Sunday 25 October at 23:35, as the service
-      // reads it: Friday's close and move on the pill, down, over Friday's
-      // line and tonight's, and tonight's price, up, in its hover.
+      // reads it: tonight's price and move on the pill, up, over Friday's
+      // line in grey and tonight's in green, and Friday's move, down, in its
+      // hover.
       // pill-sheet-night-<folder>-<file>: the listing saved as <file> in a
       // saved moment's folder (night-2026-11-19-2216-brk-b) at the folder's
       // minute, the same way, with the last trade from Robinhood's quote

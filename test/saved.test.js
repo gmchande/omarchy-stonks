@@ -37,7 +37,7 @@ const noNight = symbols => Object.fromEntries(symbols.map(s => [s, { status: "ok
 // The pill's hover past its symbol and move (`Figures.pillNote`), as the pill
 // reads it with its own freshness: a refresh's answer, or one `status`.
 const pillHover = (quote, newest, now, mode = "pct", retro = false, status = "ok") =>
-  M.pillNote(quote, newest, M.freshness({ status }, quote, now, 0, false, M.restingNewest(newest), false), mode, calendars, retro)
+  M.pillNote(quote, newest, M.freshness({ status }, quote, now, 0, false, newest, false), mode, calendars, retro)
 // The header's status at full width, the first of its forms.
 const marketStatus = (...args) => M.statusForms(...args)[0]
 const US = calendars.calendars.US
@@ -2230,11 +2230,9 @@ test("through a night the chart keeps the day that closed with tonight at its en
   expect([top.changeText, lines.close.label, lines.close.price, lines.close.changeText, lines.caption.label, lines.caption.changeText])
     .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64 USD"])
   const geometry = M.chartGeometry(day, calendars)
-  const pill = M.chartGeometry(day, calendars, M.keepsDay(newest))
   const bellX = M.axisFraction(M.chartSpan(day), day.session.regular.end)
   const dashedAt = g => M.money(g.lo + (1 - g.baselineY) * (g.hi - g.lo))
-  expect([geometry.aside, dashedAt(geometry), pill.aside, dashedAt(pill), pill.lo === geometry.lo && pill.hi === geometry.hi])
-    .toEqual([{ from: 0, to: bellX }, "249.87", { from: bellX, to: 1 }, "232.57", true])
+  expect([geometry.aside, dashedAt(geometry)]).toEqual([{ from: 0, to: bellX }, "249.87"])
   // Yahoo can send the close without the one before it: the night keeps its
   // line, and its price on top stands below it, as the move says.
   const unanchored = M.chartGeometry({ ...day, prevClose: null }, calendars)
@@ -2250,7 +2248,7 @@ test("through a night the chart keeps the day that closed with tonight at its en
   const tue = at("2026-10-27", "01:30")
   const lateLines = M.heroLines(stale, M.rowModel(stale, 0, "pct", lateNewest), late.latest, tue, late.day, calendars, "pct", false)
   expect([pillHover(stale, lateNewest, tue), rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue),
-    lateLines.close.label, lateLines.caption.label]).toEqual(["tonight \u22123.07% as of 01:25", "MON", "FRI CLOSE", ""])
+    lateLines.close.label, lateLines.caption.label]).toEqual(["overnight as of 01:25 · Fri \u22120.27%", "MON", "FRI CLOSE", ""])
 })
 
 // Wherever the pointer is on a 1D chart, its change and its animal say
@@ -2285,7 +2283,7 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.price, own: false, closed: true, joined: true, stepped: true, dayStart: at("2026-10-06", "09:30") })
   const top = M.rowModel(quote, 0, "pct", newest)
   expect([top.priceText, top.changeText, M.animalKind(top)]).toEqual(["248.04", "\u22120.73%", "bear"])
-  expect(pillHover(quote, newest, one)).toBe("tonight \u22120.73% as of 00:50")
+  expect(pillHover(quote, newest, one)).toBe("overnight as of 00:50 · Tue +7.44%")
   expect(M.heroLines(quote, top, latest, one, day, calendars, "pct", false)).toEqual({
     close: { label: "TUE CLOSE", time: "", price: "249.87", changeText: "+7.44%", tone: "up", stale: false },
     caption: { label: "OVERNIGHT", changeText: "\u22121.83 USD", tone: "down" }, move: "\u22120.73%" })
@@ -2297,31 +2295,25 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(againstDashedLine(day, "01:00")).toBe("01:00 all against 232.57 then 249.87")
   // A row matches the panel at rest, and following the pointer into
   // Tuesday's after hours reads its line against the close just gone, as
-  // the chart's line does there. The pill keeps Tuesday at rest.
-  expect([M.listRow(quote, "pct", newest).changeText, M.pillRow(quote, "pct", newest).changeText]).toEqual(["\u22120.73%", "+7.44%"])
+  // the chart's line does there.
+  expect(M.listRow(quote, "pct", newest).changeText).toBe("\u22120.73%")
   const evening = day.points.find(p => p.t >= at("2026-10-06", "17:00")).t
   expect(M.money(M.listRow(quote, "pct", newest, day, evening).close)).toBe("249.87")
-  // Yahoo failing while Robinhood answers: the panel's and a row's warning
-  // name the time of their price on top, the night's; the pill's, Tuesday's
-  // close.
+  // Yahoo failing while Robinhood answers: the panel's, a row's and the
+  // pill's warning name the time of their price on top, the night's.
   const failed = M.freshness({ status: "failed", answeredAt: one - 60 }, quote, one, 0, false, newest)
   expect(M.freshnessText(failed, quote, calendars)).toBe("REFRESH FAILED · OVERNIGHT 00:50")
-  const pillFailed = M.freshness({ status: "failed", answeredAt: one - 60 }, quote, one, 0, false, M.restingNewest(newest))
-  expect(M.freshnessText(pillFailed, quote, calendars)).toBe("REFRESH FAILED · AS OF TUE 16:00")
   // Read with no newest price, the close is on top.
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
   // Where Yahoo sent no price, the headline is the chart's 15:55 bar: the
   // line beneath calls it the last trade, never the close. The line above
-  // the price and a row in place of its name say the night's price on top
-  // is the 00:50 trade; the pill, which keeps Tuesday, says its last
-  // trade's time.
+  // the price, a row and the pill say the night's price on top is the 00:50
+  // trade.
   const untraded = { ...quote, price: null }
   const lines = M.heroLines(untraded, M.rowModel(untraded, 0, "pct", newest), null, one, day, calendars, "pct", false)
   expect(lines.close).toMatchObject({ label: "LAST TRADE", time: "TUE 15:55", price: "249.78", changeText: "+7.40%" })
   const untradedFresh = M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, newest)
   expect(M.freshnessText(untradedFresh, untraded, calendars)).toBe("OVERNIGHT 00:50")
-  const untradedPill = M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, M.restingNewest(newest))
-  expect(M.freshnessText(untradedPill, untraded, calendars)).toBe("LAST TRADE · TUE 15:55")
 })
 
 // A watch moment's listings as the service holds them, answered at the
@@ -2369,7 +2361,7 @@ const topsAt = set => {
   }
   // The pill: price, move and animal, and the pill's hover.
   const pill = (s, mode = "pct", retro = false) => {
-    const row = M.pillRow(quotes[s], mode, newest[s] || null)
+    const row = M.rowModel(quotes[s], 0, mode, newest[s] || null)
     return [[row.priceText, row.changeText, M.animalKind(row)].join(" "), pillHover(quotes[s], newest[s] || null, now, mode, retro)].join(" | ")
   }
   return { now, quotes, nights, symbols, newest, top, lines, pill }
@@ -2388,18 +2380,17 @@ test("at night the price on top is Robinhood's last trade at its venue's second,
   expect(["NVDA", "AAPL", "BRK-B", "BLDP"].map(s => [s, night.newest[s].p, night.newest[s].t, night.newest[s].phase])).toEqual([
     ["NVDA", 143.83, t("22:16") + 24, "overnight"], ["AAPL", 351.12, t("22:16") + 12, "overnight"],
     ["BRK-B", 573.29, t("22:15") + 28, "overnight"], ["BLDP", 1.16, t("21:53") + 45, "overnight"]])
-  // Berkshire's panel and row count tonight from Thursday's close, while
-  // its pill keeps Thursday's close and move with tonight's move in the
-  // hover, as NVDA's do.
+  // Berkshire's panel, row and pill count tonight from Thursday's close, with
+  // Thursday's closed move in the pill's hover, as NVDA's do.
   expect(["NVDA", "BRK-B"].map(s => [night.top(s), night.pill(s)])).toEqual([
-    ["143.83 \u22121.47% | CLOSE 145.98 \u22123.30% | OVERNIGHT \u22122.15 USD", "145.98 \u22123.30% bear | tonight \u22121.47%"],
-    ["573.29 +0.22% | CLOSE 572.04 \u22120.45% | OVERNIGHT +1.25 USD", "572.04 \u22120.45% bear | tonight +0.22%"]])
+    ["143.83 \u22121.47% | CLOSE 145.98 \u22123.30% | OVERNIGHT \u22122.15 USD", "143.83 \u22121.47% bear | overnight · today \u22123.30%"],
+    ["573.29 +0.22% | CLOSE 572.04 \u22120.45% | OVERNIGHT +1.25 USD", "573.29 +0.22% bull | overnight · today \u22120.45%"]])
   // AAPL's bid was 351.07 and its ask 351.26. The panel's price is the
-  // trade's, up 0.55% on Yahoo's close of 349.21, the pill's hover says the
-  // same move, with no time while the trade is fresh, and the line ends on
-  // it.
+  // trade's, up 0.55% on Yahoo's close of 349.21, the pill shows the same
+  // move with no time in its hover while fresh (only overnight and today's
+  // close), and the line ends on it.
   expect(night.top("AAPL").split(" | ")[0]).toBe("351.12 +0.55%")
-  expect(pillHover(night.quotes.AAPL, night.newest.AAPL, night.now)).toBe("tonight +0.55%")
+  expect(pillHover(night.quotes.AAPL, night.newest.AAPL, night.now)).toBe("overnight · today \u22120.92%")
   expect(M.lineDay("AAPL", night.quotes.AAPL, night.nights, calendars, night.now).points.at(-1))
     .toEqual({ t: t("22:16") + 12, p: 351.12, s: "overnight" })
   // A quote asked before the bars, its trade inside their last bar's slot,
@@ -2421,7 +2412,7 @@ test("at night the price on top is Robinhood's last trade at its venue's second,
   expect(M.lastTrades(fixture(`moments/${set}/robinhood-quotes.json`), ["NVDA", "AAPL", "BRK-B", "BLDP", "ZZZZQ"]).ZZZZQ).toBe(null)
 })
 
-test("in every phase, a stock that has traded since its close shows that newest price on top of the panel and on its row, measured from its chart's dashed line, while the pill keeps the day at night", () => {
+test("in every phase, a stock that has traded since its close shows that newest price on top of the panel, on its row and on the pill, measured from its chart's dashed line", () => {
   // The weekend watch's moments, 25 to 27 October. NBIS and JNJ trade at
   // night on Robinhood; PSIX doesn't; BRK-A and CVR hadn't traded since
   // their close; an index, a coin, and London, Tokyo and Toronto have no
@@ -2473,21 +2464,17 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([set, s, M.lineDay(s, at.quotes[s], {}, calendars)]).toEqual([set, s, waiting ? waiting.day : null])
     }
   }
-  // Sunday 23:35: JNJ's row draws Friday and tonight's trades against
+  // Sunday 23:35: JNJ's row and pill draw Friday and tonight's trades against
   // Friday's close, with Friday set aside and tonight bright, showing
-  // tonight's move and "Overnight"; its pill keeps Friday's move against
-  // Thursday's close, with tonight set aside.
+  // tonight's move (+0.11%, bull) and Friday's (−1.42%) in the pill's hover.
   {
     const at = topsAt("watch-2026-10-25-2335")
     const day = M.lineDay("JNJ", at.quotes.JNJ, at.nights, calendars)
     const rowLine = M.chartGeometry(day, calendars)
     const row = M.listRow(at.quotes.JNJ, "pct", at.newest.JNJ)
-    const pillLine = M.chartGeometry(day, calendars, M.keepsDay(at.newest.JNJ))
-    const pill = M.pillRow(at.quotes.JNJ, "pct", at.newest.JNJ)
     expect([day.points.at(-1).p > M.regularClose(day), row.changeText, M.rowNote(row), M.money(rowLine.lo + (1 - rowLine.baselineY) * (rowLine.hi - rowLine.lo)),
       M.asideAt(rowLine, rowLine.points.at(-1).x), M.asideAt(rowLine, 0)]).toEqual([true, "+0.11%", "Overnight", "263.81", false, true])
-    expect([pill.changeText, M.money(pillLine.lo + (1 - pillLine.baselineY) * (pillLine.hi - pillLine.lo)),
-      M.asideAt(pillLine, pillLine.points.at(-1).x), M.asideAt(pillLine, 0)]).toEqual(["\u22121.42%", "267.61", true, false])
+    expect(at.pill("JNJ")).toBe("264.11 +0.11% bull | overnight as of 23:25 · Fri \u22121.42%")
   }
   // The list's header names the day the rows measure: Friday all weekend,
   // Sunday night too, today until midnight, then Monday until the new day's
@@ -2697,30 +2684,32 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // says "As of": a price saved before a refresh, a week on with its date,
   // since a weekday would read as this week's. A failed refresh's warning
   // names both itself.
-  expect(pillHover(sunday.quotes.NBIS, nbis, sunday.now)).toBe("tonight \u22123.92% as of 23:30")
+  expect(pillHover(sunday.quotes.NBIS, nbis, sunday.now)).toBe("overnight as of 23:30 · Fri \u22120.27%")
   expect([pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now), pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, "pct", false, "saved"),
     pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, "pct", false, "saved"), pillHover(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, "pct", false, "failed")])
     .toEqual(["after hours", "after hours as of Fri 19:00", "after hours as of 23 Oct 19:00", ""])
-  // The pill keeps the day until 04:00. Monday 19:55 it shows the day's
-  // whole move, after hours in it, as its row; from tonight's first trade,
-  // Monday's close and move, with Monday's bear, and tonight's move in its
-  // hover; from 04:00 the pre-market's, as its row.
+  // The pill matches the panel at every hour: Monday 19:55 it shows the
+  // day's whole move, after hours in it; from tonight's first trade,
+  // tonight's price, move and animal, with how the closed day ended in its
+  // hover; from 04:00 the pre-market's.
   expect(["watch-2026-10-26-1955", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"]
     .map(set => topsAt(set).pill("NBIS"))).toEqual(["155.90 \u22121.79% bear | after hours",
-    "153.27 \u22123.45% bear | tonight +2.30% as of 20:00",
-    "153.27 \u22123.45% bear | tonight \u22120.16% as of 03:45",
+    "156.80 +2.30% bull | overnight as of 20:00 · today \u22123.45%",
+    "153.03 \u22120.16% bear | overnight as of 03:45 · Mon \u22123.45%",
     "154.04 +0.50% bull | pre-market"])
-  // Sunday night it keeps Friday's, in each unit and look; since the open,
-  // tonight has no open to count from, so the hover says nothing of it.
+  // Sunday night it shows tonight's move in each unit and look, with
+  // Friday's close in its hover; since the open, tonight has no open yet,
+  // so the pill shows a dash and the hover still gives Friday's close.
   expect([sunday.pill("NBIS"), sunday.pill("NBIS", "abs"), sunday.pill("NBIS", "pct", true), sunday.pill("NBIS", "open")]).toEqual([
-    "158.74 \u22120.27% bear | tonight \u22123.92% as of 23:30",
-    "158.74 \u22120.43 bear | tonight \u22126.23 as of 23:30",
-    "158.74 \u22120.27% bear | tonight ▼3.92% as of 23:30",
-    "158.74 \u22120.01% bear | "])
+    "152.51 \u22123.92% bear | overnight as of 23:30 · Fri \u22120.27%",
+    "152.51 \u22126.23 bear | overnight as of 23:30 · Fri \u22120.43",
+    "152.51 \u22123.92% bear | overnight as of 23:30 · Fri ▼0.27%",
+    "152.51 \u2014 bear | overnight as of 23:30 · Fri \u22120.27%"])
   // At every saved moment and every stock in it, a row's price, move and the
   // close it counts from equal the panel's when that stock is on show, in
-  // every unit and look, and the row's chart geometry matches the panel's.
-  // The pill keeps the closed day's close and move at night, until 04:00.
+  // every unit and look, and the row's and pill's chart geometry match the
+  // panel's. An off-screen row with only Robinhood's quote trade (`lastTrades`,
+  // no fuller bars yet) produces the same night price, move and close.
   {
     const off = []
     let moments = 0
@@ -2782,12 +2771,13 @@ test("in every phase, a stock that has traded since its close shows that newest 
         const panelGeom = M.chartGeometry(view.day, calendars)
         if (rowGeom.baselineY !== panelGeom.baselineY || JSON.stringify(rowGeom.aside) !== JSON.stringify(panelGeom.aside))
           off.push(`${set} ${s} (geometry): row baseline ${rowGeom.baselineY} aside ${JSON.stringify(rowGeom.aside)}, panel ${panelGeom.baselineY} ${JSON.stringify(panelGeom.aside)}`)
-        const pill = M.pillRow(quotes[s], "pct", rowNewest)
-        const panelPct = M.rowModel(quotes[s], 0, "pct", panelNewest)
-        const close = M.heroLines(quotes[s], panelPct, null, now || quotes[s].marketTime || 0, null, calendars, "pct", false).close
-        const pillWant = panelNewest && panelNewest.joined ? close.price + " " + close.changeText : panelPct.priceText + " " + panelPct.changeText
-        if (pill.priceText + " " + pill.changeText !== pillWant)
-          off.push(`${set} ${s} (pill): ${pill.priceText} ${pill.changeText}, not ${pillWant}`)
+        if (lastTrades[s] && lastTrades[s].trade && panelNewest && panelNewest.joined && lastTrades[s].trade.t >= panelNewest.t) {
+          const quotedNewest = M.newestTradeOf(s, quotes[s], {}, calendars, lastTrades)
+          const quotedRow = M.listRow(quotes[s], "pct", quotedNewest)
+          const panelPct = M.rowModel(quotes[s], 0, "pct", panelNewest)
+          if (quotedRow.priceText !== panelPct.priceText || quotedRow.changeText !== panelPct.changeText || quotedRow.close !== panelPct.close)
+            off.push(`${set} ${s} (quoted off-screen): ${quotedRow.priceText} ${quotedRow.changeText} (close ${quotedRow.close}), panel ${panelPct.priceText} ${panelPct.changeText} (close ${panelPct.close})`)
+        }
       }
     }
     expect([off, moments > 50, nights > 0]).toEqual([[], true, true])

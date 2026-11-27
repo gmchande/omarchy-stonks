@@ -350,37 +350,43 @@ function shownListings(s) {
 }
 
 // The listings Robinhood's quote is asked about, for the night's last
-// trade, only while a night trades: with a surface open those
-// `shownListings` names, with nothing open the pill's stock, each once
-// its trades show it trading at night.
+// trade, only while a night trades: with nothing open, the pill's stock
+// once its trades show it trading at night; with a surface open, the whole
+// list on show (plus the stock on show and a preview) so sorting by change
+// and the breadth bar agree with every row before it scrolls into sight,
+// skipping any listing whose trades already show it doesn't trade at night.
 function lastTradeListings(s) {
   var cal = Overnight.overnightMarket(s.calendars)
   var tonight = cal ? Overnight.nightAt(cal, s.now) : null
   if (!tonight || !tonight.open || (!s.open && !s.pill)) return []
-  var listings = s.open ? shownListings(s).listings : s.overnightSymbols.indexOf(s.featured) >= 0 ? [s.featured] : []
-  return listings.filter(function(x) { return Overnight.tradesAtNight(s.nights[x], cal) })
+  if (!s.open) {
+    return s.overnightSymbols.indexOf(s.featured) >= 0 && Overnight.tradesAtNight(s.nights[s.featured], cal)
+      ? [s.featured] : []
+  }
+  var shown = shownListings(s)
+  var rows = s.listSymbols || s.allSymbols
+  var listed = function(x) { return x === s.featured || (s.previewShown && x === s.preview) || rows.indexOf(x) >= 0 }
+  var listings = s.overnightSymbols.filter(listed).concat(shown.previewing ? [s.preview] : [])
+  return listings.filter(function(x) { return !s.nights[x] || Overnight.tradesAtNight(s.nights[x], cal) })
 }
 
-// The quote goes once one asked before is `interval` seconds old, the
-// chart waited on, the preview's or else the stock on show, has none, or
-// one is behind its trades: those asked now (`alongside`), or answered
-// since. A quote asked before its trades can't say whether its trade is
-// newer than their last bar (`Overnight.joinedTrade`). Rows coming into
-// sight with no quote yet wait for it rather than each send a request.
-// With it go every listing not yet asked, those due within half an
-// interval, and those behind. `lastTrades` is the quote feed's entries,
-// `nights` the trades'.
+// The quote goes once any listed symbol has none yet, one asked before is
+// `interval` seconds old, or one is behind its trades: those asked now
+// (`alongside`), or answered since. A quote asked before its trades can't
+// say whether its trade is newer than their last bar
+// (`Overnight.joinedTrade`). With it go every listing not yet asked, those
+// due within half an interval, and those behind. `lastTrades` is the quote
+// feed's entries, `nights` the trades'.
 function lastTradeAsks(s, alongside) {
   var traded = lastTradeListings(s)
-  var waited = shownListings(s).previewing ? s.preview : s.featured
   var dueBy = function(at) {
     return function(x) { return !!s.lastTrades[x] && at - s.lastTrades[x].at >= s.interval }
   }
   var behind = function(x) {
     var entry = s.lastTrades[x]
-    return !!entry && (alongside.indexOf(x) >= 0 || (!!s.nights[x] && s.nights[x].at > entry.at))
+    return !!entry && ((alongside.indexOf(x) >= 0 && entry.at < s.now) || (!!s.nights[x] && s.nights[x].at > entry.at))
   }
-  if (!traded.some(dueBy(s.now)) && !traded.some(behind) && !(traded.indexOf(waited) >= 0 && !s.lastTrades[waited])) return []
+  if (!traded.some(function(x) { return !s.lastTrades[x] }) && !traded.some(dueBy(s.now)) && !traded.some(behind)) return []
   return traded.filter(function(x) { return !s.lastTrades[x] || dueBy(s.now + s.interval / 2)(x) || behind(x) })
 }
 
