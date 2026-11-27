@@ -820,9 +820,12 @@ Harness {
         var facts = body.yearLine ? body.yearLine.facts : []
         return facts.length === 2 && facts.every(function(f) { return f.value !== "" })
       })
-      harness.check("the window closed while a cap is on its way asks nothing more for it, and open again shows the cap and P/E",
-        seriesOut && seriesIn && quiet && whole,
-        [seriesOut, seriesIn, quiet, whole].join(" ") + " | " + harness.requests().slice(capFrom).join(", "))
+      var batchedCloseRate = harness.record("runs.log").split("\n").some(function(line) {
+        return line.indexOf("fundamentals:SHOP.TO") >= 0 && line.indexOf("rate:USDCAD") >= 0
+      })
+      harness.check("the window closed while a cap is on its way asks nothing more for it, and open again shows the cap and P/E in one batched close+rate run",
+        seriesOut && seriesIn && quiet && whole && batchedCloseRate,
+        [seriesOut, seriesIn, quiet, whole, batchedCloseRate].join(" ") + " | " + harness.requests().slice(capFrom).join(", "))
       closeWindow()
 
       // The bell, sounds on, Do Not Disturb and the microphone answering a
@@ -942,6 +945,59 @@ Harness {
       var saturday = hourFrom(at(harness.sat28, 12, 15))
       harness.check("a holiday asks as a closed day does: an over-the-counter stock through Thanksgiving's hour from 12:15 as through the Saturday's",
         added && holiday === saturday, [added, "Thanksgiving " + holiday, "Saturday " + saturday].join(" | "))
+      closeWindow()
+
+      // A closed market keeps its history fresh past 15 minutes once answered
+      // after its regular close: Saturday 12:15 -> 12:35 revisiting 2Y sends
+      // no new download.
+      startAt(at(harness.sat28, 12, 15))()
+      openWindow()
+      service.feature("NEST")
+      var satBefore = harness.calls("NEST.history")
+      body.selectRange("2Y")
+      var satFirst = within(5000, function() { return harness.calls("NEST.history") === satBefore + 1 && body.historyShown && body.chartRange === "2Y" })
+      var satAskedBefore = harness.calls("NEST.history")
+      body.selectRange("1D")
+      tick(1200, 60)
+      body.selectRange("2Y")
+      var satShown = within(2000, function() { return body.historyShown && body.chartRange === "2Y" })
+      wait(500)
+      var satReasked = harness.calls("NEST.history") - satAskedBefore
+      harness.check("on a closed market, revisiting a range past 15 minutes reuses its history without re-downloading",
+        satFirst && satShown && satReasked === 0, [satFirst, satShown, "reasked=" + satReasked].join(" "))
+      body.selectRange("1D")
+      closeWindow()
+
+      // Non-streaming history ahead batch stops immediately on Yahoo 429 rather
+      // than hammering the remaining URLs in the batch.
+      startAt(at(harness.wed7, 14, 0))()
+      openWindow()
+      var ref429From = harness.requests().length
+      touch("YAHOO.refuse")
+      body.selectRange("5Y")
+      var ref429Hit = within(5000, function() {
+        return harness.requests().slice(ref429From).some(function(l) { return / 429$/.test(l) })
+      })
+      wait(600)
+      var ref429Count = harness.requests().slice(ref429From).filter(function(l) { return / 429$/.test(l) }).length
+      remove("YAHOO.refuse")
+      harness.check("a non-streaming multi-URL fetch stops on the first 429 instead of hammering remaining URLs",
+        ref429Hit && ref429Count === 1, ["hit=" + ref429Hit, "429s=" + ref429Count].join(" "))
+      body.selectRange("1D")
+      closeWindow()
+
+      // Switching changeMode to "open" judges open spark rows that deferred
+      // dayOpen while in pct mode, filling in their open prices.
+      startAt(at(harness.wed7, 14, 30))()
+      openWindow()
+      service.persist({ changeMode: "open" })
+      var openFilled = within(10000, function() {
+        var qs = service.quotes
+        return ["NEST", "KILN", "SPY"].every(function(s) { return !!qs[s] && qs[s].dayOpen !== null })
+      })
+      service.persist({ changeMode: "pct" })
+      harness.check("switching changeMode to open judges deferred spark rows and fills in dayOpen",
+        openFilled, ["openFilled=" + openFilled].join(" "))
       closeWindow()
 
       harness.finish()

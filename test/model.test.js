@@ -516,6 +516,52 @@ test("a run's output splits into its answers, each said by what came back", () =
   const began = performance.now()
   expect(M.answers("\n@@stonks 0 200 " + "1".repeat(100000))).toEqual([])
   expect(performance.now() - began).toBeLessThan(500)
+  // Line-by-line streaming (`parseMarkLine` + `makeAnswer`, as SplitParser
+  // feeds FetchRun) matches `answers()` on single-line, multi-line, trailing
+  // newline, empty-body, and adjacent-blank-line payloads.
+  const stream = raw => {
+    // Emulate Quickshell SplitParser's "\n" splitting: folds consecutive "\n"
+    // after the first into leading "\n"s on the next line.
+    const lines = []
+    let pos = 0
+    while (pos < raw.length) {
+      let nl = raw.indexOf("\n", pos)
+      if (nl < 0) { lines.push(raw.slice(pos)); break }
+      let piece = raw.slice(pos, nl)
+      if (piece === "" && lines.length > 0) {
+        let extra = "\n"
+        pos = nl + 1
+        while (pos < raw.length && raw[pos] === "\n") { extra += "\n"; pos++ }
+        const nextNl = raw.indexOf("\n", pos)
+        if (nextNl < 0) { lines.push(extra + raw.slice(pos)); break }
+        lines.push(extra + raw.slice(pos, nextNl))
+        pos = nextNl + 1
+      } else {
+        lines.push(piece)
+        pos = nl + 1
+      }
+    }
+    const out = []
+    let chunks = []
+    for (const line of lines) {
+      const mark = M.parseMarkLine(line)
+      if (!mark) { chunks.push(line); continue }
+      const body = chunks.length > 0
+        ? chunks.join("\n") + (mark.leading > 0 ? "\n".repeat(mark.leading) : "")
+        : (mark.leading > 1 ? "\n".repeat(mark.leading - 1) : "")
+      chunks = []
+      const a = M.makeAnswer(body, mark, 0)
+      out.push([a.index, a.kind, a.body, a.retryAfter])
+    }
+    return out
+  }
+  const complex = trailer(0, 429, 0, "60")
+    + '{"a":1}\n' + trailer(1, 200, 0)
+    + '{\n\n"b":2}\n' + trailer(2, 200, 0)
+    + trailer(3, "000", 6)
+    + '{"c":3}' + trailer(4, 200, 0) + "truncated"
+  expect(stream(text)).toEqual(got)
+  expect(stream(complex)).toEqual(M.answers(complex).map(a => [a.index, a.kind, a.body, a.retryAfter]))
 })
 
 test("a spark day keeps the last chart's verdict, and a jump past it waits for a chart", () => {
@@ -589,9 +635,25 @@ test("a spark day takes its open from the chart of the same session, and waits f
   const same = M.sparkQuote(day(monday, [100, 100.1, 100.2, 100.1], false), chart.verdict, [])
   expect([same.unjudged, same.quote.dayOpen]).toEqual([false, 99])
   // The next session has opened: no open is known, so none is shown, and the
-  // day waits for a chart.
+  // day waits for a chart when `needOpen` is on, but not when rows don't show
+  // moves since the open.
   const tuesday = M.sparkQuote(day(monday + 86400, [104, 105], false), chart.verdict, [])
   expect([tuesday.unjudged, tuesday.quote.dayOpen, M.change(tuesday.quote, 105, "open").pct]).toEqual([true, null, null])
+  const quiet = M.sparkQuote(day(monday + 86400, [104, 104.1, 104.2], false), chart.verdict, [], undefined, undefined, false)
+  expect([quiet.unjudged, quiet.quote.dayOpen]).toEqual([false, null])
+  // A >0.5% jump still waits for a chart even with `needOpen` off.
+  const jumped = M.sparkQuote(day(monday + 86400, [104, 106, 106.1], false), chart.verdict, [], undefined, undefined, false)
+  expect(jumped.unjudged).toBe(true)
+  // A real >0.5% move with volume settles immediately on the chart's verdict,
+  // so the next quiet bar doesn't re-trigger judging through MIXED_RUN.
+  const volDay = (cs, withOpens) => {
+    const d = day(monday, cs, withOpens)
+    if (withOpens) d.indicators.quote[0].volume = cs.map(() => 5000)
+    return d
+  }
+  const tradedVerdict = M.parseChart({ chart: { result: [volDay([100, 102, 102.1], true)] } }, []).verdict
+  expect(tradedVerdict.settled).toBe(monday + 300)
+  expect(M.sparkQuote(volDay([100, 102, 102.1, 102.2], false), tradedVerdict, [], undefined, undefined, false).unjudged).toBe(false)
 })
 
 test("a price Yahoo stamps in a US stock's night is set aside as its answer is read, so the night stays Robinhood's and the rows keep the day", () => {
@@ -1656,13 +1718,21 @@ test("a session's one bar says nothing until its day is over", () => {
   try { expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30 EDT") } finally { process.env.TZ = "America/New_York" }
 })
 
-test("Robinhood's listing date is asked once, again a day on, or five minutes after a failure", () => {
+test("Robinhood's listing date is asked once, stays settled once over a month old, or retries daily when recent/unknown and in five minutes after a failure", () => {
   const t = at("2026-10-07", "01:00")
   expect(M.listDateDue(null, t)).toBe(true)
   expect(M.listDateDue({ status: "ok", listDate: "1990-01-02", at: t }, t + 24 * 3600 - 1)).toBe(false)
+  expect(M.listDateDue({ status: "ok", listDate: "1990-01-02", at: t }, t + 10 * 24 * 3600)).toBe(false)
+  expect(M.listDateDue({ status: "ok", listDate: "2026-10-01", at: t }, t + 24 * 3600)).toBe(true)
   expect(M.listDateDue({ status: "ok", listDate: null, at: t }, t + 24 * 3600)).toBe(true)
   expect(M.listDateDue({ status: "failed", listDate: null, at: t }, t + 5 * 60 - 1)).toBe(false)
   expect(M.listDateDue({ status: "failed", listDate: null, at: t }, t + 5 * 60)).toBe(true)
+  // Settled list dates schedule no overnightNext wakeup.
+  expect(M.overnightNext({
+    open: true, pill: true, now: t, calendars, featured: "AAPL", preview: "", previewShown: false, previewQuote: null,
+    allSymbols: ["AAPL"], overnightSymbols: ["AAPL"], inSight: ["AAPL"], nights: {},
+    listDates: { AAPL: { status: "ok", listDate: "1990-01-02", at: t } }, rawYahooHole: null
+  })).toBe(0)
 })
 
 // What the service and the quote feed ask for, and when (Asks.js), on
@@ -2085,14 +2155,26 @@ test("the rows in sight have their charts fetched ahead, the charted stocks' asi
   expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
 })
 
-test("a range's chart answered under a quarter hour ago is shown as is, and the 40 charts held let the oldest go first, never one in use", () => {
+test("a range's chart answered under a quarter hour ago is shown as is, stays fresh while its market stays closed, and the 40 charts held let the oldest or least recently used go first, never one in use", () => {
   const now = 100000
   const fresh = (status, receivedAt) => M.historyFresh({ status, receivedAt }, now)
   expect([fresh("ok", now - 899), fresh("ok", now - 900), fresh("failed", now - 10), M.historyFresh(null, now)]).toEqual([true, false, false, false])
+  // Closed market: answered at or after regular close stays fresh past 15 min;
+  // answered before close expires once the close passes; trading expires at 15 min.
+  const q = { session: { regular: { start: now - 30000, end: now - 3600 } } }
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 3600 }, now, q, "1Y", false)).toBe(true)
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 3601 }, now, q, "1Y", false)).toBe(false)
+  expect(M.historyFresh({ status: "ok", receivedAt: now - 3600 }, now, q, "1Y", true)).toBe(false)
   // Forty held, oldest first; a forty-first lands.
   const held = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`S${i}|1M`, { status: "ok", receivedAt: i }]))
   const landed = M.historiesKept(held, { "NEW|1M": { status: "ok", history: [], receivedAt: 50 } }, [], 40)
   expect([Object.keys(landed).length, "S0|1M" in landed, "S1|1M" in landed, landed["NEW|1M"].receivedAt]).toEqual([40, false, true, 50])
+  // With LRU touch stamps, a recently read oldest entry stays while the least
+  // recently used entry goes.
+  const usedAt = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`S${i}|1M`, i + 1]))
+  usedAt["S0|1M"] = 100
+  const lru = M.historiesKept(held, { "NEW|1M": { status: "ok", history: [], receivedAt: 50 } }, [], 40, usedAt)
+  expect(["S0|1M" in lru, "S1|1M" in lru]).toEqual([true, false])
   // The oldest is on show: the next oldest goes in its place.
   const shown = M.historiesKept(held, { "NEW|1M": { status: "ok" } }, ["S0|1M"], 40)
   expect(["S0|1M" in shown, "S1|1M" in shown]).toEqual([true, false])
