@@ -127,10 +127,11 @@ Item {
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
     if (view && quote) {
-      // Only a warning takes the mark; an aged quote is said plainly, as its
-      // row says it.
-      var fresh = root.scrubbing || root.freshnessText === "" ? ""
-        : (Freshness.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
+      // Only a warning takes the mark; an aged quote or dimmed night price is
+      // said plainly, where a late price's time already goes.
+      var fresh = root.scrubbing ? ""
+        : root.freshnessText !== "" ? (Freshness.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
+        : root.newestOld ? Figures.staleNightNote(quote, root.newest, root.now, root.calendars) : ""
       return !root.nameOnLine ? fresh : (fresh ? fresh + " · " : "") + view.name.toUpperCase()
     }
     // A first fetch that failed says what the row says.

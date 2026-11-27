@@ -170,6 +170,7 @@ BarWidget {
   // knows Yahoo.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
     : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
+  readonly property string moveText: featured ? Format.lookSigns(featured.changeLine, retro) : changeText
   // A side bar's stacked form: the symbol over the move, four characters a
   // line at most, in the rows' unit. The "!" takes a short line of its own
   // before the move, kept empty without one, and a percent's dash keeps the
@@ -462,15 +463,31 @@ BarWidget {
         font.pixelSize: button.fontSize
       }
 
-      Text {
+      Row {
         visible: !root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
-        textFormat: Text.PlainText
-        text: root.changeText
-        // With no price, trouble is in the bar's ink, as the header says it.
-        color: root.featured ? (root.newestOld ? root.dimColor : root.trendColor) : root.warns ? button.foreground : root.dimColor
-        font.family: button.fontFamily
-        font.pixelSize: button.fontSize
+        spacing: 0
+
+        // Trouble stays in the bar's ink in every pill style, never the move's.
+        Text {
+          objectName: "pillWarning"
+          visible: !!root.featured && root.warns
+          textFormat: Text.PlainText
+          text: "! "
+          color: button.foreground
+          font.family: button.fontFamily
+          font.pixelSize: button.fontSize
+        }
+
+        Text {
+          objectName: "pillMove"
+          textFormat: Text.PlainText
+          text: root.moveText
+          // With no price, trouble is in the bar's ink, as the header says it.
+          color: root.featured ? (root.newestOld ? root.dimColor : root.trendColor) : root.warns ? button.foreground : root.dimColor
+          font.family: button.fontFamily
+          font.pixelSize: button.fontSize
+        }
       }
 
       Text {

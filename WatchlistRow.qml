@@ -245,12 +245,14 @@ Rectangle {
 
   readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
   property bool newestOld: false
+  property bool overnightList: false
+  property int minuteNow: 0
   property var freshness: null
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
   readonly property bool warns: scrubX < 0 && Freshness.freshnessWarns(shownFreshness)
   readonly property string freshnessNote: quote && scrubX < 0 ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
-  readonly property string rowNote: Figures.rowNote(view)
+  readonly property string rowNote: scrubX < 0 ? Figures.rowNote(quote, view, overnightList, minuteNow) : ""
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : (view ? view.name : ""))
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
@@ -375,7 +377,7 @@ Rectangle {
           anchors.bottomMargin: row.inset
           width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
           textFormat: Text.PlainText
-          // The name gives way to Overnight, so Overnight stays whole.
+          // The name gives way to the row's day tag, so the tag stays whole.
           text: row.detailTag === "" ? row.detail
             : (row.detail === "" ? "" : nameMetrics.elidedText.replace(/ (\u2026|\.\.\.)$/, "$1")) + row.detailTag
           color: row.warns ? row.look.foreground : row.look.dim

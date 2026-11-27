@@ -141,7 +141,7 @@ function priceTick(price, hint, inCents) {
 }
 
 function moveDigits(abs, digits) {
-  return digitsBelow(abs, 10000, Math.max(2, isFiniteNumber(digits) ? digits : 2))
+  return digitsBelow(abs, 10000, isFiniteNumber(digits) && digits >= 0 ? digits : 2)
 }
 
 function pctDigits(abs) {

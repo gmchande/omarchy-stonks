@@ -30,6 +30,8 @@ Flickable {
   property int scrubShown: 0
   property string changeMode: "pct"
   property int now: 0
+  property int minuteNow: 0
+  property bool overnightList: false
   property var owed: ({})
   // Symbols asked to refresh under 2 s ago: freshness gives them grace.
   property var asking: ({})
@@ -884,6 +886,8 @@ Flickable {
           when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
+        overnightList: root.overnightList
+        minuteNow: rowDelegate.inSight && root.overnightList ? root.minuteNow : 0
         sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow

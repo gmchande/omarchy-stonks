@@ -610,11 +610,23 @@ Harness {
       // with a "!" from the trades' failed ask, says the refresh failed, and
       // drops the "!" once Robinhood answers again.
       touch("ROBINHOOD.offline")
-      var markedAt = 0, hover = ""
+      var markedAt = 0, hover = "", warnInkOk = false
       tick(600, 5, function() {
         if (!markedAt && pill.warns) {
           markedAt = service.now
           hover = pill.warningText
+          // The pill's "!" stays in the bar's own ink in every horizontal
+          // style, never the move's green or red.
+          var wasStyle = pill.settings
+          warnInkOk = ["text", "arrow", "sparkline"].every(function(style) {
+            pill.settings = ({ id: "grvc.stonks", barStyle: style })
+            var warn = harness.find(pill, "pillWarning")
+            var move = harness.find(pill, "pillMove")
+            return !!warn && warn.visible && warn.text === "! "
+              && Qt.colorEqual(warn.color, barApi.foreground)
+              && !!move && move.visible && !/^!/.test(move.text)
+          })
+          pill.settings = wasStyle
         }
       })
       remove("ROBINHOOD.offline")
@@ -629,8 +641,8 @@ Harness {
         quoteFailed && reasked && service.feeds.lastTrade.entries.NEST.status === "ok", [quoteFailed, harness.requests().slice(rFromNight).join(", ")].join(" | "))
       var clearedAt = 0
       tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
-      harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",
-        markedAt > 0 && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, hover, clearedAt].join(" | "))
+      harness.check("Robinhood gone in the night: the pill says its refresh failed with a neutral \"!\", and once Robinhood answers again the \"!\" goes",
+        markedAt > 0 && warnInkOk && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, warnInkOk, hover, clearedAt].join(" | "))
 
       // A pointer resting on the pill at night: Robinhood answers a bar
       // still forming, then the same bar at a new price; the pill shows
@@ -689,9 +701,11 @@ Harness {
         return null
       }
       openWindow()
+      var nightHero = harness.find(app.body, "hero")
       harness.clockTo(at(harness.wed7 + 86400, 1, 21) + 29)
       var staleWake = service.clockInterval
       var freshOld = pill.newestOld
+      var freshHeroLead = nightHero ? nightHero.listingLead : "missing"
       var freshHover = ""
       var staleHover = ""
       mouseMove(pill, pill.width / 2, pill.height / 2)
@@ -699,6 +713,7 @@ Harness {
       mouseMove(pillWindow.contentItem, 1, 100)
       harness.clockTo(at(harness.wed7 + 86400, 1, 21) + 31)
       var staleOld = pill.newestOld
+      var staleHeroLead = nightHero ? nightHero.listingLead : "missing"
       mouseMove(pill, pill.width / 2, pill.height / 2)
       staleHover = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
@@ -720,12 +735,13 @@ Harness {
       within(1500, function() { return service.changeMode === wasMode })
       pill.settings = wasPillSettings
       closeWindow()
-      harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second, dims the pill arrow, and keeps the pill sparkline colored in open mode",
+      harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second, shows AS OF on the hero, dims the pill arrow, and keeps the pill sparkline colored in open mode",
         staleWake === 2005 && !freshOld && staleOld
+          && freshHeroLead === "" && staleHeroLead === "AS OF 01:19"
           && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%"
           && arrowDimmed && sparkColoredInOpen,
-        ["staleWake=" + staleWake, "old=" + freshOld + "->" + staleOld, "fresh=" + freshHover, "stale=" + staleHover,
-          "arrowDimmed=" + arrowDimmed, "sparkOpen=" + sparkColoredInOpen].join(" | "))
+        ["staleWake=" + staleWake, "old=" + freshOld + "->" + staleOld, "hero=" + freshHeroLead + "->" + staleHeroLead,
+          "fresh=" + freshHover, "stale=" + staleHover, "arrowDimmed=" + arrowDimmed, "sparkOpen=" + sparkColoredInOpen].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that

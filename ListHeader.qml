@@ -15,8 +15,8 @@ Item {
 
   property string listLabel: "All"
   property bool listMenuOpen: false
-  // The day the rows measure (`Figures.rowsDayName`): "TODAY", "FRI", or
-  // "MON".
+  // The day the rows measure (`Figures.rowsDayName`): "TODAY", "FRI", "MON",
+  // "24H", or "OVERNIGHT".
   property string rowsDay: "TODAY"
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
   // Search or a list view covers the rows: the header names their list and

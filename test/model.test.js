@@ -427,12 +427,16 @@ test("formatting", () => {
     "+99.95% +100", "+99.95% +100", "\u221299.95% \u2212100", "\u221299.95% \u2212100"])
   // In money, split at its point with its sign kept; a coin's long fraction
   // broken after four characters; from a thousand in its unit, a figure that
-  // rounds to 1,000 of one being one of the next.
+  // rounds to 1,000 of one being one of the next. Where a price shows no
+  // decimals, its move in money shows none either.
   const moneyLines = ([v, digits]) => M.stackedMoney(v, digits).lines.join(" ")
-  expect([[-3.84, 2], [0.004, 2], [-0.67, 2], [999.994, 2], [999.996, 2], [8940, 2], [-12345, 0], [999600, 0], [-0.000000123, 9]]
+  expect([[-3.84, 2], [0.004, 2], [-0.67, 2], [999.994, 2], [999.996, 2], [8940, 2], [850, 0], [0.4, 0], [-12345, 0], [999600, 0], [-0.000000123, 9]]
     .map(moneyLines))
-    .toEqual(["\u22123 .84", "0 .00", "\u22120 .67", "+999 .99", "+1.0 K", "+8.9 K", "\u221212 K", "+1.0 M", "\u22120 .000 0001 23"])
-  expect([M.stackedMoney(0.004, 2).sign, M.stackedMoney(-0.67, 2).sign, M.stackedPct(0.04).sign]).toEqual([0, -1, 0])
+    .toEqual(["\u22123 .84", "0 .00", "\u22120 .67", "+999 .99", "+1.0 K", "+8.9 K", "+850", "0", "\u221212 K", "+1.0 M", "\u22120 .000 0001 23"])
+  expect([M.stackedMoney(0.004, 2).sign, M.stackedMoney(-0.67, 2).sign, M.stackedMoney(0.4, 0).sign, M.stackedPct(0.04).sign]).toEqual([0, -1, 0, 0])
+  expect([M.signedMoney(1254, 0), M.signedMoney(-2105.766, 0), M.signedMoney(0.4, 0), M.changeTone({ abs: 0.4, pct: 0.001 }, "abs", 0)])
+    .toEqual(["+1,254", "\u22122,106", "0", "flat"])
+  expect(M.change({ prevClose: 60429.6 }, 61684.31, "abs", 0).abs).toBe(1254)
   // A symbol: an index without its ^, a longer one split at its dot or
   // dash, and what is still longer broken after its fourth character.
   expect(["AAPL", "^GSPC", "^DJI", "SHEL.L", "BTC-USD", "SHIB-USD", "BRK-B", "GOOGL", "RELIANCE.NS", "^STOXX50E"]
@@ -1578,7 +1582,26 @@ test("the rows keep the US rule when US stocks are present, and otherwise name t
   expect(day(["L", "K"], at("2026-09-08", "12:00"))).toBe("")
   expect(day(["L", "T"], at("2026-09-08", "14:00"))).toBe("")
   expect(day(["L", "T"], at("2026-09-09", "12:00"))).toBe("TUE")
-  // Tonight's trades name the day they joined.
+  // Tonight's trades switch the header to OVERNIGHT for any list holding one,
+  // while a list with none keeps its day; rows trading tonight say only their
+  // name and rows still on their day name that day after their name.
+  const tonight = { t: at("2026-09-08", "21:00"), p: 102, phase: "overnight", base: 101, own: false, closed: true, joined: true, dayStart: at("2026-09-08", "09:30") }
+  const overnightShared = M.rowsSharedDay(["A", "L", "I", "K"], quotes, { A: tonight }, calendars)
+  expect(M.rowsDayName(overnightShared, at("2026-09-09", "01:00"))).toBe("OVERNIGHT")
+  // Scrubbed back before the night opened, the header names the closed day;
+  // scrubbed into the night (including from a coin's chart), it stays OVERNIGHT.
+  expect([M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "15:00")),
+    M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "20:00")),
+    M.rowsDayName(overnightShared, at("2026-09-09", "01:00"), at("2026-09-08", "21:30"))])
+    .toEqual(["TUE", "OVERNIGHT", "OVERNIGHT"])
+  expect(day(["L", "I"], at("2026-09-09", "02:00"), { A: tonight })).toBe("TUE")
+  expect(day(["B", "I"], at("2026-09-09", "01:00"), { A: tonight })).toBe("TUE")
+  const note = (s, now, overnightList, nt = null) => M.rowNote(quotes[s], M.rowModel(quotes[s], 0, "pct", nt), overnightList, now)
+  expect([note("A", at("2026-09-09", "01:00"), true, tonight), note("I", at("2026-09-09", "01:00"), true),
+    note("I", at("2026-09-08", "21:00"), true), note("I", at("2026-09-15", "01:00"), true),
+    note("K", at("2026-09-09", "01:00"), true), note("I", at("2026-09-09", "01:00"), false)])
+    .toEqual(["", "Tue", "Today", "8 Sep", "24h", ""])
+  // A trade that didn't join the night still names its day.
   expect(day(["C"], at("2026-09-10", "12:00"), { C: { dayStart: at("2026-09-08", "09:30") } })).toBe("TUE")
 })
 
