@@ -290,7 +290,7 @@ Item {
       root.wholeWriteOwed = false
       var keys = Object.keys(root.settledKeys)
       root.settledKeys = ({})
-      if (!whole && keys.length > 0) {
+      if (taken && !whole && keys.length > 0) {
         var keep = {}
         for (var i = 0; i < keys.length; i++) keep[keys[i]] = root.fileSettings[keys[i]]
         var merged = Settings.fileSettings(Settings.copyWith(parsed, keep))

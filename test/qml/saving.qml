@@ -315,6 +315,27 @@ Harness {
         mergedOk, JSON.stringify({ readingExt: readingExt, mergedLanded: mergedLanded, picked: picked,
           featured: mergedFile.featured, range: mergedFile.range, note: mergedFile.note || "", hasGoog: mergedFile.symbols.indexOf("GOOG") >= 0 }))
 
+      // A stock click during the held read-back of a failed save keeps the
+      // earlier refused range instead of merging onto the stale file on disk.
+      var beforeRetry = harness.readFile(harness.file)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && chmod 500 "$2"')
+      service.setRange("1Y")
+      var readingFailed = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
+      sh('chmod 700 "$2"')
+      service.feature(picked)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var retriedOk = within(3000, function() {
+        if (service.saving) return false
+        try { return JSON.parse(harness.readFile(harness.file)).featured === picked } catch (e) { return false }
+      })
+      var retriedFile = JSON.parse(harness.readFile(harness.file))
+      var retryKept = readingFailed && retriedOk && retriedFile.range === "1Y" && !service.saveFailed
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', beforeRetry)
+      within(3000, function() { return service.range === "1M" && service.featuredSymbol === prevFeatured })
+      harness.check("a stock click during a failed save's read-back keeps the refused range instead of adopting stale disk text",
+        retryKept, JSON.stringify({ readingFailed: readingFailed, retriedOk: retriedOk, featured: retriedFile.featured,
+          range: retriedFile.range, saveFailed: service.saveFailed }))
+
       // A file that can't be read, put in place while a read is out, as a
       // sync tool replaces one: a change made before that read lands writes
       // nothing over it, and the footer says the change isn't saved.

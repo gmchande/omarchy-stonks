@@ -328,7 +328,7 @@ Harness {
       service.switchList("")
       tryVerify(function() { return list.displayedSymbols.length === 154 && service.rowsInSight().indexOf(scrolledSym) >= 0 }, 2000)
       var restoredSight = service.rowsInSight().concat([service.view.featured])
-      wait(250)
+      within(250, function() { return service.feeds.overnight.busy || service.feeds.listDates.busy })
       tryVerify(ovIdle, 15000)
       var backRh = harness.lines("requests.log").slice(backFrom).filter(function(l) { return /^overnight /.test(l) })
       var backExtra = [].concat.apply([], backRh.map(function(l) { return l.split(" ")[1].split(",") }))
