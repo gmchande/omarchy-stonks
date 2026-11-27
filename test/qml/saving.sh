@@ -33,4 +33,9 @@ if [ "${count:-0}" != 1 ]; then
   code=1
 fi
 sed -i "\\|$chime|d" "$work/log"
+# Queued async writes must never drop an active FileView operation.
+if rg -q 'got operation finished from dropped operation' "$work/log"; then
+  echo "FAIL async writes dropped a FileView operation"
+  code=1
+fi
 finish "SAVING DONE"

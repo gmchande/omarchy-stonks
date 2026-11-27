@@ -128,7 +128,11 @@ Item {
     preload: false
     printErrors: false
     onFileChanged: {
-      if (root.skipNextWatch && (root.writing || reader.out)) {
+      if (root.making || root.writing || root.writeQueued !== "") {
+        root.skipNextWatch = false
+        return
+      }
+      if (root.skipNextWatch && reader.out) {
         root.skipNextWatch = false
         return
       }
@@ -148,26 +152,22 @@ Item {
     blockWrites: false
     printErrors: false
     onSaved: {
-      root.writing = false
       root.files.keep([root.path])
       if (root.writeQueued !== "") {
-        var next = root.writeQueued
-        root.writeQueued = ""
-        root.writeText(next)
+        Qt.callLater(root.writeNext)
         return
       }
+      root.writing = false
       root.readFile()
     }
     onSaveFailed: function(error) {
-      root.writing = false
       root.skipNextWatch = false
       console.warn("stonks: failed to write " + root.path + ": " + error)
       if (root.writeQueued !== "") {
-        var next = root.writeQueued
-        root.writeQueued = ""
-        root.writeText(next)
+        Qt.callLater(root.writeNext)
         return
       }
+      root.writing = false
       root.readFile()
     }
   }
@@ -197,6 +197,16 @@ Item {
     file.path = root.path
     file.setText(text)
   }
+  // Start a queued write after `onSaved`/`onSaveFailed` unwinds so resetting
+  // `file.path` never drops the finishing FileView operation.
+  function writeNext() {
+    if (!root.writing) return
+    root.writing = false
+    if (root.writeQueued === "") return
+    var next = root.writeQueued
+    root.writeQueued = ""
+    root.writeText(next)
+  }
 
   FileRead {
     id: reader
@@ -222,6 +232,10 @@ Item {
     var answer = read.lossy ? { refused: true } : read
     var owed = root.writeOwed
     root.writeOwed = false
+    if (root.writing || root.writeQueued !== "") {
+      root.writeOwed = owed
+      return
+    }
     if (answer.text !== undefined) {
       root.missing = false
       if (root.files && answer.text !== root.written) root.files.forget(root.path)
@@ -280,7 +294,7 @@ Item {
   // A read of an earlier text, or none, says the last save was lost, and
   // isn't taken. Any other text ends the wait: a save from elsewhere wins.
   function takesRead(text) {
-    if (root.making) return false
+    if (root.making || root.writing || root.writeQueued !== "") return false
     if (root.staleTexts === null) {
       root.saveFailed = false
       return true

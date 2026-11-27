@@ -124,6 +124,38 @@ Harness {
         within(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
       fillFollows("a click")
 
+      // Clicking a distant row scrolled far from the featured row puts the
+      // highlight straight on it instead of flying it in from off-screen;
+      // clicking a neighbour in sight still slides.
+      var list = body.watchlist
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      click(row(rows[0]))
+      within(1500, function() { return service.featuredSymbol === rows[0] && Math.abs(list.highlightShift) < 0.5 })
+      list.takeOver()
+      list.contentY = Math.max(0, list.contentHeight - list.sightHeight)
+      rest()
+      var offScreen = !row(rows[0]).inSight
+      var farPeak = 0
+      var trackFar = function() { farPeak = Math.max(farPeak, Math.abs(list.highlightShift)) }
+      list.highlightShiftChanged.connect(trackFar)
+      click(row(rows[rows.length - 1]))
+      var farPicked = within(1500, function() { return service.featuredSymbol === rows[rows.length - 1] })
+      list.highlightShiftChanged.disconnect(trackFar)
+      var nearPeak = 0
+      var trackNear = function() { nearPeak = Math.max(nearPeak, Math.abs(list.highlightShift)) }
+      list.highlightShiftChanged.connect(trackNear)
+      click(row(rows[rows.length - 2]))
+      var nearPicked = within(1500, function() { return service.featuredSymbol === rows[rows.length - 2] && Math.abs(list.highlightShift) < 0.5 })
+      list.highlightShiftChanged.disconnect(trackNear)
+      harness.check("switching to a row when the previous featured row is out of sight lands the highlight at once, while a neighbour in sight slides",
+        offScreen && farPicked && farPeak < 0.5 && nearPicked && nearPeak > 1,
+        [offScreen, farPicked, farPeak.toFixed(1), nearPicked, nearPeak.toFixed(1)].join(" "))
+      list.takeOver()
+      list.contentY = 0
+      rest()
+
       // Held and carried past the next row, in your own order.
       var held = row(rows[0])
       var grip = held.mapToItem(body, held.width / 2, held.height / 2)
@@ -282,6 +314,35 @@ Harness {
       service.setManualOrder(rows)
       within(1500, function() { return order() === rows.join(",") })
       rest()
+
+      // Lifting a row near the bottom edge: pulling away unlocks the full
+      // bottom edge zone on the way back down.
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      var edgeSym = list.displayedSymbols.reduce(function(best, s) {
+        var r = row(s)
+        return r && r.y <= list.sightHeight - 14 && r.y + r.height > list.sightHeight - list.rowPitch ? s : best
+      }, "")
+      var edgeRow = row(edgeSym)
+      var grip = Math.min(edgeRow.height - 2, Math.max(4, list.sightHeight - edgeRow.y - 10))
+      var nearBottom = edgeRow.mapToItem(body, edgeRow.width / 2, grip)
+      var midEdge = edgeAt(list.sightHeight - list.rowPitch / 2)
+      mousePress(body, nearBottom.x, nearBottom.y)
+      mouseMove(body, nearBottom.x, nearBottom.y - down / 2, -1, Qt.LeftButton)
+      mouseMove(body, nearBottom.x, centre.y, -1, Qt.LeftButton)
+      var liftedEdge = within(1000, function() { return list.reorder.lifted === edgeSym })
+      mouseMove(body, nearBottom.x, midEdge.y, -1, Qt.LeftButton)
+      var unlocked = liftedEdge && within(1500, function() { return list.reorder.edgeHeld && list.contentY >= list.rowPitch })
+      mouseRelease(body, nearBottom.x, midEdge.y)
+      rest()
+      list.commitManualOrder(rows)
+      within(1500, function() { return order() === rows.join(",") && list.displayedSymbols.join(",") === rows.join(",") })
+      list.takeOver()
+      list.contentY = 0
+      rest()
+      harness.check("lifting near the bottom edge unlocks the full edge zone after pulling away",
+        liftedEdge && unlocked, [edgeSym, liftedEdge, unlocked, list.contentY.toFixed(1)].join(" "))
 
       click(row(rows[0]), Qt.RightButton)
       var menu = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
@@ -569,6 +630,27 @@ Harness {
       rest()
       fillFollows("returning to manual order")
 
+      // A long elided list name keeps its chevron in place across every sort order.
+      var longList = "Global Semiconductors, Cloud Infrastructure, Energy Transition and Long-Term Compounders Watchlist"
+      service.createList(longList)
+      service.switchList(longList)
+      var listLabelItem = at("listLabel")
+      var longOn = within(1500, function() { return service.listName === longList && listLabelItem.truncated })
+      var listChevron = at("listChevron")
+      var chevronXs = [listChevron.x]
+      for (var ord = 0; ord < 4; ord++) {
+        var wasOrd = service.order
+        click("orderLabel")
+        within(1500, function() { return service.order !== wasOrd })
+        chevronXs.push(listChevron.x)
+      }
+      var steadyChevron = chevronXs.every(function(x) { return Math.abs(x - chevronXs[0]) < 0.5 })
+      service.switchList("")
+      service.deleteList(longList)
+      rest()
+      harness.check("a long list name keeps the header chevron steady across every sort order",
+        longOn && steadyChevron, [longOn, listLabelItem.truncated].concat(chevronXs.map(function(x) { return x.toFixed(1) })).join(" "))
+
       // Two of them, so one range for every click can't pass.
       var options = harness.findAll(body, "rangeOption")
       var picked = [options[1], options[3]].map(function(option) {
@@ -633,6 +715,58 @@ Harness {
       body.motion.arrivalChanged.disconnect(watches)
       harness.check("in smooth, a click on another row changes its price and name where they stand, at full strength",
         landed && !!heroPrice && !!stockName && wavered.length === 0, [landed, smoothTo, standing, wavered.slice(0, 3).join(" ")].join(" "))
+
+      // After switching stocks, a live price tick that leaves the % change
+      // unchanged rolls only the price, never the previous stock's move.
+      var prevMode = service.changeMode
+      if (prevMode !== "pct") {
+        service.persist({ changeMode: "pct" })
+        within(1500, function() { return service.changeMode === "pct" })
+      }
+      var heroChange = at("changeText")
+      var hero = heroChange.parent
+      var firstMove = heroChange.text
+      var nextStock = body.watchlist.displayedSymbols.filter(function(s) {
+        var q = service.quotes[s]
+        if (!q || s === body.chartSymbol || !isFinite(q.price) || !isFinite(q.prevClose) || q.prevClose <= 0) return false
+        var qCur = service.quotes[body.chartSymbol]
+        if (qCur && Math.abs(((q.price - q.prevClose) / q.prevClose) - ((qCur.price - qCur.prevClose) / qCur.prevClose)) < 0.001) return false
+        return Math.abs(q.price) >= 20
+      })[0]
+      if (nextStock) {
+        click(row(nextStock))
+        within(3000, function() { return body.chartSymbol === nextStock && body.motion.arrival >= 1 && heroChange.text !== firstMove })
+      }
+      var steadyMove = heroChange.text
+      var origQuotes = service.feeds.quotes.quotes
+      var q0 = origQuotes[body.chartSymbol]
+      // Pick a $0.01 nudge whose rounded % matches the current quote's.
+      var pct0 = Math.round(((q0.price - q0.prevClose) / q0.prevClose) * 10000)
+      var nudge = Math.round(((q0.price + 0.01 - q0.prevClose) / q0.prevClose) * 10000) === pct0 ? 0.01 : -0.01
+      var rolledPrice = false
+      var rolledStaleMove = false
+      var watchRoll = function() {
+        if (hero.roll < 1) {
+          rolledPrice = true
+          if (heroChange.rolling) rolledStaleMove = true
+        }
+      }
+      hero.rollChanged.connect(watchRoll)
+      var ticked = Object.assign({}, origQuotes)
+      ticked[body.chartSymbol] = Object.assign({}, q0, { price: q0.price + nudge })
+      service.feeds.quotes.quotes = ticked
+      var tickDone = within(2000, function() { return rolledPrice && hero.roll >= 1 })
+      var moveAfterTick = heroChange.text
+      hero.rollChanged.disconnect(watchRoll)
+      service.feeds.quotes.quotes = origQuotes
+      within(2000, function() { return hero.roll >= 1 })
+      if (prevMode !== "pct") {
+        service.persist({ changeMode: prevMode })
+        within(1500, function() { return service.changeMode === prevMode })
+      }
+      harness.check("a live tick after a stock switch never rolls the previous stock's move into an unchanged change",
+        !!nextStock && steadyMove !== firstMove && tickDone && !rolledStaleMove && moveAfterTick === steadyMove,
+        [nextStock, firstMove, steadyMove, tickDone, rolledStaleMove, heroChange.before, moveAfterTick].join(" | "))
 
       // In smooth, stock switches and both directions of a range change draw
       // with the fast moving pass and hand over to the resting drawing on the

@@ -20,11 +20,21 @@ Item {
   // The text before the last change, which a roll starts from.
   property string before: ""
   property string latest: ""
+  property bool dirty: false
   onTextChanged: {
-    before = latest
+    if (!dirty) before = latest
     latest = text
+    dirty = true
   }
-  Component.onCompleted: latest = text
+  Component.onCompleted: {
+    before = text
+    latest = text
+    dirty = false
+  }
+  function commit() {
+    before = text
+    dirty = false
+  }
 
   readonly property bool rolling: roll < 1 && before !== "" && before !== text
   readonly property var glyphs: rolling ? Format.rolledGlyphs(before, text) : ({ arriving: [], leaving: [] })
