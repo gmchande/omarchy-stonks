@@ -70,8 +70,9 @@ hours" or "Pre-market" for a price from outside the session, and the time
 of a late price.
 
 At night, from the stock's first trade until the new day's first prices
-arrive soon after 04:00, the pill keeps the day's close and move. Its line
-draws tonight in grey, and pointing at it shows tonight's move.
+arrive soon after 04:00, the pill shows tonight's price and move, as the
+panel does. Its line draws the closed day in grey, and pointing at it
+shows how that day ended.
 
 ## Reading the chart
 
@@ -429,9 +430,10 @@ charts stop.
   listed, again 5 minutes later if that fails, and once for each stock the
   pill shows. Through the night it asks about the pill's stock and, with
   the panel or the window open, the stock on show and the rows in sight,
-  with one past each edge: for the trades each one's chart draws every 5
-  minutes, which say whether it trades at night, and for the last trade of
-  each that does every minute, as often as `"refreshIntervalSec"` sets for
+  with one past each edge, for the trades each one's chart draws every 5
+  minutes, which say whether it trades at night; and for the last trade
+  of the pill's stock or, while the panel or the window is open, the list
+  on show, every minute, as often as `"refreshIntervalSec"` sets for
   Yahoo. It asks once more on a morning Yahoo has no prices for half an
   hour or more of the pre-market, and the same for a US stock or ETF you
   pause on in search.

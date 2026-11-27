@@ -305,6 +305,16 @@ function joinedTrade(night, entry, cal) {
   return trade
 }
 
+// A lone night trade from Robinhood's quote, shaped as an answer for
+// `Day.dayChart` while a listing out of sight has no trades of its own yet:
+// only a trade in an open night, so an after-hours or pre-market trade stays
+// Yahoo's alone.
+function quotedNight(entry, cal) {
+  var trade = entry ? entry.trade : null
+  var hours = trade && cal ? nightAt(cal, trade.t) : null
+  return hours && hours.open ? { bars: [trade], from: trade.t, through: trade.t } : null
+}
+
 // Robinhood's trades, each listing's with its quote's trade at their end
 // where `joinedTrade` takes it: what the chart, the rows' lines and the
 // price on top read. `had` is the last call's { nights, joins }: a listing
@@ -516,10 +526,10 @@ function beside(quote, t) {
 // `stepped`: the trade joined the day that closed, tonight's or then the
 // pre-market's (`Day.dayChart`). Such trades belong to the day ahead, so
 // they count from the close just gone, with no open yet, and so does a
-// scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's,
-// which the pill keeps the day's close beside (`keepsDay`). `own`: the day
-// drawn is Yahoo's quote's, whose open the move may count from. `dayStart`
-// names the day the move is of: the day drawn, or the pre-market's own.
+// scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's.
+// `own`: the day drawn is Yahoo's quote's, whose open the move may count
+// from. `dayStart` names the day the move is of: the day drawn, or the
+// pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
   var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
   if (!trade) return null
@@ -529,20 +539,6 @@ function newestTrade(quote, latest, calendars, day) {
   return { t: trade.t, p: trade.p, phase: trade.phase, base: stepped ? Quote.regularClose(day) : Quote.dayBase(day), own: own && !stepped,
     closed: own && trade.phase !== "pre" && trade.t >= quote.session.regular.end, joined: joined, stepped: stepped,
     dayStart: stepped && !joined ? trade.t : day.session.regular.start }
-}
-
-// The newest trade as the pill reads it at rest: none while it keeps the
-// day (`keepsDay`). The panel and the rows show tonight's.
-function restingNewest(newest) {
-  return keepsDay(newest) ? null : newest
-}
-
-// Whether the pill keeps the day's close and move: once tonight has traded,
-// until the pre-market's first prices arrive, soon after 04:00, though the
-// 1D chart keeps the day until the open. Its line then draws tonight grey
-// (`Chart.chartGeometry`).
-function keepsDay(newest) {
-  return !!newest && !!newest.joined
 }
 
 function overnightDue(askedAt, now, calendars, failed) {

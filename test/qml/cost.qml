@@ -367,11 +367,15 @@ Harness {
       harness.check("one stock's new trade reads the newest trades at most 175 times in all",
         tradeReads.n > 0 && tradeReads.n <= 175, tradeReads.n + " reads")
 
-      // Night trading on the 154-stock list: scrolling through all 154 rows
-      // after a fresh start stays inside Robinhood's budget with no "!"; even
-      // when the budget does pace requests, no row says "Refresh failed",
-      // while a real Robinhood outage still warns on US rows trading tonight
-      // and leaves non-US listings alone.
+      // Night trading on the 154-stock list, sorted by % change: whole-list
+      // quotes land up front while fuller overnight bars stay to rows in
+      // sight, so scrolling through all 154 rows keeps sort order and breadth
+      // unchanged and stays inside Robinhood's budget with no "!". With the
+      // window closed, only the pill's stock is asked. Even when the budget
+      // does pace requests, no row says "Refresh failed", while a real
+      // Robinhood outage still warns on US rows trading tonight and leaves
+      // non-US listings alone.
+      var rhGate = service.feeds.lastTrade.gate
       var rhIdle = function() {
         var f = service.feeds
         return idle() && !f.overnight.busy && !f.lastTrade.busy && !f.listDates.busy
@@ -384,20 +388,33 @@ Harness {
       service.feeds.overnight.entries = ({})
       service.feeds.listDates.entries = ({})
       service.feeds.lastTrade.entries = ({})
-      var rhGate = service.feeds.lastTrade.gate
       rhGate.gate = Gate.openGate(rhGate.capacity)
       rhGate.budgetDueAt = 0
       app.floatingWindow.implicitHeight = 800
+      service.persist({ order: "pct", reversed: false })
       body.featureSymbol("LONG005")
       list.takeOver()
       list.contentY = 0
+      var nightStart = harness.lines("requests.log").length
       harness.time = 1791434760 // Thu 8 Oct 2026 00:46 NY
       service.tick()
       settleAll()
+      var openSight = service.rowsInSight().concat([service.view.featured])
+      var openOvAsked = [].concat.apply([], harness.lines("requests.log").slice(nightStart)
+        .filter(function(l) { return /^overnight /.test(l) })
+        .map(function(l) { return l.split(" ")[1].split(",") }))
+      var unseenOv = openOvAsked.filter(function(s) { return openSight.indexOf(s) < 0 })
+      var orderBefore = list.displayedSymbols.join(",")
+      var breadthBefore = JSON.stringify(body.breadth)
+      var upBefore = body.breadth.up
+      var orderDrift = 0
+      var breadthDrift = 0
       for (var stop = 1; stop <= 12; stop++) {
         list.contentY = list.clampY(stop * 6 * list.rowPitch)
         harness.clockOn(2)
         settleAll()
+        if (list.displayedSymbols.join(",") !== orderBefore) orderDrift++
+        if (JSON.stringify(body.breadth) !== breadthBefore) breadthDrift++
       }
       list.contentY = 0
       harness.clockOn(36)
@@ -405,9 +422,35 @@ Harness {
       var scrollFailed = Object.keys(service.nightFailed)
       var scrollRows = list.rowItems()
       var scrollWarned = Object.keys(scrollRows).filter(function(s) { return scrollRows[s].inSight && /^!/.test(scrollRows[s].detail) })
-      harness.check("154 stocks at night: scrolling through the list and refreshing stays inside Robinhood's budget with no warning",
-        !rhGate.warned && scrollFailed.length === 0 && scrollWarned.length === 0,
-        "gate warned=" + rhGate.warned + "; nightFailed=" + scrollFailed.length + "; warnedInSight=" + scrollWarned.slice(0, 5).join(","))
+      harness.check("154 stocks sorted by change at night: whole-list quotes keep sort order and breadth steady while scrolling, bars stay to rows in sight, and Robinhood's budget holds",
+        upBefore >= 150 && unseenOv.length === 0 && orderDrift === 0 && breadthDrift === 0
+          && !rhGate.warned && scrollFailed.length === 0 && scrollWarned.length === 0,
+        "upBefore=" + upBefore + "; unseenOv=" + unseenOv.length + "; orderDrift=" + orderDrift + "; breadthDrift=" + breadthDrift
+          + "; gate warned=" + rhGate.warned + "; nightFailed=" + scrollFailed.length + "; warnedInSight=" + scrollWarned.slice(0, 5).join(","))
+
+      // Five steady-state minutes at night with the window open (whole-list
+      // quotes in batches of 75 + bars for rows in sight), then five closed
+      // (pill's stock alone).
+      var rhOnly = function(lines) { return lines.filter(function(l) { return /^(overnight|instruments|lasttrade) /.test(l) }) }
+      var steadyOpenFrom = harness.lines("requests.log").length
+      for (var m1 = 0; m1 < 5; m1++) { harness.clockOn(60); settleAll() }
+      var steadyOpen = rhOnly(harness.lines("requests.log").slice(steadyOpenFrom))
+      app.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      var steadyClosedFrom = harness.lines("requests.log").length
+      for (var m2 = 0; m2 < 5; m2++) { harness.clockOn(60); settleAll() }
+      var steadyClosed = rhOnly(harness.lines("requests.log").slice(steadyClosedFrom))
+      var closedExtra = steadyClosed.filter(function(l) { return l.split(" ")[1] !== "LONG005" })
+      harness.check("154 stocks steady state at night: at most 3.2 Robinhood requests/min open and 1.2/min closed (pill alone)",
+        steadyOpen.length <= 16 && steadyClosed.length <= 7 && closedExtra.length === 0 && !rhGate.warned,
+        "open=" + (steadyOpen.length / 5).toFixed(1) + "/min (" + steadyOpen.length + " in 5m); closed=" + (steadyClosed.length / 5).toFixed(1)
+          + "/min (" + steadyClosed.length + " in 5m); closedExtra=" + closedExtra.slice(0, 3).join(","))
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      list = app.body.watchlist
+      list.takeOver()
+      list.contentY = 0
+      settleAll()
 
       // Force the local budget dry (not paused) right before the next minute's
       // refresh: it waits on budgetDueAt without stamping any row failed, then
@@ -423,11 +466,12 @@ Harness {
       var pacedWarned = Object.keys(pacedRows).filter(function(s) { return pacedRows[s].inSight && /^!/.test(pacedRows[s].detail) })
       var pacedFailed = Object.keys(service.nightFailed)
       var pacedDue = rhGate.budgetDueAt
-      if (pacedDue > harness.time) {
-        harness.time = pacedDue
+      for (var p = 0; p < 5 && rhGate.budgetDueAt > harness.time; p++) {
+        harness.time = rhGate.budgetDueAt
         service.tick()
-        settleAll()
+        tryVerify(rhIdle, 15000)
       }
+      settleAll()
       var refilledAt = service.feeds.lastTrade.entries.LONG005 ? service.feeds.lastTrade.entries.LONG005.at : 0
       harness.check("when Robinhood's budget holds a night refresh back, no row says Refresh failed and it lands once refilled",
         pacedWarned.length === 0 && pacedFailed.length === 0 && pacedDue > pacedAt && refilledAt >= pacedDue && refilledAt > beforePace,

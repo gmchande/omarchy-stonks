@@ -578,9 +578,9 @@ Harness {
         markedAt > 0 && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, hover, clearedAt].join(" | "))
 
       // A pointer resting on the pill at night: Robinhood answers a bar
-      // still forming, then the same bar at a new price, and the hover
-      // shows tonight's move as it is now, with the bar's time, since its
-      // price is late.
+      // still forming, then the same bar at a new price; the pill shows
+      // tonight's move as it is now, and its hover says overnight with the
+      // bar's time (since it is late) and how the closed day ended.
       startAt(at(harness.wed7 + 86400, 1, 0))()
       var forming = function(price) {
         runCommand(["sh", "-c", "echo 2026-10-08T05:00:00Z " + price + " > \"$STONKS_FAKE_STATE/NIGHT.bar\""])
@@ -591,29 +591,33 @@ Harness {
       forming("240.00")
       tick(600, 5, function() {})
       var joinedFirst = tonight(240)
+      var pillFirst = pill.featured ? pill.featured.changeText : ""
       mouseMove(pill, pill.width / 2, pill.height / 2)
       var entered = harness.copiedHover
       forming("241.50")
       tick(600, 5, function() {})
+      var pillAfter = pill.featured ? pill.featured.changeText : ""
       var after = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       remove("NIGHT.bar")
-      harness.check("a pointer resting on the pill at night sees tonight's newest move in its hover, a new price on the same bar included",
-        joinedFirst && entered === "Tonight +1.99% as of 01:00" && tonight(241.5) && after === "Tonight +2.62% as of 01:00",
-        [joinedFirst, entered, pill.newest ? pill.newest.p + " " + pill.newest.joined : "no newest", after].join(" | "))
+      harness.check("at night the pill shows tonight's newest move, a new price on the same bar included, and its hover shows the closed day",
+        joinedFirst && pillFirst === "+1.99%" && entered === "Overnight as of 01:00 · Wed \u22125.82%"
+          && tonight(241.5) && pillAfter === "+2.62%" && after === "Overnight as of 01:00 · Wed \u22125.82%",
+        [joinedFirst, pillFirst, entered, pillAfter, after].join(" | "))
 
       // Robinhood's quote then brings a trade at 01:19:30, newer than that
-      // bar: within a minute the hover shows its move, and no time, since
-      // the trade is fresh.
+      // bar: within a minute the pill shows its move, and the hover drops
+      // the time since the trade is fresh.
       runCommand(["sh", "-c", "echo 2026-10-08T05:19:30.250Z 242.25 > \"$STONKS_FAKE_STATE/NIGHT.trade\""])
       tick(60, 5, function() {})
+      var pillQuoted = pill.featured ? pill.featured.changeText : ""
       mouseMove(pill, pill.width / 2, pill.height / 2)
       var quoted = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
       remove("NIGHT.trade")
-      harness.check("Robinhood's quote brings a newer trade than its bars, and within a minute the pill's hover shows its move, with no time while it is fresh",
-        quoted === "Tonight +2.94%" && !!pill.newest && pill.newest.t === at(harness.wed7 + 86400, 1, 19) + 30,
-        [quoted, pill.newest ? pill.newest.p + " " + pill.newest.t : "no newest"].join(" | "))
+      harness.check("Robinhood's quote brings a newer trade than its bars, and within a minute the pill shows its move, with no time in its hover while fresh",
+        pillQuoted === "+2.94%" && quoted === "Overnight · Wed \u22125.82%" && !!pill.newest && pill.newest.t === at(harness.wed7 + 86400, 1, 19) + 30,
+        [pillQuoted, quoted, pill.newest ? pill.newest.p + " " + pill.newest.t : "no newest"].join(" | "))
 
       // Without a 1 Hz open clock, that overnight trade still wakes the clock
       // on the exact second it turns stale (01:21:31, 2 minutes + 1 s on).
@@ -631,7 +635,7 @@ Harness {
       mouseMove(pillWindow.contentItem, 1, 100)
       closeWindow()
       harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second",
-        staleWake === 2005 && freshHover === "Tonight +2.94%" && staleHover === "Tonight +2.94% as of 01:19",
+        staleWake === 2005 && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%",
         ["staleWake=" + staleWake, "fresh=" + freshHover, "stale=" + staleHover].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked

@@ -87,15 +87,17 @@ function lineDay(symbol, quote, nights, calendars, dayClock) {
 }
 
 // A listing's newest trade, measured from the dashed line of the day its
-// chart draws. While that day waits on Robinhood, Yahoo's own trades make
-// it. Until the next open that is the day that closed, as the chart will
-// draw it, with its after hours counted as its own, until Robinhood's
-// answer brings tonight's trade. It reads the listing's quote and its
-// night's trades and reach, and nothing else.
-function newestTradeOf(symbol, quote, nights, calendars) {
+// chart draws. While a listing out of sight waits on Robinhood's fuller
+// trades, its quote's night trade (`lastTrades`) stands in if tonight
+// traded, else Yahoo's own trades. It reads the listing's quote, its
+// night's trades and reach, and its last trade, and nothing else.
+function newestTradeOf(symbol, quote, nights, calendars, lastTrades) {
   if (!quote || !Overnight.hasOvernight(quote, calendars)) return null
   var drawn = dayDrawn(symbol, quote, nights, calendars)
-  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars)
+  if (drawn.waiting) {
+    var quoted = lastTrades ? Overnight.quotedNight(lastTrades[symbol], Overnight.overnightMarket(calendars)) : null
+    drawn = Day.dayChart(quote, quoted || NO_ANSWER, calendars)
+  }
   return Overnight.newestTrade(quote, drawn.latest, calendars, drawn.day)
 }
 
@@ -125,13 +127,11 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // and the close, so the baseline stays in view.
 //
 // Once tonight has traded (`Day.nightBell`), the day holds two closes, and
-// the one dashed line is the one the number beside the chart counts from:
-// the panel's and the rows', the close just gone, so the day before the
-// bell is set aside; the pill's while it keeps the day's move (`dayMove`),
-// the close before the day, so what traded since the bell is: `aside`.
+// the one dashed line is the close just gone, which the number beside the
+// chart counts from, so the day before the bell is set aside (`aside`).
 // The scale holds both closes, so nothing moves when one look turns into
 // the other.
-function chartGeometry(quote, calendars, dayMove) {
+function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
   var reg = quote.session.regular
@@ -146,7 +146,7 @@ function chartGeometry(quote, calendars, dayMove) {
   // Known apart from the day's: Yahoo can send the close without the one before.
   var gone = bell !== null ? Quote.regularClose(quote) : null
   var stepped = Format.isFiniteNumber(gone)
-  var base = stepped && !dayMove ? gone : dayBase
+  var base = stepped ? gone : dayBase
   var known = Format.isFiniteNumber(base)
   var lo = known ? base : (pts.length ? pts[0].p : 0)
   var hi = lo
@@ -184,7 +184,7 @@ function chartGeometry(quote, calendars, dayMove) {
   return {
     points: out,
     baselineY: known ? 1 - (base - lo) / (hi - lo) : null,
-    aside: !stepped ? null : dayMove ? { from: bellX, to: 1 } : { from: 0, to: bellX },
+    aside: stepped ? { from: 0, to: bellX } : null,
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true

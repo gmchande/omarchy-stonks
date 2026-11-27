@@ -181,6 +181,7 @@ Item {
   property var newestFrom: ({})
   function workOutNewest() {
     var nights = root.nights
+    var lastTrades = lastTradeFeed.entries
     var from = {}
     var out = {}
     var count = 0
@@ -191,9 +192,10 @@ Item {
       var night = nights[symbol]
       var bars = night ? night.bars : null
       var through = night ? night.through : null
+      var trade = !night && lastTrades[symbol] ? lastTrades[symbol].trade : null
       var had = root.newestFrom[symbol]
-      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through ? had
-        : { quote: quote, bars: bars, through: through, newest: Chart.newestTradeOf(symbol, quote, nights, root.calendars) }
+      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trade === trade ? had
+        : { quote: quote, bars: bars, through: through, trade: trade, newest: Chart.newestTradeOf(symbol, quote, nights, root.calendars, lastTrades) }
       if (!from[symbol].newest) return
       out[symbol] = from[symbol].newest
       count++
@@ -218,7 +220,10 @@ Item {
   onOrderChanged: root.heldOrder = null
   onReversedChanged: root.heldOrder = null
   onChangeModeChanged: root.heldOrder = null
-  onListNameChanged: root.heldOrder = null
+  onListNameChanged: {
+    root.heldOrder = null
+    Qt.callLater(root.askOvernight)
+  }
   onListsHeldChanged: root.heldOrder = null
 
   // ---- Open surfaces and the search's preview
@@ -635,7 +640,9 @@ Item {
     gate: robinhoodGate
     holding: root.drawing.length > 0
     onEntriesChanged: {
+      var before = root.nights
       root.joinNights()
+      if (root.nights === before) root.workOutNewest()
       Qt.callLater(root.askOvernight)
     }
     onBusyChanged: Qt.callLater(root.releaseOrder)
@@ -790,7 +797,7 @@ Item {
     var open = root.openSurfaces.length > 0
     var asking = root.robinhoodAsking()
     var asks = Asks.overnightAsks(asking)
-    var lastTrades = Asks.lastTradeAsks(asking, asks ? asks.trades : [])
+    var lastTrades = Asks.lastTradeAsks(asking, asks && !overnightFeed.busy ? asks.trades : [])
     root.lastTradeDueAt = Asks.lastTradeNext(asking)
     root.overnightDueAt = Asks.overnightNext(asking)
     if ((!asks && lastTrades.length === 0) || !root.screensClear()) return
@@ -814,7 +821,8 @@ Item {
   onLastTradeDueAtChanged: armClock()
   onOvernightDueAtChanged: armClock()
   function overnightWanted() {
-    return Asks.overnightAsks(root.robinhoodAsking())
+    var asking = root.robinhoodAsking()
+    return !!Asks.overnightAsks(asking) || Asks.lastTradeAsks(asking, []).length > 0
   }
   function robinhoodAsking() {
     var previewed = root.previewSymbol
@@ -827,6 +835,7 @@ Item {
       yahooHole: root.rawYahooHole,
       rawYahooHole: root.rawYahooHole,
       overnightSymbols: root.overnightSymbols,
+      listSymbols: root.view.rows,
       allSymbols: root.allSymbols,
       inSight: root.rowsInSight(),
       preview: previewed,

@@ -687,10 +687,9 @@ test("a price Yahoo stamps in a US stock's night is set aside as its answer is r
   const robinhood = [{ t: mon("20:00"), p: 100.1, s: "overnight" }, { t: mon("20:05"), p: 100.3, s: "overnight" }]
   const { day: drawn, latest } = M.dayChart(evening, { bars: robinhood, through: mon("20:05") }, calendars, mon("21:05"))
   expect(drawn.points.filter(p => p.t >= mon("19:55")).map(p => [p.t, p.p, p.s])).toEqual([[mon("19:55"), 101, "post"]].concat(robinhood.map(b => [b.t, b.p, b.s])))
-  // The newest price is Robinhood's night trade, so the pill keeps Monday's
-  // close and move until 04:00.
+  // The newest price is Robinhood's night trade, joined to Monday's day.
   const newest = M.newestTrade(evening, latest, calendars, drawn)
-  expect([newest.p, newest.phase, M.keepsDay(newest)]).toEqual([100.3, "overnight", true])
+  expect([newest.p, newest.phase, newest.joined]).toEqual([100.3, "overnight", true])
   // The rows' spark answer reads the same.
   const spark = M.sparkQuote(answer(mon("21:00"), [mon], "NMS", false), evening.verdict, [], mon("21:05"), nightOf)
   expect(times(spark.quote)).toEqual(monday)
@@ -2074,19 +2073,21 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
 })
 
-test("Robinhood's quote is asked each minute while a night trades, for the pill's stock with nothing open and the US stocks on show with a surface open, once their trades show them trading at night, and again whenever their trades are asked after it", () => {
+test("Robinhood's quote is asked each minute while a night trades, for the pill's stock with nothing open and the whole list on show with a surface open, skipping those whose trades show no night trade, and again whenever their trades are asked after it", () => {
   const now = at(WED, "21:00")
   // Trades with one at 20:55, tonight's; and trades with none tonight or
   // last night.
   const nightly = { status: "ok", bars: [{ t: now - 300, p: 10, s: "overnight" }], through: now - 300, at: now - 60 }
   const quiet = { status: "ok", bars: [{ t: now - 3600, p: 10, s: "post" }], through: now - 300, at: now - 60 }
   const base = {
-    open: false, pill: true, featured: "AAPL", overnightSymbols: ["AAPL", "MSFT", "NVDA"], allSymbols: ["AAPL", "MSFT", "NVDA", "SHEL.L"], inSight: [],
+    open: false, pill: true, featured: "AAPL", overnightSymbols: ["AAPL", "MSFT", "NVDA"], listSymbols: ["AAPL", "MSFT", "NVDA", "SHEL.L"],
+    allSymbols: ["AAPL", "MSFT", "NVDA", "SHEL.L"], inSight: [],
     preview: "", previewShown: false, previewQuote: null, nights: { AAPL: nightly, MSFT: nightly, NVDA: nightly }, lastTrades: {}, interval: 60, now, calendars
   }
   const asks = (changes, alongside = []) => M.lastTradeAsks({ ...base, ...changes }, alongside)
   const askedAgo = (ago, symbols = ["AAPL"]) => Object.fromEntries(symbols.map(s => [s, { status: "ok", trade: null, at: now - ago }]))
-  // Nothing open: the pill's stock, each minute; with no pill, nothing.
+  // Nothing open: the pill's stock alone, each minute, never off-screen rows;
+  // with no pill, nothing.
   expect([asks({}), asks({ lastTrades: askedAgo(30) }), asks({ lastTrades: askedAgo(60) }), asks({ pill: false })]).toEqual([["AAPL"], [], ["AAPL"], []])
   // The clock wakes when it falls due, not at the next whole minute: asked
   // at 20:59:05, at 21:00:05; every 30 s where that is the setting.
@@ -2094,16 +2095,16 @@ test("Robinhood's quote is asked each minute while a night trades, for the pill'
     .toEqual([now + 5, now + 20, 0])
   // By day, and on a Saturday night, nothing.
   expect([asks({ now: at(WED, "14:00") }), asks({ now: at("2026-10-24", "21:00") })]).toEqual([[], []])
-  // A surface open: the stock on show and the rows in sight, one whose
-  // trades show no night trade, or that has no trades yet, left out. It
-  // goes once one is a minute old or the stock on show has none, so a row
-  // coming into sight waits for it; with it go those not yet asked and
-  // those due within half a minute.
-  const open = { open: true, inSight: ["MSFT", "NVDA"] }
+  // A surface open: the whole list on show (even rows out of sight with no
+  // trades fetched yet), skipping any whose trades already show no night
+  // trade. Unasked list symbols go at once even if the featured stock was
+  // just asked; once all are asked, due symbols bring those within half an
+  // interval.
+  const open = { open: true, inSight: ["AAPL"] }
   expect(asks(open)).toEqual(["AAPL", "MSFT", "NVDA"])
-  expect(asks({ ...open, nights: { AAPL: nightly, MSFT: quiet } })).toEqual(["AAPL"])
-  expect(asks({ ...open, lastTrades: askedAgo(10) })).toEqual([])
-  expect(asks({ ...open, lastTrades: askedAgo(10) }, ["MSFT", "NVDA"])).toEqual([])
+  expect(asks({ ...open, nights: { AAPL: nightly, MSFT: quiet } })).toEqual(["AAPL", "NVDA"])
+  expect(asks({ ...open, listSymbols: ["AAPL", "MSFT"] })).toEqual(["AAPL", "MSFT"])
+  expect(asks({ ...open, lastTrades: askedAgo(10) })).toEqual(["MSFT", "NVDA"])
   expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(30, ["MSFT"]), ...askedAgo(10, ["NVDA"]) } })).toEqual(["AAPL", "MSFT"])
   expect(asks({ ...open, lastTrades: { ...askedAgo(60), ...askedAgo(10, ["MSFT"]) } })).toEqual(["AAPL", "NVDA"])
   // A quote asked before its trades can't say whether its trade is newer
