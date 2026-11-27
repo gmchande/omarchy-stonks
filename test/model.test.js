@@ -3188,23 +3188,43 @@ describe("another stock's chart bends out of the one before", () => {
     expect(faint[0].length).toBe(5) // 4 faint points + 1 adjacent full point
   })
 
-  test("intermediate morph decimation stays within its vertex budget while keeping endpoints, breaks, untraded steps, flag edges, and exact resting frames", () => {
+  test("intermediate morph simplification trims redundant vertices while keeping endpoints, breaks, untraded steps, flag edges, and sub-pixel handover accuracy", () => {
     const denseYear = {
       day: false, baselineY: 0.5, aside: null, ticks: [],
-      points: Array.from({ length: 260 }, (_, i) => pt(i / 259, wobble(i * 0.7)))
+      points: Array.from({ length: 260 }, (_, i) => pt(i / 259, 0.5 + 0.35 * Math.sin(i * 0.08) + 0.05 * Math.sin(i * 0.7)))
     }
     const plan = Morph.plan(night, denseYear)
-    expect(Morph.frame(plan, 0, 100)).toBe(night)
-    expect(Morph.frame(plan, 1, 100)).toBe(denseYear)
+    expect(Morph.frame(plan, 0, 630, 184)).toBe(night)
+    expect(Morph.frame(plan, 1, 630, 184)).toBe(denseYear)
     const full = Morph.frame(plan, 0.5)
-    const slim = Morph.frame(plan, 0.5, 100)
+    const slim = Morph.frame(plan, 0.5, 630, 184)
     expect(full.points.length).toBeGreaterThan(250)
-    expect(slim.points.length).toBeLessThanOrEqual(115)
+    expect(slim.points.length).toBeLessThan(full.points.length)
     expect(slim.points[0]).toEqual(full.points[0])
     expect(slim.points[slim.points.length - 1]).toEqual(full.points[full.points.length - 1])
-    // Untraded steps and breaks survive decimation.
+    // Near the end of an OutCubic 260 ms morph (one 120 Hz frame left),
+    // every point of the resting target lies within 0.1 logical px of the moving stroke.
+    const lastT = 1 - Math.pow(8.33 / 260, 3)
+    const nearEnd = Morph.frame(plan, lastT, 630, 184)
+    const segDist = (p, a, b) => {
+      const dx = (b.x - a.x) * 630, dy = (b.y - a.y) * 184
+      const px = (p.x - a.x) * 630, py = (p.y - a.y) * 184
+      const l2 = dx * dx + dy * dy
+      const f = l2 ? Math.max(0, Math.min(1, (px * dx + py * dy) / l2)) : 0
+      return Math.hypot(px - dx * f, py - dy * f)
+    }
+    let worst = 0
+    for (const p of denseYear.points) {
+      let best = Infinity
+      for (let i = 1; i < nearEnd.points.length; i++) {
+        if (!nearEnd.points[i].brk) best = Math.min(best, segDist(p, nearEnd.points[i - 1], nearEnd.points[i]))
+      }
+      if (best > worst) worst = best
+    }
+    expect(worst).toBeLessThan(0.1)
+    // Untraded steps and breaks survive simplification.
     const lunchPlan = Morph.plan(lunch, denseYear)
-    const slimLunch = Morph.frame(lunchPlan, 0.25, 90)
+    const slimLunch = Morph.frame(lunchPlan, 0.25, 630, 184)
     expect(slimLunch.points.some(p => p.brk)).toBe(true)
     expect(slim.points.some(p => p.untraded)).toBe(true)
     // Scalar settings fast path matches full fileSettings and keeps unchanged list arrays intact.

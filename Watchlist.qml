@@ -380,7 +380,13 @@ Flickable {
   // numbers, so it changes only as a row crosses the edge.
   readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).first
   readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).last
-  readonly property var sightSymbols: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
+  // Held while a list switch or reopen restores its scroll position so the
+  // service never sees an intermediate slice at the old scroll offset.
+  readonly property var sightSymbolsNow: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
+  property bool switching: false
+  property var sightSymbols: []
+  onSightSymbolsNowChanged: if (!switching) sightSymbols = sightSymbolsNow
+  onSwitchingChanged: if (!switching) sightSymbols = sightSymbolsNow
 
   function restingTopFor(index, top) {
     return Rows.restingTop(index, rowSize(), top, sightHeight, rowsLength())
@@ -651,10 +657,12 @@ Flickable {
       cursorSymbol = ""
       forgetClicks()
       takeOver()
+      switching = true
       display(view.shown.slice(), false)
       contentY = clampY(places[view.listKey] || 0)
       settleRows()
       forgetGoneCursor()
+      switching = false
     } else if (reordered) {
       reorder.cancel()
       reorderRows()
@@ -674,12 +682,14 @@ Flickable {
     cursorSymbol = ""
     forgetClicks()
     listHover.rest()
+    switching = true
     layOut()
     var featuredAt = displayedSymbols.indexOf(featuredSymbol)
     if (featuredAt >= 0 && !wholeInSight(featuredAt, contentY)) {
       takeOver()
       contentY = restingTopFor(featuredAt, contentY)
     }
+    switching = false
   }
   Component.onCompleted: {
     lastPitch = rowPitch
@@ -687,6 +697,7 @@ Flickable {
     lineLook = look.retro
     Rows.syncModel(rowsModel, "symbol", view.allSymbols)
     display(view.shown.slice(), false)
+    sightSymbols = sightSymbolsNow
   }
 
   // A look switch swaps each row's day line, a canvas, which a long All

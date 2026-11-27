@@ -130,8 +130,8 @@ Item {
     function onReduceMotionChanged() { if (Style.reduceMotion) root.settle() }
   }
 
-  readonly property int morphBudget: Math.max(80, Math.min(160, Math.round((width - pad * 2) / 3)))
-  readonly property var shown: plan && morph < 1 ? Morph.frame(plan, morph, moving ? morphBudget : 0)
+  readonly property var shown: plan && morph < 1
+    ? Morph.frame(plan, morph, moving ? width - pad * 2 : 0, moving ? height - pad * 2 : 0)
     : tailFrom && tailT < 1 && geometry ? tailGeometry(geometry, tailFrom, tailT)
     : geometry
   readonly property var lastPoint: Chart.newestPoint(shown)

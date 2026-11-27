@@ -88,8 +88,12 @@ Item {
     onTriggered: root.writeSettled()
   }
   function writeSettled() {
-    root.settledKeys = ({})
-    if (root.ready && !root.unreadable) root.writeFile(root.fileSettings)
+    if (!root.ready || root.unreadable) {
+      root.settledKeys = ({})
+      return
+    }
+    root.writeFile(root.fileSettings)
+    if (!root.writeOwed) root.settledKeys = ({})
   }
   // Flush any pending delayed save at once (surface close, update restart).
   function flush() {
@@ -255,12 +259,22 @@ Item {
         if (taken) root.takeLoadedSettings(answer.text)
         return
       }
-      if (!Settings.readListsFile(answer.text)) {
+      var parsed = Settings.readListsFile(answer.text)
+      if (!parsed) {
+        root.settledKeys = ({})
         root.takeUnreadableFile()
         root.editsUnsaved = true
         return
       }
       root.unreadable = false
+      var keys = Object.keys(root.settledKeys)
+      if (keys.length > 0) {
+        var keep = {}
+        for (var i = 0; i < keys.length; i++) keep[keys[i]] = root.fileSettings[keys[i]]
+        root.settledKeys = ({})
+        var merged = Settings.fileSettings(Settings.copyWith(parsed, keep))
+        if (!Settings.settingsEqual(merged, root.fileSettings)) root.adopt(merged)
+      }
       root.writeFile(root.fileSettings)
       return
     }
@@ -269,8 +283,10 @@ Item {
     if (root.files) root.files.forget(root.path)
     if (root.missing) {
       var gone = root.takesRead(null)
-      if (owed) root.writeFile(root.fileSettings)
-      else if (gone) root.takeMissingFile()
+      if (owed) {
+        root.settledKeys = ({})
+        root.writeFile(root.fileSettings)
+      } else if (gone) root.takeMissingFile()
       return
     }
     // A read while the file is being made is no answer: a write it held
@@ -282,7 +298,10 @@ Item {
     root.staleTexts = null
     root.saveFailed = false
     root.takeUnreadableFile()
-    if (owed) root.editsUnsaved = true
+    if (owed) {
+      root.settledKeys = ({})
+      root.editsUnsaved = true
+    }
   }
 
   // While a save awaits its read-back: each text the file may still hold

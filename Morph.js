@@ -182,12 +182,46 @@ function evenness(g) {
   return g.day && !g.aside ? 1 : 0
 }
 
-// Reduces an intermediate morph polyline to about `maxPoints` vertices while
-// keeping every endpoint, break, untraded step, flag transition, and each
-// bucket's min/max envelope so the moving curve matches the full shape.
-function decimate(points, maxPoints) {
+// Keeps every vertex needed so no omitted point lies more than `eps` logical
+// pixels from the kept segments, preserving every endpoint, break, untraded
+// step, and flag transition.
+function simplifySpan(points, a, b, scaleX, scaleY, eps2, keep) {
+  var maxD2 = 0
+  var idx = -1
+  var ax = points[a].x * scaleX
+  var ay = points[a].y * scaleY
+  var dx = points[b].x * scaleX - ax
+  var dy = points[b].y * scaleY - ay
+  var len2 = dx * dx + dy * dy
+  for (var i = a + 1; i < b; i++) {
+    var px = points[i].x * scaleX - ax
+    var py = points[i].y * scaleY - ay
+    var d2
+    if (len2 === 0) {
+      d2 = px * px + py * py
+    } else {
+      var f = (px * dx + py * dy) / len2
+      if (f < 0) f = 0
+      else if (f > 1) f = 1
+      var ex = px - f * dx
+      var ey = py - f * dy
+      d2 = ex * ex + ey * ey
+    }
+    if (d2 > maxD2) {
+      maxD2 = d2
+      idx = i
+    }
+  }
+  if (maxD2 > eps2 && idx >= 0) {
+    keep[idx] = true
+    simplifySpan(points, a, idx, scaleX, scaleY, eps2, keep)
+    simplifySpan(points, idx, b, scaleX, scaleY, eps2, keep)
+  }
+}
+
+function simplify(points, plotW, plotH, epsPx) {
   var n = points.length
-  if (!maxPoints || maxPoints <= 0 || n <= maxPoints) return points
+  if (!(epsPx > 0) || !(plotW > 0) || !(plotH > 0) || n <= 2) return points
   var keep = new Array(n)
   keep[0] = true
   keep[n - 1] = true
@@ -200,42 +234,12 @@ function decimate(points, maxPoints) {
       keep[i] = true
     }
   }
-  var kept = 0
-  for (var m = 0; m < n; m++) if (keep[m]) kept++
-  var room = maxPoints - kept
-  if (room > 0) {
-    var runs = []
-    var totalFlex = 0
-    var r = 0
-    while (r < n) {
-      if (keep[r]) { r++; continue }
-      var start = r
-      while (r < n && !keep[r]) r++
-      runs.push([start, r])
-      totalFlex += r - start
-    }
-    if (totalFlex <= room) return points
-    for (var ri = 0; ri < runs.length; ri++) {
-      var a = runs[ri][0], b = runs[ri][1], len = b - a
-      var share = Math.max(1, Math.round(room * len / totalFlex))
-      if (len <= share) {
-        for (var j = a; j < b; j++) keep[j] = true
-        continue
-      }
-      var buckets = Math.max(1, Math.floor(share / 2))
-      for (var bk = 0; bk < buckets; bk++) {
-        var lo = a + Math.floor(bk * len / buckets)
-        var hi = a + Math.floor((bk + 1) * len / buckets)
-        if (hi <= lo) continue
-        var minI = lo, maxI = lo
-        for (var p = lo + 1; p < hi; p++) {
-          if (points[p].y < points[minI].y) minI = p
-          if (points[p].y > points[maxI].y) maxI = p
-        }
-        keep[minI] = true
-        keep[maxI] = true
-      }
-    }
+  var eps2 = epsPx * epsPx
+  var start = 0
+  for (var j = 1; j < n; j++) {
+    if (!keep[j]) continue
+    if (j - start > 1) simplifySpan(points, start, j, plotW, plotH, eps2, keep)
+    start = j
   }
   var out = []
   for (var k = 0; k < n; k++) if (keep[k]) out.push(points[k])
@@ -243,9 +247,10 @@ function decimate(points, maxPoints) {
 }
 
 // The chart `t` of the way from `plan`'s old one to its new one, a frame of
-// the eased motion. When `maxPoints` is given, intermediate frames decimate to
-// that vertex budget while keeping exact full geometry at `t <= 0` and `t >= 1`.
-function frame(p, t, maxPoints) {
+// the eased motion. When `plotW` and `plotH` are given, intermediate frames
+// drop vertices that stay within a sub-pixel tolerance that tightens to zero
+// at both ends, cutting morph paint work without a jump at handover.
+function frame(p, t, plotW, plotH) {
   if (t <= 0) return p.a.real
   if (t >= 1) return p.b.real
   var a = p.a, b = p.b
@@ -304,7 +309,10 @@ function frame(p, t, maxPoints) {
       ext: flagged(ext, u)
     })
   }
-  if (maxPoints > 0) points = decimate(points, maxPoints)
+  if (plotW > 0 && plotH > 0) {
+    var eps = Math.min(1.0, 1.5 * Math.pow(Math.min(t, 1 - t), 1 / 3))
+    points = simplify(points, plotW, plotH, eps)
+  }
   var ticks = a.g.ticks.concat(b.g.ticks)
   var tickAlpha = a.g.ticks.map(function(x, i) { return (a.g.tickAlpha ? a.g.tickAlpha[i] : 1) * (1 - t) })
     .concat(b.g.ticks.map(function() { return t }))
