@@ -41,7 +41,7 @@ OverRows {
   readonly property var shown: own.concat(results.filter(function(r) { return ownSymbols.indexOf(r.symbol) < 0 }))
   readonly property int ownCount: own.length
   // Yahoo's rows dim under a newer query; the list's own follow every letter.
-  function dimmed(index) { return stale && index >= ownCount }
+  function dimmed(index) { return stale && index >= own.length }
   property string note: ""
   readonly property bool messageShown: answer === "none" || answer === "failed" || (answer === "" && slow)
   // What Yahoo said goes under the list's own; with more of them than the
@@ -67,13 +67,14 @@ OverRows {
   // sight, from an older query's answer.
   property string chosenSymbol: ""
   onShownChanged: {
+    var owned = own.length
     if (chosenSymbol === "") {
-      if (ownCount > 0) showResult(0)
+      if (owned > 0) showResult(0)
       return
     }
     var at = shown.map(function(r) { return r.symbol }).indexOf(chosenSymbol)
-    if (at >= 0 && !(ownCount > 0 && dimmed(at))) resultIndex = at
-    else if (ownCount > 0) showResult(0)
+    if (at >= 0 && !(owned > 0 && dimmed(at))) resultIndex = at
+    else if (owned > 0) showResult(0)
     // Until Yahoo answers, the chart stays on what it shows.
     else resultIndex = -1
   }

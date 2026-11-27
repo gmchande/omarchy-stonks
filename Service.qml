@@ -1121,17 +1121,45 @@ Item {
     var atNight = root.nightSymbols.indexOf(sym) >= 0
     return Overnight.marketAsleep(q, atNight, now, root.calendars) !== Overnight.marketAsleep(q, atNight, now - 5, root.calendars) ? now + 5 : 0
   }
+  function newestStaleAt(symbols, now) {
+    var trades = root.newestTrades
+    var at = 0
+    for (var i = 0; i < symbols.length; i++) {
+      var sym = symbols[i]
+      var nt = trades[sym]
+      if (!nt && sym === root.previewSymbol) {
+        var pq = previewFeed.quotes[sym]
+        if (pq) nt = Chart.newestTradeOf(sym, pq, root.nights, root.calendars)
+      }
+      if (!nt || nt.phase !== "overnight" || nt.t === null || nt.t === undefined) continue
+      var due = nt.t + Overnight.OVERNIGHT_STALE + 1
+      if (due > now && (!at || due < at)) at = due
+    }
+    return at
+  }
   function tick() {
     root.now = root.wallSecond()
     root.armClock()
   }
+  property bool clockPending: false
+  function armClockSoon() {
+    if (clockPending) return
+    clockPending = true
+    Qt.callLater(function() {
+      if (!root.clockPending) return
+      root.clockPending = false
+      root.armClock()
+    })
+  }
   function armClock() {
+    clockPending = false
     if (!root.ready) return
     if (root.screensOff) {
       clock.stop()
       return
     }
-    var visible = root.openSurfaces.length > 0 ? [root.view.featured].concat(root.rowsInSight()) : root.pillInBar ? [root.view.featured] : []
+    var charted = root.openSurfaces.length > 0 ? root.chartsOnShow() : root.pillInBar ? [root.view.featured] : []
+    var visible = root.openSurfaces.length > 0 ? charted.concat(root.rowsInSight()) : charted
     var nowMs = root.wallClock ? root.wallSecond() * 1000 : Date.now()
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, nowMs, root.now,
       [root.dueAt, root.lastTradeDueAt, root.overnightDueAt,
@@ -1139,11 +1167,13 @@ Item {
         yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,
         Freshness.overdueAt(root.owed, root.now),
         Freshness.staleAt(feed.quotes, visible, root.now),
+        root.newestStaleAt(charted, root.now),
         root.bellWindowEndAt(root.now)])
     clock.restart()
   }
-  onDueAtChanged: armClock()
-  onOwedChanged: armClock()
+  onDueAtChanged: armClockSoon()
+  onOwedChanged: armClockSoon()
+  onNewestTradesChanged: armClockSoon()
   onReadyChanged: armClock()
   // Each step also tries the next chart ahead, which may have waited on
   // Yahoo's budget.

@@ -1248,15 +1248,8 @@ Harness {
       }
       var many = /-menu(\d+)-/.exec(root.stateName)
       for (var n = stub.lists.length; many && n < Number(many[1]); n++) stub.lists = stub.lists.concat([choice("List " + n, all.slice(n % 9, n % 9 + 3))])
-      var child = function(name) { return body.children.filter(function(c) { return c.objectName === name })[0] }
-      var find = function(item, name) {
-        if (item.objectName === name) return item
-        for (var i = 0; i < item.children.length; i++) {
-          var found = find(item.children[i], name)
-          if (found) return found
-        }
-        return null
-      }
+      var child = function(name) { return root.find(body, name) }
+      var find = function(item, name) { return root.find(item, name) }
       if (root.stateName.indexOf("-menu-") > 0 || many) {
         // The cursor's row under the menu's left edge, which must not show
         // its bar through: a turn later, once the rows show.

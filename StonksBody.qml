@@ -581,14 +581,14 @@ Item {
   function fittedHeight(maxHeight) {
     return Layout.fittedHeight(fit, {
       help: showingHelp,
-      helpHeight: helpSheet ? helpSheet.contentHeight : 0,
+      helpHeight: showingHelp && helpSheet ? helpSheet.contentHeight : 0,
       lists: listViewOpen,
-      listsHeight: managingLists ? (manageLists ? manageLists.contentHeight : 0) : (symbolLists ? symbolLists.contentHeight : 0),
+      listsHeight: managingLists ? (manageLists ? manageLists.contentHeight : 0) : (listsSymbol !== "" && symbolLists ? symbolLists.contentHeight : 0),
       search: adding,
-      searchHeight: search ? search.desiredHeight : 0,
+      searchHeight: adding && search ? search.desiredHeight : 0,
       menu: listMenuOpen,
-      menuHeight: listMenu ? listMenu.contentHeight : 0,
-      menuLeast: listMenu ? listMenu.leastHeight : 0
+      menuHeight: listMenuOpen && listMenu ? listMenu.contentHeight : 0,
+      menuLeast: listMenuOpen && listMenu ? listMenu.leastHeight : 0
     }, maxHeight)
   }
 

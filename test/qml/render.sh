@@ -34,9 +34,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
 mkdir -p "$out"
 plugin_tree render.qml
-# The pill sheet's pills load no panel: the offscreen platform has no
-# PopupWindow to put one in, and no render shows one.
-patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 
 export QT_QPA_PLATFORM=offscreen
 export STONKS_VISUAL_CALENDARS="$plugin/calendars.json"
