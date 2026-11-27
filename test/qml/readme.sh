@@ -53,8 +53,6 @@ card_window
 # Offscreen, a grab's empty pixels are black, not the window's colour, so
 # the window's grab takes a ground of that colour under the body.
 patch_copy plugin/App.qml '/^      Loader {$/i\      Rectangle { anchors.fill: parent; color: window.color }'
-# The pills on their strips open no panel of their own.
-patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 if [ -n "$keep" ]; then
   at_moment jump-2026-11-23-1756 '["NBIS"]' '[]'
 else

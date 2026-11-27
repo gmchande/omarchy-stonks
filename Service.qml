@@ -160,6 +160,8 @@ Item {
   function keepDay(symbol, chart) {
     if (!chart || !chart.quote || chart.day === chart.quote) return
     if (builtDays[symbol] && builtDays[symbol].day === chart.day) return
+    var keys = Object.keys(builtDays)
+    if (keys.length >= 24 && !(symbol in builtDays)) delete builtDays[keys[0]]
     builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, root.nights), { day: chart.day, latest: chart.latest })
   }
   function dayMadeFrom(symbol, chart, nights) {
@@ -496,6 +498,7 @@ Item {
     clock: root
     onPausedChanged: root.releaseOrder()
     onPausedUntilChanged: root.armClock()
+    onBudgetDueAtChanged: root.armClock()
     // Yahoo answering again says the network is back.
     onReopened: {
       root.showHistory(false)
@@ -515,12 +518,15 @@ Item {
     perMinute: 10
     onPausedChanged: root.releaseOrder()
     onPausedUntilChanged: root.armClock()
+    onBudgetDueAtChanged: root.armClock()
+    onReopened: Qt.callLater(root.askOvernight)
   }
   Gate {
     id: githubGate
     host: "GitHub"
     clock: root
     onPausedUntilChanged: root.armClock()
+    onBudgetDueAtChanged: root.armClock()
   }
 
   QuoteFeed {
@@ -661,14 +667,24 @@ Item {
   // askOvernight() or sayFills() without a real change.
   property var overnightSymbols: []
   property var nightSymbols: []
+  // Newest Yahoo pre-market hole across `overnightSymbols`, cached per quote
+  // batch so clock ticks never scan all 152 quotes in `askOvernight`.
+  property var rawYahooHole: null
   function updateOvernightSets() {
     var quotes = feed.quotes
     var cals = root.calendars
     var nextOver = []
+    var newestHole = null
     for (var i = 0; i < root.allSymbols.length; i++) {
       var s = root.allSymbols[i]
-      if (quotes[s] && Overnight.hasOvernight(quotes[s], cals)) nextOver.push(s)
+      var q = quotes[s]
+      if (q && Overnight.hasOvernight(q, cals)) {
+        nextOver.push(s)
+        var h = Overnight.yahooHole(q)
+        if (h !== null && (newestHole === null || h > newestHole)) newestHole = h
+      }
     }
+    root.rawYahooHole = newestHole
     if (nextOver.length !== root.overnightSymbols.length
         || nextOver.some(function(s, idx) { return s !== root.overnightSymbols[idx] }))
       root.overnightSymbols = nextOver
@@ -773,6 +789,7 @@ Item {
     var asks = Asks.overnightAsks(asking)
     var lastTrades = Asks.lastTradeAsks(asking, asks ? asks.trades : [])
     root.lastTradeDueAt = Asks.lastTradeNext(asking)
+    root.overnightDueAt = Asks.overnightNext(asking)
     if ((!asks && lastTrades.length === 0) || !root.screensClear()) return
     // The pill's own ask waits for a request already out.
     if (!open && (listDateFeed.busy || overnightFeed.busy || lastTradeFeed.busy)) return
@@ -787,9 +804,12 @@ Item {
     }
     lastTradeFeed.fetch(lastTrades, root.now)
   }
-  // When the next quote falls due, so the clock wakes then with nothing open.
+  // When the next Robinhood quote or overnight refresh falls due, so the
+  // clock wakes at its exact second.
   property int lastTradeDueAt: 0
+  property int overnightDueAt: 0
   onLastTradeDueAtChanged: armClock()
+  onOvernightDueAtChanged: armClock()
   function overnightWanted() {
     return Asks.overnightAsks(root.robinhoodAsking())
   }
@@ -801,6 +821,8 @@ Item {
       featured: root.view.featured,
       quoteEntries: feed.entries,
       quotes: feed.quotes,
+      yahooHole: root.rawYahooHole,
+      rawYahooHole: root.rawYahooHole,
       overnightSymbols: root.overnightSymbols,
       allSymbols: root.allSymbols,
       inSight: root.rowsInSight(),
@@ -872,7 +894,8 @@ Item {
     var now = root.wallSecond()
     var removed = root.lastRemoval ? root.lastRemoval.symbol : ""
     var keep = function(s) { return root.allSymbols.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
-    for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
+    var keepDay = function(s) { return s === root.view.featured || s === root.previewSymbol || s === removed || root.rowsInSight().indexOf(s) >= 0 }
+    for (var symbol in root.builtDays) if (!keepDay(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
     // A fill is said once while it's on a chart.
     for (var said in root.saidFills) {
@@ -1085,21 +1108,72 @@ Item {
   function wallSecond() { return wallClock ? wallClock() : Math.floor(Date.now() / 1000) }
   property int now: wallSecond()
 
-  // Each second while a surface is open, each minute otherwise; it also
-  // wakes when the next quote falls due, a pause ends, or a refresh turns
-  // overdue, so the pill's "!" comes on time.
+  // Each minute boundary, and sooner at exact deadlines (next quote due,
+  // Robinhood overnight/last-trade due, pause or budget end, overdue "!",
+  // stale "As of" transition, or 5 s bell window end). Paused while every
+  // screen is off.
+  readonly property int clockInterval: clock.running ? clock.interval : 0
+  function bellWindowEndAt(now) {
+    if (root.openSurfaces.length === 0) return 0
+    var sym = root.view.featured
+    var q = sym ? feed.quotes[sym] : null
+    if (!q || q.crypto) return 0
+    var atNight = root.nightSymbols.indexOf(sym) >= 0
+    return Overnight.marketAsleep(q, atNight, now, root.calendars) !== Overnight.marketAsleep(q, atNight, now - 5, root.calendars) ? now + 5 : 0
+  }
+  function newestStaleAt(symbols, now) {
+    var trades = root.newestTrades
+    var at = 0
+    for (var i = 0; i < symbols.length; i++) {
+      var sym = symbols[i]
+      var nt = trades[sym]
+      if (!nt && sym === root.previewSymbol) {
+        var pq = previewFeed.quotes[sym]
+        if (pq) nt = Chart.newestTradeOf(sym, pq, root.nights, root.calendars)
+      }
+      if (!nt || nt.phase !== "overnight" || nt.t === null || nt.t === undefined) continue
+      var due = nt.t + Overnight.OVERNIGHT_STALE + 1
+      if (due > now && (!at || due < at)) at = due
+    }
+    return at
+  }
   function tick() {
     root.now = root.wallSecond()
     root.armClock()
   }
+  property bool clockPending: false
+  function armClockSoon() {
+    if (clockPending) return
+    clockPending = true
+    Qt.callLater(function() {
+      if (!root.clockPending) return
+      root.clockPending = false
+      root.armClock()
+    })
+  }
   function armClock() {
+    clockPending = false
     if (!root.ready) return
-    clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
-      [root.dueAt, root.lastTradeDueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
+    if (root.screensOff) {
+      clock.stop()
+      return
+    }
+    var charted = root.openSurfaces.length > 0 ? root.chartsOnShow() : root.pillInBar ? [root.view.featured] : []
+    var visible = root.openSurfaces.length > 0 ? charted.concat(root.rowsInSight()) : charted
+    var nowMs = root.wallClock ? root.wallSecond() * 1000 : Date.now()
+    clock.interval = Asks.clockWait(root.openSurfaces.length > 0, nowMs, root.now,
+      [root.dueAt, root.lastTradeDueAt, root.overnightDueAt,
+        yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil,
+        yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,
+        Freshness.overdueAt(root.owed, root.now),
+        Freshness.staleAt(feed.quotes, visible, root.now),
+        root.newestStaleAt(charted, root.now),
+        root.bellWindowEndAt(root.now)])
     clock.restart()
   }
-  onDueAtChanged: armClock()
-  onOwedChanged: armClock()
+  onDueAtChanged: armClockSoon()
+  onOwedChanged: armClockSoon()
+  onNewestTradesChanged: armClockSoon()
   onReadyChanged: armClock()
   // Each step also tries the next chart ahead, which may have waited on
   // Yahoo's budget.
@@ -1111,6 +1185,9 @@ Item {
     }
   }
   onNowChanged: {
+    if (yahooGate.budgetDueAt > 0 && root.now >= yahooGate.budgetDueAt) yahooGate.budgetDueAt = 0
+    if (robinhoodGate.budgetDueAt > 0 && root.now >= robinhoodGate.budgetDueAt) robinhoodGate.budgetDueAt = 0
+    if (githubGate.budgetDueAt > 0 && root.now >= githubGate.budgetDueAt) githubGate.budgetDueAt = 0
     stepDayClock()
     askOvernight()
     if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
@@ -1139,7 +1216,14 @@ Item {
     if (at !== root.dayClock) root.dayClock = at
     if (root.openSurfaces.length > 0 && root.viewDayClock !== root.dayClock) root.viewDayClock = root.dayClock
   }
-  onScreensOffChanged: stepDayClock()
-  onOpenSurfacesChanged: stepDayClock()
+  onScreensOffChanged: {
+    stepDayClock()
+    if (root.screensOff) clock.stop()
+    else root.tick()
+  }
+  onOpenSurfacesChanged: {
+    stepDayClock()
+    armClock()
+  }
   Component.onCompleted: stepDayClock()
 }

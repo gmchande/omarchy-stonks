@@ -34,7 +34,6 @@ declare -A listed=(
   # counts as shadowing: the alias and the id's line each.
   ["StonksBody.qml id-shadows-member motion"]=2
   ["StonksBody.qml id-shadows-member watchlist"]=2
-  ["StonksBody.qml id-shadows-member search"]=2
   ["WindowHost.qml id-shadows-member app"]=2
   ["Service.qml id-shadows-member yahooGate"]=2
 )

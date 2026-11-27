@@ -30,6 +30,22 @@ function overdueAt(owed, now) {
   return at
 }
 
+// Earliest future second when any shown trading listing's quote crosses
+// LIVE_QUOTE_MAX_AGE and switches from live to "As of".
+function staleAt(quotes, symbols, now) {
+  var at = 0
+  for (var i = 0; i < symbols.length; i++) {
+    var quote = quotes[symbols[i]]
+    if (!quote) continue
+    var head = Quote.headlineQuote(quote)
+    if (!head || head.t === null || head.t === undefined) continue
+    if (!Market.isTrading(Market.sessionPhase(quote, now))) continue
+    var due = head.t + LIVE_QUOTE_MAX_AGE + 1
+    if (due > now && (!at || due < at)) at = due
+  }
+  return at
+}
+
 // A normal answer's time, so a surface opening on a quote nothing kept fresh
 // says no "As of" before its price lands. `Service.asking` times it to the
 // millisecond; in the clock's whole seconds it ends 1 to 2 s on.

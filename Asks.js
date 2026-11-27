@@ -303,9 +303,18 @@ function overnightAsks(s) {
   })
   // Listings asked together share `entry.at`, so each ask is judged once.
   var judged = {}
-  var quotes = s.overnightSymbols.map(function(x) { return s.quotes[x] })
-  if (previewing && s.previewQuote.session) quotes.push(s.previewQuote)
-  var hole = newestHole(quotes, s.now)
+  var hole = null
+  if (s.yahooHole !== undefined) {
+    if (s.yahooHole !== null && s.yahooHole + Overnight.OVERNIGHT_LAG <= s.now) hole = s.yahooHole
+    if (previewing && s.previewQuote.session) {
+      var pHole = Overnight.yahooHole(s.previewQuote)
+      if (pHole !== null && pHole + Overnight.OVERNIGHT_LAG <= s.now && (hole === null || pHole > hole)) hole = pHole
+    }
+  } else {
+    var quotes = s.overnightSymbols.map(function(x) { return s.quotes[x] })
+    if (previewing && s.previewQuote.session) quotes.push(s.previewQuote)
+    hole = newestHole(quotes, s.now)
+  }
   var holeDue = function(x) {
     return hole !== null && Overnight.tradesAtNight(s.nights[x], cal) && Overnight.holeDue(hole, s.nights[x], s.now)
   }
@@ -381,6 +390,35 @@ function lastTradeNext(s) {
     var entry = s.lastTrades[x]
     return entry && (!next || entry.at + s.interval < next) ? entry.at + s.interval : next
   }, 0)
+}
+
+// When the next Robinhood overnight bar, hole, or list-date check falls due,
+// so the clock wakes at its exact second without a 1 Hz open heartbeat.
+function overnightNext(s) {
+  if (!s.open && !s.pill) return 0
+  var cal = Overnight.overnightMarket(s.calendars)
+  var tonight = cal ? Overnight.nightAt(cal, s.now) : null
+  var nightOpen = !!tonight && tonight.open
+  var shown = shownListings(s)
+  var listings = s.open ? shown.listings : (s.overnightSymbols.indexOf(s.featured) >= 0 ? [s.featured] : [])
+  var next = 0
+  var take = function(at) { if (at > s.now && (!next || at < next)) next = at }
+  for (var i = 0; i < listings.length; i++) {
+    var x = listings[i]
+    var entry = s.nights[x]
+    if (entry) {
+      if (Overnight.uncarried(entry)) take(entry.at + Overnight.LIST_DATE_INTERVAL)
+      else if (entry.status === "failed" || nightOpen) take(entry.at + Overnight.OVERNIGHT_INTERVAL)
+    }
+    var ld = s.listDates[x]
+    if (ld) take(ld.at + (ld.status === "ok" ? Overnight.LIST_DATE_INTERVAL : Overnight.OVERNIGHT_INTERVAL))
+  }
+  if (s.rawYahooHole !== null && s.rawYahooHole !== undefined) take(s.rawYahooHole + Overnight.OVERNIGHT_LAG)
+  if (shown.previewing && s.previewQuote && s.previewQuote.session) {
+    var pHole = Overnight.yahooHole(s.previewQuote)
+    if (pHole !== null) take(pHole + Overnight.OVERNIGHT_LAG)
+  }
+  return next
 }
 
 // The newest stretch Yahoo left empty in these quotes, once Robinhood's bars
@@ -485,10 +523,12 @@ function fundamentalsWanted(charted, quotes, previewQuotes) {
 // ---- The clock
 
 // `nowMs` is the wall clock, `now` the service's second. Wakes 5 ms past
-// the step, so its second has begun.
+// the next minute boundary or the earliest discrete deadline, so nothing on
+// screen needs a 1 Hz open heartbeat while quotes, bells, pauses and overdue
+// marks still land on their exact second.
 function clockWait(open, nowMs, now, deadlines) {
   var wall = Math.floor(nowMs / 1000)
-  var next = open ? wall + 1 : (Math.floor(wall / 60) + 1) * 60
+  var next = (Math.floor(wall / 60) + 1) * 60
   deadlines.forEach(function(at) { if (at > now && at < next) next = at })
   return Math.max(0, (next - wall - 1) * 1000 + 1000 - nowMs % 1000) + 5
 }

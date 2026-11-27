@@ -49,12 +49,14 @@ Item {
   // Async write for large cache files (such as quotes.json) where the caller
   // does not need a synchronous pass/fail return on the shell's thread.
   property var heldAsync: ({})
+  property int asyncGen: 0
   function writeAsync(path, data) {
     if (!root.made) {
       root.heldAsync[path] = data
       root.makeFolder()
       return
     }
+    root.asyncGen++
     asyncFile.path = ""
     asyncFile.path = path
     if (typeof data === "string") asyncFile.setText(data)
@@ -112,8 +114,18 @@ Item {
     blockWrites: false
     atomicWrites: true
     printErrors: false
-    onSaved: root.keep([asyncFile.path])
-    onSaveFailed: root.forget(asyncFile.path)
+    onSaved: {
+      var savedPath = asyncFile.path
+      var gen = root.asyncGen
+      if (savedPath) root.keep([savedPath])
+      Qt.callLater(function() { if (root.asyncGen === gen) asyncFile.path = "" })
+    }
+    onSaveFailed: {
+      var failedPath = asyncFile.path
+      var gen = root.asyncGen
+      root.forget(failedPath)
+      Qt.callLater(function() { if (root.asyncGen === gen) asyncFile.path = "" })
+    }
   }
 
   // The id comes once: as the service is made, or just after (`Plugin`).

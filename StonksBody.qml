@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -75,7 +77,12 @@ Item {
   signal refreshRequested()
 
   readonly property alias watchlist: watchlist
-  readonly property alias search: search
+  readonly property var search: searchLoader.item
+  readonly property var manageLists: manageListsLoader.item
+  readonly property var symbolLists: symbolListsLoader.item
+  readonly property var helpSheet: helpSheetLoader.item
+  readonly property var rowMenuView: rowMenuLoader.item
+  readonly property var listMenu: listMenuLoader.item
   readonly property alias chartItem: heroBand.chartItem
   readonly property alias motion: motion
 
@@ -175,6 +182,7 @@ Item {
     restoreMode: Binding.RestoreNone
   }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
+  readonly property int minuteNow: Math.floor(now / 60) * 60
 
   readonly property var calendars: service ? service.calendars : null
   // Kept as the same array while row membership is unchanged, so switching
@@ -185,7 +193,6 @@ Item {
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
     return true
   }
-  Component.onCompleted: if (!sameRows(stableRows, view.rows)) stableRows = view.rows
   readonly property var symbols: stableRows
   readonly property string listName: view.list
   readonly property string listLabel: listName !== "" ? listName : "All"
@@ -205,7 +212,10 @@ Item {
   // A search held back while no screen showed it goes once one does.
   onSurfaceOpenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
-    if (!surfaceOpen) previewTo("")
+    if (!surfaceOpen) {
+      previewTo("")
+      rowLinesFrom = ({})
+    }
   }
   onOnScreenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
@@ -248,7 +258,7 @@ Item {
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
     function onScreensReady() { searchFeed.sendWaiting() }
-    function onYahooBack() { if (root.onScreen) search.yahooBack() }
+    function onYahooBack() { if (root.onScreen && root.search) root.search.yahooBack() }
     function onSavingChanged() {
       if (!root.pendingRestart || !root.service || root.service.saving) return
       root.pendingRestart = false
@@ -368,7 +378,7 @@ Item {
   // Said under the price: what a scrub's move counts from, the dashed line
   // under the pointer, or since the open the day's open.
   readonly property string baselineText: historyShown ? History.baselineLegend(history, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars, changeMode, featuredNewest) : "")
+    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, featuredToday, calendars, changeMode, featuredNewest) : "")
 
   // The moment shown against the baseline; the pill's reads the day.
   readonly property string animalKind: Figures.headerAnimal(featured)
@@ -481,8 +491,19 @@ Item {
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
 
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
-  readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+  readonly property var marketFormsNow: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.tradesAtNight, now, calendars)) : []
+  property var marketForms: []
+  function sameStrings(a, b) {
+    if (!a || !b || a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+  onMarketFormsNowChanged: if (!sameStrings(marketForms, marketFormsNow)) marketForms = marketFormsNow
+  Component.onCompleted: {
+    if (!sameRows(stableRows, view.rows)) stableRows = view.rows
+    marketForms = marketFormsNow
+  }
   readonly property var headerLine: Figures.headerLine({
     hasService: !!service,
     whenMissing: headerWhenMissing,
@@ -560,31 +581,44 @@ Item {
   function fittedHeight(maxHeight) {
     return Layout.fittedHeight(fit, {
       help: showingHelp,
-      helpHeight: helpSheet.contentHeight,
+      helpHeight: showingHelp && helpSheet ? helpSheet.contentHeight : 0,
       lists: listViewOpen,
-      listsHeight: managingLists ? manageLists.contentHeight : symbolLists.contentHeight,
+      listsHeight: managingLists ? (manageLists ? manageLists.contentHeight : 0) : (listsSymbol !== "" && symbolLists ? symbolLists.contentHeight : 0),
       search: adding,
-      searchHeight: search.desiredHeight,
+      searchHeight: adding && search ? search.desiredHeight : 0,
       menu: listMenuOpen,
-      menuHeight: listMenu.contentHeight,
-      menuLeast: listMenu.leastHeight
+      menuHeight: listMenuOpen && listMenu ? listMenu.contentHeight : 0,
+      menuLeast: listMenuOpen && listMenu ? listMenu.leastHeight : 0
     }, maxHeight)
   }
 
   // ---- What is open over the rows
 
+  // One-shot lazy activation flags for the six hidden overlays: none is
+  // instantiated on first panel open, and once used each stays alive through
+  // its close fade.
+  property bool searchLoaded: false
+  property bool manageListsLoaded: false
+  property bool symbolListsLoaded: false
+  property bool helpSheetLoaded: false
+  property bool rowMenuLoaded: false
+  property bool listMenuLoaded: false
+
   property bool adding: false
   property string previewSymbol: ""
   property bool showingHelp: false
+  onShowingHelpChanged: if (showingHelp) helpSheetLoaded = true
   property bool listMenuOpen: false
+  onListMenuOpenChanged: if (listMenuOpen) listMenuLoaded = true
   property bool managingLists: false
+  onManagingListsChanged: if (managingLists) manageListsLoaded = true
   property string listsSymbol: ""
   // Held through the close fade so the overlay doesn't empty before it goes.
   property string heldListsSymbol: ""
-  onListsSymbolChanged: if (listsSymbol !== "") heldListsSymbol = listsSymbol
+  onListsSymbolChanged: if (listsSymbol !== "") { heldListsSymbol = listsSymbol; symbolListsLoaded = true }
   property var rowMenu: null
   property var heldRowMenu: null
-  onRowMenuChanged: if (rowMenu !== null) heldRowMenu = rowMenu
+  onRowMenuChanged: if (rowMenu !== null) { heldRowMenu = rowMenu; rowMenuLoaded = true }
   readonly property bool listViewOpen: managingLists || listsSymbol !== ""
   readonly property bool rowsShown: !showingHelp && !adding && !listViewOpen
   readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen || rowMenu !== null
@@ -604,8 +638,8 @@ Item {
   }
 
   function keepRename() {
-    if (managingLists && manageLists.renaming) manageLists.keepName()
-    return !(managingLists && manageLists.renaming)
+    if (managingLists && manageLists && manageLists.renaming) manageLists.keepName()
+    return !(managingLists && manageLists && manageLists.renaming)
   }
 
   function toggleHelp() {
@@ -613,7 +647,7 @@ Item {
     var shown = showingHelp
     closeViews()
     showingHelp = !shown
-    if (showingHelp) helpSheet.contentY = 0
+    if (showingHelp && helpSheet) helpSheet.contentY = 0
   }
 
   // ---- Search, and a stock being added
@@ -636,7 +670,7 @@ Item {
   // shows at rest, and All's while a new list is being filled, so a stock
   // Stonks already follows comes at once, without asking Yahoo. Asked only
   // while search is open.
-  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, filling ? lists[0].symbols : members, quotes).map(function(symbol) {
+  readonly property var ownFound: adding && search ? Search.ownMatches(search.searchText, filling ? lists[0].symbols : members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
     var row = quote ? Figures.listRow(quote, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
@@ -645,7 +679,10 @@ Item {
 
   // Search opened by New list, to fill the list just made.
   property bool filling: false
-  onAddingChanged: if (!adding) filling = false
+  onAddingChanged: {
+    if (adding) searchLoaded = true
+    else filling = false
+  }
 
   function startAdding() {
     if (!keepRename()) return
@@ -682,7 +719,7 @@ Item {
     if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
-    if (filling) search.addedOne(s)
+    if (filling && search) search.addedOne(s)
   }
 
   // Show features the member before the preview ends, so the chart on show
@@ -761,7 +798,7 @@ Item {
   function createList(name) {
     if (!service) return
     var problem = service.createList(name)
-    if (problem !== "") { listMenu.problem = problem; return }
+    if (problem !== "") { if (listMenu) listMenu.problem = problem; return }
     startAdding()
     filling = true
   }
@@ -790,8 +827,8 @@ Item {
   function renameList(name, newName) {
     if (!service) return
     var problem = service.renameList(name, newName)
-    if (problem !== "") manageLists.problem = problem
-    else manageLists.stopEditing()
+    if (problem !== "") { if (manageLists) manageLists.problem = problem }
+    else if (manageLists) manageLists.stopEditing()
   }
 
   function setMembership(name, member) {
@@ -1190,15 +1227,15 @@ Item {
   function keepTyped() {
     if (!service) return
     var typed, problem
-    if (managingLists && manageLists.renaming) {
+    if (managingLists && manageLists && manageLists.renaming) {
       typed = manageLists.typedName
       problem = typed.trim() === "" ? "" : service.renameList(manageLists.pendingName, typed)
       if (problem !== "") draft = { list: manageLists.pendingName, key: service.listKey(manageLists.pendingName), text: typed, problem: problem }
-    } else if (listMenuOpen && listMenu.typedName.trim() !== "") {
+    } else if (listMenuOpen && listMenu && listMenu.typedName.trim() !== "") {
       typed = listMenu.typedName
       problem = service.createList(typed)
       if (problem !== "") draft = { list: "", text: typed, problem: problem }
-    } else if (adding && search.searchText.trim() !== "") {
+    } else if (adding && search && search.searchText.trim() !== "") {
       draft = { search: search.searchText }
     }
   }
@@ -1208,27 +1245,28 @@ Item {
     draft = null
     if (!kept || !service) return
     if (kept.search !== undefined) {
-      search.resumed = kept.search
+      searchLoaded = true
+      if (search) search.resumed = kept.search
       startAdding()
     } else if (kept.list !== "") {
       if (service.listKey(kept.list) !== kept.key) return
       openManageLists()
-      manageLists.resumeRename(kept.list, kept.text, kept.problem)
+      if (manageLists) manageLists.resumeRename(kept.list, kept.text, kept.problem)
     } else {
       openListMenu()
-      listMenu.resumeNaming(kept.text, kept.problem)
+      if (listMenu) listMenu.resumeNaming(kept.text, kept.problem)
     }
   }
 
   function resetInteraction() {
     closeViews()
     freeze()
-    search.settle()
-    manageLists.settle()
-    symbolLists.settle()
-    rowMenuView.settle()
-    listMenu.settle()
-    helpSheet.settle()
+    if (search) search.settle()
+    if (manageLists) manageLists.settle()
+    if (symbolLists) symbolLists.settle()
+    if (rowMenuView) rowMenuView.settle()
+    if (listMenu) listMenu.settle()
+    if (helpSheet) helpSheet.settle()
     heldRowMenu = null
     heldListsSymbol = ""
     motion.reset()
@@ -1282,7 +1320,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
-    rowsDay: Figures.rowsDayName(root.rowsShared, root.now)
+    rowsDay: Figures.rowsDayName(root.rowsShared, root.minuteNow)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1361,7 +1399,7 @@ Item {
     anchors.topMargin: root.groupGap
     height: root.rowsFit.listHeight
     sightHeight: root.rowsFit.sightHeight
-    menuCovers: root.listMenuOpen ? listMenu.y + listMenu.height - watchlist.y : 0
+    menuCovers: root.listMenuOpen && root.listMenu ? root.listMenu.y + root.listMenu.height - watchlist.y : 0
     held: root.rowMenu !== null
     visible: root.rowsShown
     view: root.view
@@ -1405,13 +1443,13 @@ Item {
     id: searchFeed
     gate: root.service ? root.service.yahooGate : null
     mayAsk: root.service ? function() { return root.onScreen && root.service.screensClear() } : null
-    active: search.active
-    wanted: search.searchText.trim()
+    active: !!root.search && root.search.active
+    wanted: root.search ? root.search.searchText.trim() : ""
   }
 
-  SymbolSearch {
-    id: search
-    objectName: "symbolSearch"
+  Loader {
+    id: searchLoader
+    active: root.searchLoaded || root.adding
     z: 5
     anchors.left: parent.left
     anchors.right: parent.right
@@ -1421,80 +1459,93 @@ Item {
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
-    open: root.adding
-    seen: root.seen
-    still: !root.surfaceOpen
-    feed: searchFeed
-    active: root.adding && root.surfaceOpen
-    look: root.look
-    gutter: root.gutter
-    // Short, so a list's name fits the panel's field.
-    placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
-    members: root.members
-    own: root.ownFound
-    putBack: root.putBack
-    filling: root.filling
-    onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
-    onChose: function(symbol, result) { root.previewTo(symbol, result) }
-    onCancelled: root.cancelAdding()
-  }
-
-  ManageLists {
-    id: manageLists
-    objectName: "manageLists"
-    z: 5
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: heroBand.bottom
-    anchors.bottom: parent.bottom
-    anchors.leftMargin: root.margins
-    anchors.rightMargin: root.margins
-    anchors.topMargin: root.groupGap
-    anchors.bottomMargin: root.margins
-    open: root.managingLists
-    seen: root.seen
-    still: !root.surfaceOpen
-    active: root.managingLists && root.surfaceOpen
-    choices: root.lists
-    look: root.look
-    gutter: root.gutter
-    onRenameRequested: function(name, newName) { root.renameList(name, newName) }
-    onMoveRequested: function(name, delta) { if (root.service) root.service.moveList(name, delta) }
-    onDeleteRequested: function(name) { if (root.service) root.service.deleteList(name) }
-    onDismissed: root.closeListViews()
-  }
-
-  SymbolLists {
-    id: symbolLists
-    objectName: "symbolLists"
-    z: 5
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: heroBand.bottom
-    anchors.bottom: parent.bottom
-    anchors.leftMargin: root.margins
-    anchors.rightMargin: root.margins
-    anchors.topMargin: root.groupGap
-    anchors.bottomMargin: root.margins
-    open: root.listsSymbol !== ""
-    seen: root.seen
-    still: !root.surfaceOpen
-    active: root.listsSymbol !== "" && root.surfaceOpen
-    readonly property string shownSymbol: root.listsSymbol !== "" ? root.listsSymbol : root.heldListsSymbol
-    onVisibleChanged: if (!visible && root.listsSymbol === "") root.heldListsSymbol = ""
-    choices: root.lists
-    symbol: shownSymbol
-    symbolName: shownSymbol && root.quotes[shownSymbol] ? root.quotes[shownSymbol].name : ""
-    note: root.note
-    look: root.look
-    gutter: root.gutter
-    onToggled: function(name, member) { root.setMembership(name, member) }
-    onCreateRequested: function(name) {
-      var problem = root.service ? root.service.createList(name, root.listsSymbol) : ""
-      if (problem !== "") symbolLists.problem = problem
-      else symbolLists.stopNaming()
+    sourceComponent: SymbolSearch {
+      objectName: "symbolSearch"
+      anchors.fill: parent
+      open: root.adding
+      seen: root.seen
+      still: !root.surfaceOpen
+      feed: searchFeed
+      active: root.adding && root.surfaceOpen
+      look: root.look
+      gutter: root.gutter
+      // Short, so a list's name fits the panel's field.
+      placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
+      members: root.members
+      own: root.ownFound
+      putBack: root.putBack
+      filling: root.filling
+      onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
+      onChose: function(symbol, result) { root.previewTo(symbol, result) }
+      onCancelled: root.cancelAdding()
     }
-    onDismissed: root.closeListViews()
+  }
+
+  Loader {
+    id: manageListsLoader
+    active: root.manageListsLoaded || root.managingLists
+    z: 5
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: heroBand.bottom
+    anchors.bottom: parent.bottom
+    anchors.leftMargin: root.margins
+    anchors.rightMargin: root.margins
+    anchors.topMargin: root.groupGap
+    anchors.bottomMargin: root.margins
+    sourceComponent: ManageLists {
+      objectName: "manageLists"
+      anchors.fill: parent
+      open: root.managingLists
+      seen: root.seen
+      still: !root.surfaceOpen
+      active: root.managingLists && root.surfaceOpen
+      choices: root.lists
+      look: root.look
+      gutter: root.gutter
+      onRenameRequested: function(name, newName) { root.renameList(name, newName) }
+      onMoveRequested: function(name, delta) { if (root.service) root.service.moveList(name, delta) }
+      onDeleteRequested: function(name) { if (root.service) root.service.deleteList(name) }
+      onDismissed: root.closeListViews()
+    }
+  }
+
+  Loader {
+    id: symbolListsLoader
+    active: root.symbolListsLoaded || root.listsSymbol !== ""
+    z: 5
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: heroBand.bottom
+    anchors.bottom: parent.bottom
+    anchors.leftMargin: root.margins
+    anchors.rightMargin: root.margins
+    anchors.topMargin: root.groupGap
+    anchors.bottomMargin: root.margins
+    sourceComponent: SymbolLists {
+      id: symbolListsItem
+      objectName: "symbolLists"
+      anchors.fill: parent
+      open: root.listsSymbol !== ""
+      seen: root.seen
+      still: !root.surfaceOpen
+      active: root.listsSymbol !== "" && root.surfaceOpen
+      readonly property string shownSymbol: root.listsSymbol !== "" ? root.listsSymbol : root.heldListsSymbol
+      onVisibleChanged: if (!visible && root.listsSymbol === "") root.heldListsSymbol = ""
+      choices: root.lists
+      symbol: shownSymbol
+      symbolName: shownSymbol && root.quotes[shownSymbol] ? root.quotes[shownSymbol].name : ""
+      note: root.note
+      look: root.look
+      gutter: root.gutter
+      onToggled: function(name, member) { root.setMembership(name, member) }
+      onCreateRequested: function(name) {
+        var problem = root.service ? root.service.createList(name, root.listsSymbol) : ""
+        if (problem !== "") symbolListsItem.problem = problem
+        else symbolListsItem.stopNaming()
+      }
+      onDismissed: root.closeListViews()
+    }
   }
 
   // A closing surface keeps its rows, so it says nothing.
@@ -1558,20 +1609,17 @@ Item {
   // Ground backing while HelpSheet fades out so the hero and rows underneath
   // emerge cleanly without overlapping words.
   Rectangle {
-    anchors.fill: helpSheet
+    anchors.fill: helpSheetLoader
     z: 5
-    visible: helpSheet.visible && !root.showingHelp
-    opacity: helpSheet.opacity
+    visible: !!root.helpSheet && root.helpSheet.visible && !root.showingHelp
+    opacity: root.helpSheet ? root.helpSheet.opacity : 0
     color: root.ground
   }
 
-  HelpSheet {
-    id: helpSheet
-    objectName: "helpSheet"
+  Loader {
+    id: helpSheetLoader
+    active: root.helpSheetLoaded || root.showingHelp
     z: 6
-    shown: root.showingHelp
-    seen: root.seen
-    still: !root.surfaceOpen
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1580,12 +1628,19 @@ Item {
     anchors.rightMargin: root.margins
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
-    inset: root.inset
-    edge: root.gutter + root.inset
-    sheet: root.keySheet
-    version: root.updates && root.updates.runningVersion || ""
-    look: root.look
-    onCloseRequested: root.showingHelp = false
+    sourceComponent: HelpSheet {
+      objectName: "helpSheet"
+      anchors.fill: parent
+      shown: root.showingHelp
+      seen: root.seen
+      still: !root.surfaceOpen
+      inset: root.inset
+      edge: root.gutter + root.inset
+      sheet: root.keySheet
+      version: root.updates && root.updates.runningVersion || ""
+      look: root.look
+      onCloseRequested: root.showingHelp = false
+    }
   }
 
   // Hover passes, so nothing under the pointer changes as the card fades.
@@ -1603,7 +1658,7 @@ Item {
     hoverEnabled: true
     acceptedButtons: Qt.AllButtons
     z: 9
-    onClicked: listMenu.typedName.trim() !== "" ? root.createList(listMenu.typedName) : root.closeListMenu()
+    onClicked: root.listMenu && root.listMenu.typedName.trim() !== "" ? root.createList(root.listMenu.typedName) : root.closeListMenu()
     onWheel: function(wheel) { wheel.accepted = true }
   }
 
@@ -1620,45 +1675,51 @@ Item {
     onWheel: function(wheel) { wheel.accepted = true }
   }
 
-  RowMenu {
-    id: rowMenuView
-    objectName: "rowMenu"
-    open: root.rowMenu !== null
-    seen: root.seen
-    still: !root.surfaceOpen
-    active: root.rowMenu !== null && root.surfaceOpen
-    readonly property var menu: root.rowMenu || root.heldRowMenu
-    onVisibleChanged: if (!visible && root.rowMenu === null) root.heldRowMenu = null
+  Loader {
+    id: rowMenuLoader
+    active: root.rowMenuLoaded || root.rowMenu !== null
     z: 10
-    maxWidth: root.width - root.margins * 2
-    x: menu ? Math.max(root.margins, Math.min(menu.x, root.width - root.margins - width)) : 0
-    y: !menu ? 0 : menu.below + height <= root.edge - root.margins ? menu.below
-      : Math.max(root.margins, menu.above - height)
-    lines: menu ? menu.lines.map(function(line) { return line.label }) : []
-    startLine: menu ? menu.startLine : -1
-    look: root.look
-    onTaken: function(index) { root.takeRowMenu(index) }
-    onDismissed: root.rowMenu = null
+    sourceComponent: RowMenu {
+      objectName: "rowMenu"
+      open: root.rowMenu !== null
+      seen: root.seen
+      still: !root.surfaceOpen
+      active: root.rowMenu !== null && root.surfaceOpen
+      readonly property var menu: root.rowMenu || root.heldRowMenu
+      onVisibleChanged: if (!visible && root.rowMenu === null) root.heldRowMenu = null
+      maxWidth: root.width - root.margins * 2
+      x: menu ? Math.max(root.margins, Math.min(menu.x, root.width - root.margins - width)) : 0
+      y: !menu ? 0 : menu.below + height <= root.edge - root.margins ? menu.below
+        : Math.max(root.margins, menu.above - height)
+      lines: menu ? menu.lines.map(function(line) { return line.label }) : []
+      startLine: menu ? menu.startLine : -1
+      look: root.look
+      onTaken: function(index) { root.takeRowMenu(index) }
+      onDismissed: root.rowMenu = null
+    }
   }
 
-  ListMenu {
-    id: listMenu
-    objectName: "listMenu"
-    open: root.listMenuOpen
-    seen: root.seen
-    still: !root.surfaceOpen
-    active: root.listMenuOpen && root.surfaceOpen
+  Loader {
+    id: listMenuLoader
+    active: root.listMenuLoaded || root.listMenuOpen
     z: 10
-    x: root.margins
-    y: root.fit.listMenuTop
-    maxHeight: root.rowsFit.listMenuRoom
-    choices: root.lists
-    current: root.listName
-    look: root.look
-    onChosen: function(name) { root.chooseList(name) }
-    onCreateRequested: function(name) { root.createList(name) }
-    onManageRequested: root.openManageLists()
-    onDismissed: root.closeListMenu()
+    sourceComponent: ListMenu {
+      objectName: "listMenu"
+      open: root.listMenuOpen
+      seen: root.seen
+      still: !root.surfaceOpen
+      active: root.listMenuOpen && root.surfaceOpen
+      x: root.margins
+      y: root.fit.listMenuTop
+      maxHeight: root.rowsFit.listMenuRoom
+      choices: root.lists
+      current: root.listName
+      look: root.look
+      onChosen: function(name) { root.chooseList(name) }
+      onCreateRequested: function(name) { root.createList(name) }
+      onManageRequested: root.openManageLists()
+      onDismissed: root.closeListMenu()
+    }
   }
 
   ChartMotion {

@@ -2128,21 +2128,32 @@ test("the caps and P/Es wanted are the charted stocks', the featured one first, 
   expect(M.fundamentalsWanted([], quotes, preview)).toEqual([])
 })
 
-test("the clock steps just past each second while a surface is open and each minute while none is, sooner for a quote due, a pause ending or a refresh turning overdue", () => {
+test("the clock steps just past each minute whether open or closed, sooner for a quote due, a Robinhood ask, a pause ending or a refresh turning overdue", () => {
   const now = at(WED, "12:00")
   const ms = now * 1000 + 250
-  expect(M.clockWait(true, ms, now, [])).toBe(755)
+  expect(M.clockWait(true, ms, now, [])).toBe(59755)
   expect(M.clockWait(false, ms, now, [])).toBe(59755)
-  // Only a deadline after the service's second and before the next step
+  // Only a deadline after the service's second and before the next minute
   // counts; one the wall clock has passed already is at once.
+  expect(M.clockWait(true, ms, now, [now + 20, now - 5, now + 600, 0])).toBe(19755)
   expect(M.clockWait(false, ms, now, [now + 20, now - 5, now + 600, 0])).toBe(19755)
   expect(M.clockWait(false, ms, now - 3, [now - 1])).toBe(5)
-  // With nothing open, the pill's "!" comes as the first refresh owed turns
+  // The pill's and panel's "!" comes as the first refresh owed turns
   // overdue, not at the next minute; one overdue already wakes nothing.
   const overdue = owed => M.clockWait(false, ms, now, [M.overdueAt(owed, now)])
   expect(overdue({ AAPL: now - 60, MSFT: now - 30 })).toBe(29755)
   expect(overdue({ AAPL: now - 100 })).toBe(59755)
   expect(overdue({})).toBe(59755)
+  // Robinhood's overnight bars and failed retries schedule their exact second
+  // so an open surface without a 1 Hz clock still re-asks on time.
+  const nightNow = at(WED, "22:00") + 17
+  const nextOver = M.overnightNext({
+    open: true, pill: true, featured: "AAPL", overnightSymbols: ["AAPL", "MSFT"],
+    allSymbols: ["AAPL", "MSFT"], inSight: ["AAPL", "MSFT"], preview: "", previewShown: false,
+    previewQuote: null, listDates: {}, nights: { AAPL: { status: "ok", at: nightNow - 280, through: nightNow - 280, bars: [] } },
+    rawYahooHole: null, now: nightNow, calendars
+  })
+  expect(nextOver).toBe(nightNow + 20)
 })
 
 test("community themes that one hue, a faint colour, or a tinted light ground would trip", () => {
