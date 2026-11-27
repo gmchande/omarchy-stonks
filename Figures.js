@@ -175,6 +175,7 @@ function dayTitles() {
 // list with no US stock takes the day its own rows share, "24H" for rolling
 // coins alone, and blank where they disagree or none names one.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
+  var hasOvernight = false
   var usShared = null
   var usMixed = false
   var hasUs = false
@@ -185,7 +186,7 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
     var q = quotes[symbols[i]]
     if (!q) continue
     var nt = newest ? newest[symbols[i]] : null
-    if (nt && nt.joined && nt.closed) return { overnight: true }
+    if (nt && nt.joined && nt.closed) hasOvernight = true
     if (Overnight.hasOvernight(q, calendars)) {
       hasUs = true
       var usHead = Quote.headlineQuote(q)
@@ -215,17 +216,17 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
       if (offset > otherShared.maxOffset) otherShared.maxOffset = offset
     }
   }
-  if (hasUs) return usMixed || !usShared ? { today: true } : usShared
-  if (otherMixed) return null
-  if (otherShared) return otherShared
-  return rolling ? { rolling: true } : null
+  var out = hasUs ? (usMixed || !usShared ? { today: true } : usShared)
+    : otherMixed ? null : otherShared ? otherShared : (rolling ? { rolling: true } : null)
+  return hasOvernight ? Object.assign({ overnight: true }, out || {}) : out
 }
 
-function rowsDayName(shared, now) {
+function rowsDayName(shared, now, scrubDay) {
   if (!shared) return ""
-  if (shared.overnight) return "OVERNIGHT"
+  if (shared.overnight && !scrubDay) return "OVERNIGHT"
   if (shared.today) return "TODAY"
   if (shared.rolling) return "24H"
+  if (!shared.quote) return ""
   var off = shared.quote.gmtoffset || 0
   var minToday = Math.floor((now + (shared.minOffset !== undefined ? shared.minOffset : off)) / 86400)
   var maxToday = Math.floor((now + (shared.maxOffset !== undefined ? shared.maxOffset : off)) / 86400)

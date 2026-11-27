@@ -478,8 +478,11 @@ Item {
     : restingRowsSummary.breadth)
 
   // The day the rows share, worked out again only as their prices change;
-  // the clock reads only its name (`Figures.rowsDayName`).
+  // the clock reads only its name (`Figures.rowsDayName`). Scrubbed back into
+  // the closed day, the header names that day rather than OVERNIGHT.
   readonly property var rowsShared: restingRowsSummary.shared
+  readonly property bool scrubbingDay: watchlistScrubShown !== 0
+    && (!featuredDay || !featuredDay.tonight || watchlistScrubShown < featuredDay.tonight)
 
   // ---- The header's words
 
@@ -1324,7 +1327,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
-    rowsDay: Figures.rowsDayName(root.rowsShared, root.minuteNow)
+    rowsDay: Figures.rowsDayName(root.rowsShared, root.minuteNow, root.scrubbingDay)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1418,7 +1421,7 @@ Item {
     changeMode: root.changeMode
     now: root.now
     minuteNow: root.minuteNow
-    overnightList: !!root.rowsShared && !!root.rowsShared.overnight
+    overnightList: !!root.rowsShared && !!root.rowsShared.overnight && !root.scrubbingDay
     owed: root.owed
     asking: root.asking
     nightFailed: root.nightFailed
