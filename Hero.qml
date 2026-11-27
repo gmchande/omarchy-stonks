@@ -155,7 +155,14 @@ Item {
     return listingRoom - metaNeed >= Math.ceil(listingMetrics.advanceWidth("W…"))
   }
   readonly property string listingMeta: metaCore === "" ? "" : (leadFits ? " · " : "") + metaCore
-  readonly property real metaAdvance: listingMeta === "" ? 0 : Math.ceil(listingMetrics.advanceWidth(listingMeta))
+  readonly property real metaAdvance: {
+    var font = listingMetrics.font // read, so a new text size measures again
+    return listingMeta === "" ? 0 : Math.ceil(listingMetrics.advanceWidth(listingMeta))
+  }
+  readonly property real leadAdvance: {
+    var font = listingMetrics.font // read, so a new text size measures again
+    return listingLead === "" ? 0 : Math.ceil(listingMetrics.advanceWidth(listingLead))
+  }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property var caption: lines.caption
   // Drawn only clear of the strip's left side, so the two never meet.
@@ -235,7 +242,7 @@ Item {
     Text {
       id: listingText
       leftPadding: Style.space(8)
-      width: root.leadFits ? leftPadding + Math.min(Math.ceil(listingMetrics.advanceWidth(root.listingLead)), Math.max(0, root.listingRoom - root.metaAdvance)) : leftPadding
+      width: root.leadFits ? leftPadding + Math.min(root.leadAdvance, Math.max(0, root.listingRoom - root.metaAdvance)) : leftPadding
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.leadFits ? root.listingLead : ""
@@ -257,7 +264,7 @@ Item {
     objectName: "listingMeta"
     x: listingText.x + listingText.leftPadding + listingText.contentWidth
     y: symbolText.baselineOffset - baselineOffset
-    width: Math.min(root.metaAdvance, Math.max(0, root.width - x))
+    width: Math.max(0, root.width - x)
     textFormat: Text.PlainText
     text: root.listingMeta
     color: listingText.color

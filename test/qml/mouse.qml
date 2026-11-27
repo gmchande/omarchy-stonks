@@ -970,7 +970,16 @@ Harness {
 
       // Fault 18: wide row figures stay inside priceWidth without crossing onto
       // the sparkline, and long unmapped exchange names in Hero stay inside
-      // Hero's right edge with no dangling dot when the lead has no room.
+      // Hero's right edge with no dangling dot when the lead has no room;
+      // normal exchange + currency never elide when the text size grows.
+      var heroMeta = at("listingMeta")
+      var heroItem = heroMeta ? heroMeta.parent : null
+      var savedBaseSize = Style.fontBaseSize
+      Style.fontBaseSize = 20
+      var bigMetaWhole = within(1500, function() { return !!heroMeta && heroMeta.text !== "" && !heroMeta.truncated })
+      Style.fontBaseSize = savedBaseSize
+      within(1500, function() { return Style.fontBaseSize === savedBaseSize })
+
       var edgeSym = body.chartSymbol
       var edgeOrig = service.feeds.quotes.quotes
       var edgeQ = edgeOrig[edgeSym]
@@ -997,16 +1006,14 @@ Harness {
       findTexts(edgeRow)
       var changeItem = rowTexts.filter(function(t) { return /0\.00000000261/.test(t.text) })[0]
       var changeFits = !!changeItem && changeItem.paintedWidth <= changeItem.width + 0.5
-      var heroMeta = at("listingMeta")
-      var heroItem = heroMeta ? heroMeta.parent : null
-      var metaFits = !!heroMeta && !!heroItem && heroMeta.x + heroMeta.width <= heroItem.width + 0.5 && heroMeta.text.indexOf(" · ") !== 0
-      var edgeDiag = [wideReady, changeFits, changeItem ? changeItem.paintedWidth.toFixed(1) + "/" + changeItem.width.toFixed(1) : "no change",
-        metaFits, heroMeta ? (heroMeta.x + heroMeta.width).toFixed(1) + "/" + (heroItem ? heroItem.width.toFixed(1) : 0) + " '" + heroMeta.text + "'" : "no meta"].join(" | ")
+      var metaFits = !!heroMeta && !!heroItem && heroMeta.x + heroMeta.paintedWidth <= heroItem.width + 0.5 && heroMeta.text.indexOf(" · ") !== 0
+      var edgeDiag = [bigMetaWhole, wideReady, changeFits, changeItem ? changeItem.paintedWidth.toFixed(1) + "/" + changeItem.width.toFixed(1) : "no change",
+        metaFits, heroMeta ? (heroMeta.x + heroMeta.paintedWidth).toFixed(1) + "/" + (heroItem ? heroItem.width.toFixed(1) : 0) + " '" + heroMeta.text + "'" : "no meta"].join(" | ")
       service.feeds.quotes.quotes = edgeOrig
       service.persist({ changeMode: edgeMode })
       within(2000, function() { return service.changeMode === edgeMode })
-      harness.check("wide row figures stay within priceWidth and long Hero exchange names stay inside Hero without a leading dot",
-        wideReady && changeFits && metaFits, edgeDiag)
+      harness.check("wide row figures stay within priceWidth and Hero exchange names stay whole at bigger text sizes while long ones fit inside Hero without a leading dot",
+        bigMetaWhole && wideReady && changeFits && metaFits, edgeDiag)
 
       // Fault 9: in SymbolLists with many lists, submitting an invalid New list…
       // name scrolls the error into sight, scroll stays locked while naming,
