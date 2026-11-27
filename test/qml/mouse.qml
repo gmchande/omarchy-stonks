@@ -316,47 +316,33 @@ Harness {
       rest()
 
       // Lifting a row near the bottom edge: pulling away unlocks the full
-      // bottom edge zone on the way back down, and dragging straight to the
-      // border scrolls briskly.
-      var bottomRowAtTop = function() {
-        list.takeOver()
-        list.contentY = 0
-        rest()
-        var shownNow = list.displayedSymbols
-        var sym = shownNow.reduce(function(best, s) {
-          var r = row(s)
-          return r && r.y <= list.sightHeight - 14 && r.y + r.height > list.sightHeight - list.rowPitch ? s : best
-        }, "")
-        var r = row(sym)
-        var grip = Math.min(r.height - 2, Math.max(4, list.sightHeight - r.y - 10))
-        return { sym: sym, pt: r.mapToItem(body, r.width / 2, grip) }
-      }
-      var borderBottom = edgeAt(list.sightHeight - 1)
-      var midEdge = edgeAt(list.sightHeight - list.rowPitch / 2)
-      var pick1 = bottomRowAtTop()
-      mousePress(body, pick1.pt.x, pick1.pt.y)
-      mouseMove(body, pick1.pt.x, pick1.pt.y - down / 2, -1, Qt.LeftButton)
-      mouseMove(body, pick1.pt.x, centre.y, -1, Qt.LeftButton)
-      var liftedEdge = within(1000, function() { return list.reorder.lifted === pick1.sym })
-      mouseMove(body, pick1.pt.x, midEdge.y, -1, Qt.LeftButton)
-      var unlocked = liftedEdge && within(1500, function() { return list.reorder.edgeHeld && list.contentY >= list.rowPitch })
-      mouseRelease(body, pick1.pt.x, midEdge.y)
+      // bottom edge zone on the way back down.
+      list.takeOver()
+      list.contentY = 0
       rest()
-      var pick2 = bottomRowAtTop()
-      mousePress(body, pick2.pt.x, pick2.pt.y)
-      mouseMove(body, pick2.pt.x, pick2.pt.y + 4, -1, Qt.LeftButton)
-      mouseMove(body, pick2.pt.x, borderBottom.y, -1, Qt.LeftButton)
-      var brisk = within(700, function() { return list.reorder.lifted === pick2.sym && list.contentY >= 2 * list.rowPitch })
-      var briskY = list.contentY
-      mouseRelease(body, pick2.pt.x, borderBottom.y)
+      var edgeSym = list.displayedSymbols.reduce(function(best, s) {
+        var r = row(s)
+        return r && r.y <= list.sightHeight - 14 && r.y + r.height > list.sightHeight - list.rowPitch ? s : best
+      }, "")
+      var edgeRow = row(edgeSym)
+      var grip = Math.min(edgeRow.height - 2, Math.max(4, list.sightHeight - edgeRow.y - 10))
+      var nearBottom = edgeRow.mapToItem(body, edgeRow.width / 2, grip)
+      var midEdge = edgeAt(list.sightHeight - list.rowPitch / 2)
+      mousePress(body, nearBottom.x, nearBottom.y)
+      mouseMove(body, nearBottom.x, nearBottom.y - down / 2, -1, Qt.LeftButton)
+      mouseMove(body, nearBottom.x, centre.y, -1, Qt.LeftButton)
+      var liftedEdge = within(1000, function() { return list.reorder.lifted === edgeSym })
+      mouseMove(body, nearBottom.x, midEdge.y, -1, Qt.LeftButton)
+      var unlocked = liftedEdge && within(1500, function() { return list.reorder.edgeHeld && list.contentY >= list.rowPitch })
+      mouseRelease(body, nearBottom.x, midEdge.y)
       rest()
       list.commitManualOrder(rows)
       within(1500, function() { return order() === rows.join(",") && list.displayedSymbols.join(",") === rows.join(",") })
       list.takeOver()
       list.contentY = 0
       rest()
-      harness.check("lifting near the bottom edge unlocks the edge after pulling away and scrolls briskly at the border",
-        liftedEdge && unlocked && brisk, [pick1.sym, pick2.sym, liftedEdge, unlocked, brisk, briskY.toFixed(1)].join(" "))
+      harness.check("lifting near the bottom edge unlocks the full edge zone after pulling away",
+        liftedEdge && unlocked, [edgeSym, liftedEdge, unlocked, list.contentY.toFixed(1)].join(" "))
 
       click(row(rows[0]), Qt.RightButton)
       var menu = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })

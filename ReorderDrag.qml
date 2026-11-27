@@ -45,17 +45,15 @@ Item {
   // scrolls the list, faster the deeper it's held, until the list ends. A
   // row lifted within that row starts the edge where it was lifted so only
   // a move toward the edge scrolls; pulling away widens the edge back to a
-  // full row, and speed scales to the active edge span so the border still
-  // reaches full speed.
+  // full row.
   readonly property real topEdge: Math.min(pitch, topAnchor)
   readonly property real bottomEdge: Math.max(sight - pitch, bottomAnchor)
   readonly property real depth: pointer < topEdge ? pointer - topEdge : pointer > bottomEdge ? pointer - bottomEdge : 0
-  readonly property real edgeSpan: Math.max(1, depth < 0 ? topEdge : sight - bottomEdge)
   readonly property bool edgeHeld: lifted !== "" && !glide.running && (depth < 0 ? contentY > 0 : depth > 0 && contentY < reach)
   FrameAnimation {
     running: root.edgeHeld
     onTriggered: {
-      var rowsPerSecond = 8 * Math.max(-2, Math.min(2, root.depth / root.edgeSpan))
+      var rowsPerSecond = 8 * Math.max(-2, Math.min(2, root.depth / root.pitch))
       var by = rowsPerSecond * root.pitch * Math.min(frameTime, 0.05)
       root.scrollTo(Math.max(0, Math.min(root.reach, root.contentY + by)))
     }
