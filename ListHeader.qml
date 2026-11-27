@@ -134,6 +134,20 @@ Item {
     font: orderText.font
   }
 
+  // Widest sort-order label in the current font, so cycling sort orders
+  // never shifts a long elided list name, its chevron or TODAY.
+  readonly property real widestOrderWidth: {
+    var font = captionLine.font // read, so a new text size measures again
+    var widest = 0
+    var orders = Object.keys(Rows.ORDER_LABELS)
+    for (var i = 0; i < orders.length; i++) {
+      widest = Math.max(widest,
+        Math.ceil(captionLine.advanceWidth(Rows.orderLabel(orders[i], false))),
+        Math.ceil(captionLine.advanceWidth(Rows.orderLabel(orders[i], true))))
+    }
+    return widest
+  }
+
   Rectangle {
     objectName: "listControl"
     anchors.left: listText.left
@@ -154,8 +168,8 @@ Item {
     objectName: "listLabel"
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.min(implicitWidth, parent.width - orderText.implicitWidth - todayText.implicitWidth
-      - unitSign.width - orderText.anchors.rightMargin - Style.space(80))
+    width: Math.max(0, Math.min(implicitWidth, parent.width - root.widestOrderWidth - todayText.implicitWidth
+      - unitSign.width - orderText.anchors.rightMargin - Style.space(80)))
     textFormat: Text.PlainText
     text: root.listLabel.toUpperCase()
     color: root.look.foreground

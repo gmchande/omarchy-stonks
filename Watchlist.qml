@@ -733,7 +733,7 @@ Flickable {
     highlightedSymbol = featuredSymbol
     highlightSlide.stop()
     highlightShift = 0
-    if (!seen || !from || !to || from === to || !from.visible || !to.visible || to.moving) return
+    if (!seen || !from || !to || from === to || !from.visible || !to.visible || !from.inSight || !to.inSight || to.moving) return
     highlightShift = was - to.y
     highlightSlide.start()
   }

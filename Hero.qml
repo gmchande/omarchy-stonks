@@ -48,6 +48,12 @@ Item {
   function settle() {
     rollAnim.stop()
     roll = 1
+    commitRollers()
+  }
+  function commitRollers() {
+    price.commit()
+    changeText.commit()
+    captionMove.commit()
   }
   onStillChanged: if (still && rollAnim.running) rollAnim.pause()
   onSeenChanged: if (!seen) Qt.callLater(function() { if (!root.seen && !root.still) root.settle() })
@@ -64,21 +70,40 @@ Item {
     var was = lastPrice
     var value = Format.shownNumber(priceText)
     lastPrice = { symbol: symbol, text: priceText, value: value, scrubbing: scrubbing }
-    if (!was || was.text === priceText) return
+    if (!was || was.text === priceText) {
+      if (!rollAnim.running) commitRollers()
+      else {
+        if (changeText.dirty) changeText.commit()
+        if (captionMove.dirty) captionMove.commit()
+      }
+      return
+    }
     rollAnim.stop()
     roll = 1
     if (still || !seen || look.retro || scrubbing || was.scrubbing || was.symbol !== symbol || arrival < 1
-      || !isFinite(value) || !isFinite(was.value) || value === was.value) return
+      || !isFinite(value) || !isFinite(was.value) || value === was.value) {
+      commitRollers()
+      return
+    }
+    if (!price.dirty) price.commit(); else price.dirty = false
+    if (!changeText.dirty) changeText.commit(); else changeText.dirty = false
+    if (!captionMove.dirty) captionMove.commit(); else captionMove.dirty = false
     rollUp = value > was.value
     rollAnim.start()
   }
-  NumberAnimation { id: rollAnim; target: root; property: "roll"; from: 0; to: 1; duration: Motion.duration(Style, Motion.SWITCH_MS); easing.type: Easing.OutCubic }
+  NumberAnimation {
+    id: rollAnim
+    target: root
+    property: "roll"
+    from: 0
+    to: 1
+    duration: Motion.duration(Style, Motion.SWITCH_MS)
+    easing.type: Easing.OutCubic
+    onFinished: root.commitRollers()
+  }
   // It ends once the price's digits are within half a pixel of their place,
   // which no frame after would show.
-  onRollChanged: if (rollAnim.running && (1 - roll) * price.inkHeight < 0.5) {
-    rollAnim.stop()
-    roll = 1
-  }
+  onRollChanged: if (rollAnim.running && (1 - roll) * price.inkHeight < 0.5) settle()
 
   readonly property string freshnessText: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is on top. None once its quote
@@ -260,6 +285,7 @@ Item {
     anchors.right: parent.right
     y: root.baselineY - baselineOffset
     text: Format.lookSigns(root.lines.move, root.look.retro)
+    onTextChanged: Qt.callLater(root.takePrice)
     // An old night's move dims with its price.
     color: root.newestOld ? root.look.dim : root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.look.fontFamily
@@ -384,8 +410,10 @@ Item {
     }
     // The move dims with an old night's price, and rolls with the price.
     RollingText {
+      id: captionMove
       visible: text !== ""
       text: Format.lookSigns(root.caption.changeText, root.look.retro)
+      onTextChanged: Qt.callLater(root.takePrice)
       color: root.newestOld ? root.look.dim : root.toneColor(root.caption.tone)
       font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption

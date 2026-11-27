@@ -214,6 +214,21 @@ Harness {
         [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded,
           quitReady, quitPending, flushedOnQuit, listSaved].join(" | "))
 
+      // A rapid burst of overlapping changes lands cleanly without a false
+      // save-failed warning from an in-flight write's watch echo or chmod.
+      harness.checks = []
+      service.files.forget(harness.file)
+      var burstRanges = ["1W", "1M", "3M", "6M", "1Y", "2Y", "5Y", "1W", "1M", "3M"]
+      for (var b = 0; b < burstRanges.length; b++) {
+        service.setRange(burstRanges[b])
+        if (b % 2 === 1) wait(3)
+      }
+      var burstLanded = landed() && within(3000, function() { return !service.saving })
+      var burstClean = burstLanded && !within(500, function() { return service.saveFailed || harness.checks.indexOf(false) >= 0 })
+      harness.check("a rapid run of changes lands cleanly without saying the save didn't take",
+        burstClean && !service.saveFailed && harness.checks.indexOf(false) < 0 && footer().indexOf("aren't saved") < 0,
+        [burstLanded, service.saveFailed, JSON.stringify(harness.checks), footer()].join(" | "))
+
       // Lists a hand edit named oddly: a case twin, All, and none, the last
       // holding a symbol no other list or All holds, beside a key Stonks
       // doesn't know.

@@ -29,8 +29,10 @@ Item {
   // Where the pointer took the row, and where the pointer is in the view.
   property real offset: 0
   property real pointer: 0
-  // Where the pointer was in the view as the row lifted.
-  property real liftedAt: 0
+  // Furthest the pointer has pulled back from each edge during this drag,
+  // starting where the row lifted.
+  property real topAnchor: 0
+  property real bottomAnchor: 0
 
   // Dropped from one place to another, or the same, before it glides.
   signal dropped(int from, int to)
@@ -41,16 +43,19 @@ Item {
 
   // Within a row of the view's top or bottom, or past it, the held row
   // scrolls the list, faster the deeper it's held, until the list ends. A
-  // row lifted within that row starts the edge where it was lifted, so
-  // only a move toward the edge scrolls.
-  readonly property real topEdge: Math.min(pitch, liftedAt)
-  readonly property real bottomEdge: Math.max(sight - pitch, liftedAt)
+  // row lifted within that row starts the edge where it was lifted so only
+  // a move toward the edge scrolls; pulling away widens the edge back to a
+  // full row, and speed scales to the active edge span so the border still
+  // reaches full speed.
+  readonly property real topEdge: Math.min(pitch, topAnchor)
+  readonly property real bottomEdge: Math.max(sight - pitch, bottomAnchor)
   readonly property real depth: pointer < topEdge ? pointer - topEdge : pointer > bottomEdge ? pointer - bottomEdge : 0
+  readonly property real edgeSpan: Math.max(1, depth < 0 ? topEdge : sight - bottomEdge)
   readonly property bool edgeHeld: lifted !== "" && !glide.running && (depth < 0 ? contentY > 0 : depth > 0 && contentY < reach)
   FrameAnimation {
     running: root.edgeHeld
     onTriggered: {
-      var rowsPerSecond = 8 * Math.max(-2, Math.min(2, root.depth / root.pitch))
+      var rowsPerSecond = 8 * Math.max(-2, Math.min(2, root.depth / root.edgeSpan))
       var by = rowsPerSecond * root.pitch * Math.min(frameTime, 0.05)
       root.scrollTo(Math.max(0, Math.min(root.reach, root.contentY + by)))
     }
@@ -90,7 +95,8 @@ Item {
     glide.stop()
     offset = y - from * pitch
     pointer = y - contentY
-    liftedAt = pointer
+    topAnchor = pointer
+    bottomAnchor = pointer
     liftedY = from * pitch
     slot = from
     lifted = key
@@ -100,6 +106,8 @@ Item {
   function moveTo(y) {
     if (lifted === "") return
     pointer = y - contentY
+    if (pointer > topAnchor) topAnchor = pointer
+    if (pointer < bottomAnchor) bottomAnchor = pointer
     liftedY = Math.max(first * pitch, Math.min((keys.length - 1) * pitch, y - offset))
     slot = Math.max(first, Rows.dragSlot(liftedY / pitch, slot, keys.length))
   }
