@@ -1243,6 +1243,17 @@ Harness {
       var badNotDown = badLanded && !body.yahooDown && !/Can't get prices/.test(body.headerText)
       var badSaysSymbol = !!badHero && /NO DATA FOR THIS SYMBOL/.test(badHero.listingLead)
         && !!badRow && /No data for this symbol/.test(badRow.detail)
+      // Fault 19d: in icon mode with no price and a warning, the pill hover
+      // never repeats "! No data · No data" or "! Can't get prices · No data".
+      var savedPillSettings = pill.settings
+      pill.settings = Object.assign({}, savedPillSettings, { barStyle: "icon" })
+      var badButton = null
+      for (var pi = 0; pi < pill.children.length; pi++) {
+        if (typeof pill.children[pi].tooltipText === "string") badButton = pill.children[pi]
+      }
+      var iconFailTip = badButton ? badButton.tooltipText : ""
+      var iconFailClean = iconFailTip === "ZZZZBADSYM ! · No data for this symbol"
+      pill.settings = savedPillSettings
       // Now a mixed list (NEST + KILN + delisted ZZZZBADSYM) going offline
       // during regular hours: yahooDown still turns on so rows stay quiet.
       var mon7 = sat5 + 2 * 86400
@@ -1262,10 +1273,10 @@ Harness {
       gate.gate = Object.assign({}, gate.gate, { left: gate.capacity, filledAt: service.now, pause: "", pausedUntil: 0, refusals: 0, silences: 0, loneOut: false })
       service.save(savedSettings)
       within(5000, function() { return service.allSymbols.indexOf("SPY") >= 0 })
-      harness.check("a 1-symbol 404 list says No data for this symbol, and a mixed list with a 404 symbol still quiets rows when Yahoo goes offline",
-        badLanded && badNotDown && badSaysSymbol && mixedDown,
+      harness.check("a 1-symbol 404 list says No data for this symbol, icon pill hover never repeats No data, and a mixed list with a 404 symbol still quiets rows when Yahoo goes offline",
+        badLanded && badNotDown && badSaysSymbol && iconFailClean && mixedDown,
         [badLanded, body.yahooDown, badHero ? badHero.listingLead : "no hero", badRow ? badRow.detail : "no row",
-          mixedReady, mixedDown, body.headerText, nestRow ? nestRow.detail : "no nest"].join(" | "))
+          "iconTip:" + iconFailTip, mixedReady, mixedDown, body.headerText, nestRow ? nestRow.detail : "no nest"].join(" | "))
       closeWindow()
 
       harness.finish()

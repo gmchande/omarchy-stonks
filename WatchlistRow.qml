@@ -450,6 +450,9 @@ Rectangle {
           color: row.newestOld ? row.look.dim : row.look.foreground
           font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
+          fontSizeMode: Text.HorizontalFit
+          minimumPixelSize: Math.max(8, Style.font.caption - 2)
+          elide: Text.ElideRight
         }
 
         Text {
@@ -464,6 +467,9 @@ Rectangle {
           font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
           font.bold: true
+          fontSizeMode: Text.HorizontalFit
+          minimumPixelSize: Math.max(8, Style.font.caption - 2)
+          elide: Text.ElideRight
         }
 
         // Keeps the press from the list: a drag lifts the row, and only the

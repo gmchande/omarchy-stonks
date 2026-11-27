@@ -231,7 +231,7 @@ test("a young listing shows only what traded: on its first day the IPO price, na
   expect(lines(before, "11:41").close).toMatchObject({ label: "IPO PRICE", price: "" })
   const fresh = M.freshness({ status: "ok", receivedAt: 0 }, before, M.epochAt(US, "2026-11-19", "11:41"), 0, false, null, false)
   expect(M.freshnessText(fresh, before, calendars)).toBe("NOT TRADED YET")
-  expect(M.dayNote(before, M.epochAt(US, "2026-11-19", "11:41"), calendars)).toBe("No trades yet")
+  expect(M.dayNote(before, M.epochAt(US, "2026-11-19", "11:41"), calendars)).toBe("Not traded yet")
   const note = (q, mode, newest) => M.listingNote(q, M.rowModel(q, 0, mode, newest), mode)
   expect([note(before, "pct"), note(before, "open")]).toEqual(["Not traded yet · IPO price 83.00", "Not traded yet · IPO price 83.00"])
   // Its ranges then hold the IPO price twice, at the bell and at Yahoo's
@@ -4410,6 +4410,32 @@ test("a screenshot's foot says when its price is from, a close as the close, and
     latest: null, scrubT: 0, calendars })
   const year = ranged("aapl-1y", "1Y", quote)
   expect([year.foot, year.start, year.end]).toEqual(["TUE 1 SEP 2026 · CLOSE 16:00 EDT", "", ""])
+  // Longer-range scrubbed notifications read like plain English: natural month
+  // casing and the right preposition for days, weeks, months, quarters, starts
+  // and IPO prices, while the card footer keeps its uppercase form.
+  const yHist = M.parseHistory(fixture("history/aapl-1y.json"), "1Y")
+  const yBar = yHist.bars[10]
+  const yScrub = Share.words({ quote, day: quote, history: yHist, latest: null, scrubT: yBar.t, calendars })
+  expect(yScrub.said).toBe("on 26 Sep 2025")
+  const wHist = Object.assign({}, yHist, { range: "5Y", interval: "1wk" })
+  expect(Share.words({ quote, day: quote, history: wHist, latest: null, scrubT: yBar.t, calendars }).said)
+    .toBe("for the week of 26 Sep 2025")
+  const mHist = Object.assign({}, yHist, { range: "10Y", interval: "1mo" })
+  expect(Share.words({ quote, day: quote, history: mHist, latest: null, scrubT: yBar.t, calendars }).said)
+    .toBe("for Sep 2025")
+  const qHist = Object.assign({}, yHist, { range: "All", interval: "3mo" })
+  expect(Share.words({ quote, day: quote, history: qHist, latest: null, scrubT: yBar.t, calendars }).said)
+    .toBe("for Sep–Nov 2025")
+  const closeBefore = Object.assign({}, yHist, { start: { t: yHist.bars[0].t - 1, c: yHist.baseline, clock: null, listed: false } })
+  expect(Share.words({ quote, day: quote, history: closeBefore, latest: null, scrubT: closeBefore.start.t, calendars }).said)
+    .toBe("at the close before 12 Sep 2025")
+  const ipoStart = Object.assign({}, yHist, { offered: true, start: { t: yHist.bars[0].t - 1, c: yHist.baseline, clock: null, listed: true } })
+  expect(Share.words({ quote, day: quote, history: ipoStart, latest: null, scrubT: ipoStart.start.t, calendars }).said)
+    .toBe("at the IPO price")
+  const fiveDay = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
+  const fiveBar = fiveDay.bars[5]
+  expect(Share.words({ quote, day: quote, history: fiveDay, latest: null, scrubT: fiveBar.t, calendars }).said)
+    .toMatch(/^on \d+ [A-Z][a-z]{2} at \d{2}:\d{2} [A-Z]+$/)
   const gspc = savedDay("listings-2026-10-07-1455", "gspc")
   expect([gspc, spy, savedDay("listings-2026-10-07-1455", "shel.l")].map(q => Share.words({ quote: q, day: q,
     history: null, latest: null, scrubT: 0, calendars }).currency))

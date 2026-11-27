@@ -139,11 +139,29 @@ Item {
   }
   // The exchange and currency stay whole, and the lead gives way to them. A
   // name cut short, or in the header, no longer says the currency it ends with.
-  readonly property string listingMeta: {
+  // When no room remains for the lead beside an unmapped long exchange name,
+  // drop the lead and its separator so metaText elides cleanly against the edge.
+  readonly property string metaCore: {
     if (!view || !quote) return ""
     var font = listingMetrics.font // read, so a new text size measures again
-    var cut = !nameOnLine || listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom
-    return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
+    var full = Figures.listingMeta(quote, false)
+    var cut = !nameOnLine || listingMetrics.advanceWidth((listingLead !== "" ? listingLead + " · " : "") + full) > listingRoom
+    return Figures.listingMeta(quote, cut)
+  }
+  readonly property bool leadFits: {
+    if (listingLead === "") return false
+    var font = listingMetrics.font
+    var metaNeed = metaCore !== "" ? Math.ceil(listingMetrics.advanceWidth(" · " + metaCore)) : 0
+    return listingRoom - metaNeed >= Math.ceil(listingMetrics.advanceWidth("W…"))
+  }
+  readonly property string listingMeta: metaCore === "" ? "" : (leadFits ? " · " : "") + metaCore
+  readonly property real metaAdvance: {
+    var font = listingMetrics.font // read, so a new text size measures again
+    return listingMeta === "" ? 0 : Math.ceil(listingMetrics.advanceWidth(listingMeta))
+  }
+  readonly property real leadAdvance: {
+    var font = listingMetrics.font // read, so a new text size measures again
+    return listingLead === "" ? 0 : Math.ceil(listingMetrics.advanceWidth(listingLead))
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property var caption: lines.caption
@@ -224,10 +242,10 @@ Item {
     Text {
       id: listingText
       leftPadding: Style.space(8)
-      width: Math.min(implicitWidth, leftPadding + Math.max(0, root.listingRoom - metaText.implicitWidth))
+      width: root.leadFits ? leftPadding + Math.min(root.leadAdvance, Math.max(0, root.listingRoom - root.metaAdvance)) : leftPadding
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
-      text: root.listingLead
+      text: root.leadFits ? root.listingLead : ""
       color: Freshness.freshnessWarns(root.shownFreshness) ? root.look.foreground : root.look.dim
       font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
@@ -246,10 +264,12 @@ Item {
     objectName: "listingMeta"
     x: listingText.x + listingText.leftPadding + listingText.contentWidth
     y: symbolText.baselineOffset - baselineOffset
+    width: Math.max(0, root.width - x)
     textFormat: Text.PlainText
     text: root.listingMeta
     color: listingText.color
     font: listingText.font
+    elide: Text.ElideRight
   }
 
   RollingText {
