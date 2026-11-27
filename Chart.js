@@ -126,8 +126,8 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 //
 // Once tonight has traded (`Day.nightBell`), the day holds two closes, and
 // the one dashed line is the one the number beside the chart counts from:
-// the panel's, the close just gone, so the day before the bell is set
-// aside; a row's or the pill's while it keeps the day's move (`dayMove`),
+// the panel's and the rows', the close just gone, so the day before the
+// bell is set aside; the pill's while it keeps the day's move (`dayMove`),
 // the close before the day, so what traded since the bell is: `aside`.
 // The scale holds both closes, so nothing moves when one look turns into
 // the other.

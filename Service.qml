@@ -1177,7 +1177,7 @@ Item {
         yahooGate.budgetDueAt, robinhoodGate.budgetDueAt, githubGate.budgetDueAt,
         Freshness.overdueAt(root.owed, root.now),
         Freshness.staleAt(feed.quotes, visible, root.now),
-        root.newestStaleAt(charted, root.now),
+        root.newestStaleAt(visible, root.now),
         root.bellWindowEndAt(root.now)])
     clock.restart()
   }
