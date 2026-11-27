@@ -193,6 +193,22 @@ Harness {
       app.open("{}")
       tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
 
+      // View-state changes (switchList, setRange, setStyle) debounce rather
+      // than writing synchronously on every click, and flush on surface close.
+      service.switchList("")
+      service.setRange("6M")
+      body.setStyle("retro")
+      var viewDebounced = service.saving && JSON.parse(harness.readFile(harness.file)).range !== "6M"
+      app.close()
+      var viewFlushed = landed() && within(3000, function() { return !service.saving })
+      var afterViewClose = JSON.parse(harness.readFile(harness.file))
+      var viewCloseOk = viewDebounced && viewFlushed && afterViewClose.list === "" && afterViewClose.range === "6M" && afterViewClose.style === "retro"
+      app.open("{}")
+      tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
+      service.switchList("Tech")
+      body.setStyle("smooth")
+      landed()
+
       var quitting = restart.createObject(started)
       var quitReady = within(5000, function() { return quitting.ready })
       quitting.persist({ range: "2Y" }, true)
@@ -209,9 +225,9 @@ Harness {
       service.deleteList("Quick")
       landed()
       harness.check("back-to-back async saves land in order, and delayed saves flush on restart, close and quit",
-        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded
+        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded && viewCloseOk
           && quitReady && quitPending && flushedOnQuit && listSaved,
-        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded,
+        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded, viewCloseOk,
           quitReady, quitPending, flushedOnQuit, listSaved].join(" | "))
 
       // A rapid burst of overlapping changes lands cleanly without a false
@@ -271,6 +287,54 @@ Harness {
         through && harness.checks.indexOf(false) < 0 && !service.saveFailed && footer().indexOf("aren't saved") < 0 && service.range === "1M"
           && JSON.parse(harness.readFile(harness.file)).range === "1M",
         [through, service.saveFailed, footer(), service.range, JSON.stringify(harness.checks)].join(" | "))
+
+      // Closing after an immediate stock selection + debounced range change
+      // while an external edit's read is in flight keeps both local changes
+      // and the external edit (new symbol + unknown key).
+      var beforeMerge = harness.readFile(harness.file)
+      var prevFeatured = JSON.parse(beforeMerge).featured
+      var picked = prevFeatured === "NVDA" ? "MSFT" : "NVDA"
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && jq \'.note = "kept-external" | .symbols += ["GOOG"]\' "$1" > "$1.new" && mv "$1.new" "$1"')
+      var readingExt = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
+      service.feature(picked)
+      service.setRange("6M")
+      app.close()
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var mergedLanded = within(3000, function() {
+        if (service.saving) return false
+        try { return JSON.parse(harness.readFile(harness.file)).range === "6M" } catch (e) { return false }
+      })
+      var mergedFile = JSON.parse(harness.readFile(harness.file))
+      var mergedOk = readingExt && mergedLanded && mergedFile.featured === picked
+        && mergedFile.note === "kept-external" && mergedFile.symbols.indexOf("GOOG") >= 0
+      app.open("{}")
+      tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', beforeMerge)
+      within(3000, function() { return service.range === "1M" && service.featuredSymbol === prevFeatured && service.allSymbols.indexOf("GOOG") < 0 })
+      harness.check("closing after a stock click and debounced range change while an external edit is being read preserves all three",
+        mergedOk, JSON.stringify({ readingExt: readingExt, mergedLanded: mergedLanded, picked: picked,
+          featured: mergedFile.featured, range: mergedFile.range, note: mergedFile.note || "", hasGoog: mergedFile.symbols.indexOf("GOOG") >= 0 }))
+
+      // A stock click during the held read-back of a failed save keeps the
+      // earlier refused range instead of merging onto the stale file on disk.
+      var beforeRetry = harness.readFile(harness.file)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && chmod 500 "$2"')
+      service.setRange("1Y")
+      var readingFailed = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
+      sh('chmod 700 "$2"')
+      service.feature(picked)
+      sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
+      var retriedOk = within(3000, function() {
+        if (service.saving) return false
+        try { return JSON.parse(harness.readFile(harness.file)).featured === picked } catch (e) { return false }
+      })
+      var retriedFile = JSON.parse(harness.readFile(harness.file))
+      var retryKept = readingFailed && retriedOk && retriedFile.range === "1Y" && !service.saveFailed
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', beforeRetry)
+      within(3000, function() { return service.range === "1M" && service.featuredSymbol === prevFeatured })
+      harness.check("a stock click during a failed save's read-back keeps the refused range instead of adopting stale disk text",
+        retryKept, JSON.stringify({ readingFailed: readingFailed, retriedOk: retriedOk, featured: retriedFile.featured,
+          range: retriedFile.range, saveFailed: service.saveFailed }))
 
       // A file that can't be read, put in place while a read is out, as a
       // sync tool replaces one: a change made before that read lands writes

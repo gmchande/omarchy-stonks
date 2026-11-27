@@ -182,9 +182,75 @@ function evenness(g) {
   return g.day && !g.aside ? 1 : 0
 }
 
+// Keeps every vertex needed so no omitted point lies more than `eps` logical
+// pixels from the kept segments, preserving every endpoint, break, untraded
+// step, and flag transition.
+function simplifySpan(points, a, b, scaleX, scaleY, eps2, keep) {
+  var maxD2 = 0
+  var idx = -1
+  var ax = points[a].x * scaleX
+  var ay = points[a].y * scaleY
+  var dx = points[b].x * scaleX - ax
+  var dy = points[b].y * scaleY - ay
+  var len2 = dx * dx + dy * dy
+  for (var i = a + 1; i < b; i++) {
+    var px = points[i].x * scaleX - ax
+    var py = points[i].y * scaleY - ay
+    var d2
+    if (len2 === 0) {
+      d2 = px * px + py * py
+    } else {
+      var f = (px * dx + py * dy) / len2
+      if (f < 0) f = 0
+      else if (f > 1) f = 1
+      var ex = px - f * dx
+      var ey = py - f * dy
+      d2 = ex * ex + ey * ey
+    }
+    if (d2 > maxD2) {
+      maxD2 = d2
+      idx = i
+    }
+  }
+  if (maxD2 > eps2 && idx >= 0) {
+    keep[idx] = true
+    simplifySpan(points, a, idx, scaleX, scaleY, eps2, keep)
+    simplifySpan(points, idx, b, scaleX, scaleY, eps2, keep)
+  }
+}
+
+function simplify(points, plotW, plotH, epsPx) {
+  var n = points.length
+  if (!(epsPx > 0) || !(plotW > 0) || !(plotH > 0) || n <= 2) return points
+  var keep = new Array(n)
+  keep[0] = true
+  keep[n - 1] = true
+  for (var i = 1; i < n - 1; i++) {
+    var prev = points[i - 1], cur = points[i], next = points[i + 1]
+    if (cur.brk || cur.untraded || next.brk || next.untraded
+      || cur.faint !== prev.faint || cur.faint !== next.faint
+      || cur.dim !== prev.dim || cur.dim !== next.dim
+      || cur.ext !== prev.ext || cur.ext !== next.ext) {
+      keep[i] = true
+    }
+  }
+  var eps2 = epsPx * epsPx
+  var start = 0
+  for (var j = 1; j < n; j++) {
+    if (!keep[j]) continue
+    if (j - start > 1) simplifySpan(points, start, j, plotW, plotH, eps2, keep)
+    start = j
+  }
+  var out = []
+  for (var k = 0; k < n; k++) if (keep[k]) out.push(points[k])
+  return out
+}
+
 // The chart `t` of the way from `plan`'s old one to its new one, a frame of
-// the eased motion.
-function frame(p, t) {
+// the eased motion. When `plotW` and `plotH` are given, intermediate frames
+// drop vertices that stay within a sub-pixel tolerance that tightens to zero
+// at both ends, cutting morph paint work without a jump at handover.
+function frame(p, t, plotW, plotH) {
   if (t <= 0) return p.a.real
   if (t >= 1) return p.b.real
   var a = p.a, b = p.b
@@ -242,6 +308,10 @@ function frame(p, t) {
       dim: flagged(dim, u),
       ext: flagged(ext, u)
     })
+  }
+  if (plotW > 0 && plotH > 0) {
+    var eps = Math.min(1.0, 1.5 * Math.pow(Math.min(t, 1 - t), 1 / 3))
+    points = simplify(points, plotW, plotH, eps)
   }
   var ticks = a.g.ticks.concat(b.g.ticks)
   var tickAlpha = a.g.ticks.map(function(x, i) { return (a.g.tickAlpha ? a.g.tickAlpha[i] : 1) * (1 - t) })

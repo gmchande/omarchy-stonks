@@ -43,22 +43,25 @@ Item {
   // finish, or a save awaiting its read-back.
   readonly property bool saving: settleWrite.running || writeOwed || making || writing || writeQueued !== "" || staleTexts !== null
 
-  // Keys changed by a delayed save (`settles`) still waiting for the timer,
-  // so an external read meanwhile keeps every pending key, not only `featured`.
+  // Keys changed by `persist(values, ...)` waiting for the debounce timer or an
+  // in-flight read so an external edit merges them instead of being overwritten.
+  // `wholeWriteOwed` is true once a full `save()` waits on a read in flight.
   property var settledKeys: ({})
+  property bool wholeWriteOwed: false
 
   function persist(values, settles) {
-    root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles, values)
+    var next = Settings.withValues(root.fileSettings, values)
+    root.store(next, settles, values, next !== root.fileSettings)
   }
 
   function save(next) {
     if (!Settings.settingsEqual(next, root.fileSettings)) {
-      root.store(next)
+      root.store(next, false, null, true)
     }
   }
 
-  function store(next, settles, values) {
-    var changed = !Settings.settingsEqual(next, root.fileSettings)
+  function store(next, settles, values, knownChanged) {
+    var changed = knownChanged !== undefined ? knownChanged : !Settings.settingsEqual(next, root.fileSettings)
     root.fileSettings = next
     if (!root.ready) return
     if (root.unreadable) {
@@ -67,15 +70,24 @@ Item {
     }
     if (settles) {
       if (changed || settleWrite.running) {
-        var pending = Object.assign({}, root.settledKeys)
-        if (values) for (var k in values) pending[k] = true
-        root.settledKeys = pending
+        if (!root.wholeWriteOwed) {
+          var pending = Object.assign({}, root.settledKeys)
+          if (values) for (var k in values) pending[k] = true
+          root.settledKeys = pending
+        }
         settleWrite.restart()
       }
       return
     }
-    root.settledKeys = ({})
     settleWrite.stop()
+    if (reader.out && values && !root.wholeWriteOwed) {
+      var owedKeys = Object.assign({}, root.settledKeys)
+      for (var ok in values) owedKeys[ok] = true
+      root.settledKeys = owedKeys
+    } else {
+      root.settledKeys = ({})
+      if (reader.out) root.wholeWriteOwed = true
+    }
     root.writeFile(next)
   }
 
@@ -87,8 +99,16 @@ Item {
     onTriggered: root.writeSettled()
   }
   function writeSettled() {
-    root.settledKeys = ({})
-    if (root.ready && !root.unreadable) root.writeFile(root.fileSettings)
+    if (!root.ready || root.unreadable) {
+      root.settledKeys = ({})
+      root.wholeWriteOwed = false
+      return
+    }
+    root.writeFile(root.fileSettings)
+    if (!root.writeOwed) {
+      root.settledKeys = ({})
+      root.wholeWriteOwed = false
+    }
   }
   // Flush any pending delayed save at once (surface close, update restart).
   function flush() {
@@ -99,6 +119,8 @@ Item {
   // The footer's try again.
   function saveAgain() {
     settleWrite.stop()
+    root.settledKeys = ({})
+    if (reader.out) root.wholeWriteOwed = true
     root.writeSettled()
   }
   // The shell is going: any pending delayed or in-flight async change is
@@ -109,6 +131,7 @@ Item {
     var pending = settleWrite.running || root.writing || root.writeQueued !== ""
     settleWrite.stop()
     root.settledKeys = ({})
+    root.wholeWriteOwed = false
     root.writeQueued = ""
     if (!pending || !root.ready || root.unreadable || root.missing || reader.out) return
     var body = JSON.stringify(root.fileSettings, null, 2) + "\n"
@@ -254,12 +277,25 @@ Item {
         if (taken) root.takeLoadedSettings(answer.text)
         return
       }
-      if (!Settings.readListsFile(answer.text)) {
+      var parsed = Settings.readListsFile(answer.text)
+      if (!parsed) {
+        root.settledKeys = ({})
+        root.wholeWriteOwed = false
         root.takeUnreadableFile()
         root.editsUnsaved = true
         return
       }
       root.unreadable = false
+      var whole = root.wholeWriteOwed
+      root.wholeWriteOwed = false
+      var keys = Object.keys(root.settledKeys)
+      root.settledKeys = ({})
+      if (taken && !whole && keys.length > 0) {
+        var keep = {}
+        for (var i = 0; i < keys.length; i++) keep[keys[i]] = root.fileSettings[keys[i]]
+        var merged = Settings.fileSettings(Settings.copyWith(parsed, keep))
+        if (!Settings.settingsEqual(merged, root.fileSettings)) root.adopt(merged)
+      }
       root.writeFile(root.fileSettings)
       return
     }
@@ -268,8 +304,11 @@ Item {
     if (root.files) root.files.forget(root.path)
     if (root.missing) {
       var gone = root.takesRead(null)
-      if (owed) root.writeFile(root.fileSettings)
-      else if (gone) root.takeMissingFile()
+      if (owed) {
+        root.settledKeys = ({})
+        root.wholeWriteOwed = false
+        root.writeFile(root.fileSettings)
+      } else if (gone) root.takeMissingFile()
       return
     }
     // A read while the file is being made is no answer: a write it held
@@ -281,7 +320,11 @@ Item {
     root.staleTexts = null
     root.saveFailed = false
     root.takeUnreadableFile()
-    if (owed) root.editsUnsaved = true
+    if (owed) {
+      root.settledKeys = ({})
+      root.wholeWriteOwed = false
+      root.editsUnsaved = true
+    }
   }
 
   // While a save awaits its read-back: each text the file may still hold

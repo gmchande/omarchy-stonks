@@ -22,6 +22,32 @@ function calendarFor(calendars, quote) {
   return null
 }
 
+// Fast lookup matching `calendarFor`, built once per walk over a list.
+function calendarLookup(calendars) {
+  var map = calendarMap(calendars)
+  if (!map) return function() { return null }
+  var byExchange = {}
+  var hasIndex = {}
+  for (var id in map) {
+    var cal = map[id]
+    if (!cal) continue
+    if (cal.exchanges) {
+      for (var i = 0; i < cal.exchanges.length; i++) {
+        var ek = "k" + cal.exchanges[i]
+        if (!(ek in byExchange)) byExchange[ek] = cal
+      }
+    }
+    if (cal.indexes) {
+      for (var j = 0; j < cal.indexes.length; j++) hasIndex["k" + cal.indexes[j]] = true
+    }
+  }
+  return function(quote) {
+    if (!quote || !quote.exchange) return null
+    if (quote.symbol && hasIndex["k" + quote.symbol] === true) return calendarFor(calendars, quote)
+    return byExchange["k" + quote.exchange] || null
+  }
+}
+
 // US exchanges trade in whole cents from $1 (Reg NMS); a coin or a European
 // listing trades finer.
 function centExchanges(calendars) {
@@ -154,12 +180,32 @@ function calendarNow(cal, now) {
   var early = cal && cal.earlyCloses ? cal.earlyCloses[date] : null
   var breakEnd = null
   for (var i = 0; i < segs.length - 1; i++) if (now >= segs[i].end && now < segs[i + 1].start) breakEnd = segs[i + 1].start
+  var segment = segs.some(function(seg) { return now >= seg.start && now < seg.end })
+  var dates = {}
+  var earlies = {}
+  var dateOf = cal ? function(t) {
+    if (t in dates) return dates[t]
+    var d = dateStringOf(localDate(t, cal))
+    dates[t] = d
+    return d
+  } : null
+  var earlyOf = cal ? function(d) {
+    if (d in earlies) return earlies[d]
+    if (!cal.earlyCloses || !cal.earlyCloses[d]) { earlies[d] = null; return null }
+    var s = d === date ? segs : segmentsOn(cal, d)
+    var val = s.length ? { close: s[s.length - 1].end, postEnd: cal.post ? postClose(cal, d) : null } : null
+    earlies[d] = val
+    return val
+  } : null
   return {
     cal: cal,
     quiet: kind === "weekend" || kind === "closure",
     breakEnd: breakEnd,
     earlyEnd: early && segs.length ? segs[segs.length - 1].end : 0,
-    segment: segs.some(function(seg) { return now >= seg.start && now < seg.end })
+    segment: segment,
+    regular: segment ? { start: segs[0].start, end: segs[segs.length - 1].end } : null,
+    dateOf: dateOf,
+    earlyOf: earlyOf
   }
 }
 
@@ -223,8 +269,8 @@ function tradingDay(cal, date) {
 // Each calendar's day is read once, not once a listing.
 function tradingDays() {
   var read = new Map()
-  return function(cal, t) {
-    var date = dateStringOf(localDate(t, cal))
+  return function(cal, t, dateOf) {
+    var date = dateOf ? dateOf(t) : dateStringOf(localDate(t, cal))
     if (!read.has(cal)) read.set(cal, {})
     var days = read.get(cal)
     if (!(date in days)) days[date] = tradingDay(cal, date)

@@ -74,6 +74,7 @@ Item {
   property var yearLine: null
   property var factLists: []
   property var infoRanges: []
+  property var listInfo: ({ key: "", factLists: [], ranges: [] })
   property var rangeMarks: null
   property string baselineText: ""
   // The clock, by which the hero's overnight trade is old.
@@ -83,12 +84,15 @@ Item {
   readonly property alias chartItem: heroChart
   readonly property var smoothChart: smoothLoader.item
   readonly property var retroChart: retroLoader.item
-  // A replay's sound steps through it in retro, a note a column.
-  readonly property var pixelGrid: retroChart ? retroChart.grid : Chart.retroGrid(root.geometry, heroChart.width, heroChart.height, 5, 1)
+  // A replay's sound and retro wipe read the grid on demand, never eagerly in
+  // smooth mode on geometry changes.
+  function pixelGridNow() {
+    return retroChart ? retroChart.grid : Chart.retroGrid(root.geometry, heroChart.width, heroChart.height, 5, 1)
+  }
   // The retro column a place on the chart stands in, which a scrub's chime
   // strikes.
   function pixelColumnAt(fraction) {
-    return retroChart ? retroChart.columnAt(fraction) : Chart.retroColumn(pixelGrid, fraction)
+    return retroChart ? retroChart.columnAt(fraction) : Chart.retroColumn(pixelGridNow(), fraction)
   }
 
   // The hero's change or the rows' unit, clicked: the unit steps.
@@ -118,7 +122,11 @@ Item {
   // Left-to-right column-pitch wipe on smooth ↔ retro, synced with LookIcon.
   property real lookWipe: 1
   readonly property bool lookWiping: lookWipe < 1
-  readonly property real wipeX: Math.min(heroChart.width, Math.round(lookWipe * pixelGrid.columns) * pixelGrid.pitch)
+  readonly property real wipeX: {
+    if (!lookWiping) return heroChart.width
+    var grid = pixelGridNow()
+    return Math.min(heroChart.width, Math.round(lookWipe * grid.columns) * grid.pitch)
+  }
   function settleLook() {
     lookWipeAnim.stop()
     lookWipe = 1
@@ -398,6 +406,7 @@ Item {
       titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
       factLists: root.factLists
       ranges: root.infoRanges
+      listInfo: root.listInfo
       look: root.look
       seen: root.seen
       still: root.still

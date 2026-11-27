@@ -319,17 +319,31 @@ Item {
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote, shownTrades) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var heldLines: chart ? History.heldLines(histories, chartSymbol, featuredQuote, shownTrades) : []
-  readonly property var infoFactLists: (!dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
-    .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
-    .concat(heldLines.map(function(line) { return line.facts }))).concat(listInfo.factLists)
-  readonly property var infoRanges: (!dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range })))
-    .concat(listInfo.ranges)
+  readonly property var ownInfoNow: {
+    if (!surfaceOpen) return null
+    if (!dayLine) return { key: "", factLists: [], ranges: [] }
+    var fl = [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
+    if (yearLine) fl.push(History.rangeFacts(yearLine.range.widest))
+    for (var i = 0; i < heldLines.length; i++) fl.push(heldLines[i].facts)
+    var rl = [dayLine.range]
+    for (var j = 0; j < heldLines.length; j++) rl.push(heldLines[j].range)
+    var fKey = fl.map(function(list) {
+      return list.map(function(f) { return f.label + " " + (f.widest || "") + " " + (f.value || "") }).join("|")
+    }).join("/")
+    var rKey = rl.map(function(r) { return (r.widest || "") + "|" + (r.lowText || "") + "|" + (r.highText || "") }).join("/")
+    return { key: fKey + "#" + rKey, factLists: fl, ranges: rl }
+  }
+  property var ownInfo: ({ key: "", factLists: [], ranges: [] })
+  onOwnInfoNowChanged: if (ownInfoNow && ownInfoNow.key !== ownInfo.key) ownInfo = ownInfoNow
+  readonly property var infoFactLists: ownInfo.factLists
+  readonly property var infoRanges: ownInfo.ranges
   // Every stock in All as the table holds it: its day's and its 52 weeks'
   // facts and prices, by the shape of their widest, so a refresh that keeps
   // every shape lays nothing out again. Per-symbol results are cached by quote
   // and rates reference so a batch only recomputes symbols that changed.
   readonly property var listInfoCache: ({ by: {}, rates: null })
   readonly property var listInfoNow: {
+    if (!surfaceOpen) return null
     var all = lists.length ? lists[0].symbols : []
     var cache = listInfoCache
     if (cache.rates !== rates) {
@@ -370,7 +384,7 @@ Item {
       factLists: factKeys.map(function(k) { return facts[k] }), ranges: rangeKeys.map(function(k) { return ranges[k] }) }
   }
   property var listInfo: ({ key: "", factLists: [], ranges: [] })
-  onListInfoNowChanged: if (listInfoNow.key !== listInfo.key) listInfo = listInfoNow
+  onListInfoNowChanged: if (listInfoNow && listInfoNow.key !== listInfo.key) listInfo = listInfoNow
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades, featuredNewest) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
@@ -507,6 +521,8 @@ Item {
   onMarketFormsNowChanged: if (!sameStrings(marketForms, marketFormsNow)) marketForms = marketFormsNow
   Component.onCompleted: {
     if (!sameRows(stableRows, view.rows)) stableRows = view.rows
+    if (listInfoNow && listInfoNow.key !== listInfo.key) listInfo = listInfoNow
+    if (ownInfoNow && ownInfoNow.key !== ownInfo.key) ownInfo = ownInfoNow
     marketForms = marketFormsNow
   }
   readonly property var headerLine: Figures.headerLine({
@@ -934,7 +950,7 @@ Item {
   }
   function setStyle(style) {
     showingHelp = false
-    if (service) service.persist({ style: style })
+    if (service) service.persist({ style: style }, true)
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
   // Turned on, the add sound plays once, so you hear how loud they are.
@@ -1098,7 +1114,7 @@ Item {
   // the same bar.
   function chime(again) {
     if (!sounds || motion.replayRunning) return
-    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid,
+    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: retro ? heroBand.pixelGridNow() : null,
       column: retro && motion.scrubX >= 0 ? heroBand.pixelColumnAt(motion.scrubX) : -1 }, motion.scrubX)
     if (bar !== chimed || again) sounds.chime(bar)
     chimed = bar
@@ -1375,6 +1391,7 @@ Item {
     periodLine: root.periodLine
     factLists: root.infoFactLists
     infoRanges: root.infoRanges
+    listInfo: root.listInfo
     rangeMarks: root.rangeMarks
     baselineText: root.baselineText
     yearLine: root.yearLine
@@ -1738,7 +1755,7 @@ Item {
     calendars: root.calendars
     // Made from the chart as drawn in the look on screen.
     onReplayStarted: function(from, to) {
-      if (root.sounds) root.sounds.playReplay(root, { geometry: motion.geometry, grid: heroBand.pixelGrid,
+      if (root.sounds) root.sounds.playReplay(root, { geometry: motion.geometry, grid: root.retro ? heroBand.pixelGridNow() : null,
         from: from, to: to, seconds: motion.replayDuration / 1000 })
     }
     onReplayCut: if (root.sounds) root.sounds.stopReplay(root)

@@ -304,6 +304,43 @@ Harness {
         redrawn.length === 0 && stale.length === 0,
         redrawn.length + " rows out of sight redrawn; in sight without their latest: " + stale.slice(0, 5).join(","))
 
+      // Returning to a scrolled list asks Robinhood only for the rows visible
+      // at the restored scroll position, never for the top rows of that list.
+      var ovIdle = function() { return !service.feeds.overnight.busy && !service.feeds.listDates.busy && !service.overnightWanted() }
+      list.takeOver()
+      list.contentY = list.clampY(50 * list.rowPitch)
+      var scrolledSym = list.displayedSymbols[51]
+      tryVerify(function() { return service.rowsInSight().indexOf(scrolledSym) >= 0 }, 2000)
+      tryVerify(ovIdle, 10000)
+      service.switchList("Ten")
+      tryVerify(function() { return list.displayedSymbols.length === 10 && list.contentY === 0 }, 2000)
+      tryVerify(ovIdle, 10000)
+      var clearFrom = function(entries) {
+        var out = Object.assign({}, entries)
+        service.allSymbols.forEach(function(s) {
+          if (list.displayedSymbols.indexOf(s) < 0) delete out[s]
+        })
+        return out
+      }
+      var backFrom = harness.lines("requests.log").length
+      service.feeds.overnight.entries = clearFrom(service.feeds.overnight.entries)
+      service.feeds.listDates.entries = clearFrom(service.feeds.listDates.entries)
+      service.switchList("")
+      tryVerify(function() { return list.displayedSymbols.length === 154 && service.rowsInSight().indexOf(scrolledSym) >= 0 }, 2000)
+      var restoredSight = service.rowsInSight().concat([service.view.featured])
+      within(250, function() { return service.feeds.overnight.busy || service.feeds.listDates.busy })
+      tryVerify(ovIdle, 15000)
+      var backRh = harness.lines("requests.log").slice(backFrom).filter(function(l) { return /^overnight /.test(l) })
+      var backExtra = [].concat.apply([], backRh.map(function(l) { return l.split(" ")[1].split(",") }))
+        .filter(function(s) { return restoredSight.indexOf(s) < 0 })
+      list.takeOver()
+      list.contentY = 0
+      tryVerify(ovIdle, 15000)
+      rested()
+      harness.check("returning to a scrolled list asks Robinhood only for its visible rows, never the skipped top",
+        backRh.length > 0 && backExtra.length === 0,
+        "sight=" + restoredSight.join(",") + " | requests=" + backRh.join(" | ") + " | extra=" + backExtra.join(","))
+
       // A click on a row and a new range save the lists file, and All holds
       // the same stocks: the feeds go on as they were, and no other row works
       // out its figures again, the clicked stock's chart answer landing too.

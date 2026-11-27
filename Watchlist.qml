@@ -380,7 +380,13 @@ Flickable {
   // numbers, so it changes only as a row crosses the edge.
   readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).first
   readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY - rowPitch, sightHeight + 2 * rowPitch).last
-  readonly property var sightSymbols: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
+  // Held while a list switch or reopen restores its scroll position so the
+  // service never sees an intermediate slice at the old scroll offset.
+  readonly property var sightSymbolsNow: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
+  property bool switching: false
+  property var sightSymbols: []
+  onSightSymbolsNowChanged: if (!switching) sightSymbols = sightSymbolsNow
+  onSwitchingChanged: if (!switching) sightSymbols = sightSymbolsNow
 
   function restingTopFor(index, top) {
     return Rows.restingTop(index, rowSize(), top, sightHeight, rowsLength())
@@ -651,8 +657,12 @@ Flickable {
       cursorSymbol = ""
       forgetClicks()
       takeOver()
-      layOut()
+      switching = true
+      display(view.shown.slice(), false)
       contentY = clampY(places[view.listKey] || 0)
+      settleRows()
+      forgetGoneCursor()
+      switching = false
     } else if (reordered) {
       reorder.cancel()
       reorderRows()
@@ -672,12 +682,14 @@ Flickable {
     cursorSymbol = ""
     forgetClicks()
     listHover.rest()
+    switching = true
     layOut()
     var featuredAt = displayedSymbols.indexOf(featuredSymbol)
     if (featuredAt >= 0 && !wholeInSight(featuredAt, contentY)) {
       takeOver()
       contentY = restingTopFor(featuredAt, contentY)
     }
+    switching = false
   }
   Component.onCompleted: {
     lastPitch = rowPitch
@@ -685,6 +697,7 @@ Flickable {
     lineLook = look.retro
     Rows.syncModel(rowsModel, "symbol", view.allSymbols)
     display(view.shown.slice(), false)
+    sightSymbols = sightSymbolsNow
   }
 
   // A look switch swaps each row's day line, a canvas, which a long All
@@ -800,7 +813,7 @@ Flickable {
         required property int index
         Binding on lineRetro {
           value: root.lineLook
-          when: rowDelegate.built || rowDelegate.index < root.lineSweep
+          when: rowDelegate.inSight || (rowDelegate.built && root.lineSweep > 0) || rowDelegate.index < root.lineSweep
           restoreMode: Binding.RestoreNone
         }
         // Whether the row lies within `above` and `below` of the view at
@@ -823,38 +836,46 @@ Flickable {
         // comes into sight. Ternaries short-circuit before reading the whole
         // maps when `when` is false, since Qt 6 still evaluates `value`.
         property var sightQuote: null
+        property var keptQuote: null
+        onSightQuoteChanged: if (sightQuote) keptQuote = sightQuote
         Binding on sightQuote {
-          value: rowDelegate.inSight ? (root.quotes[rowDelegate.symbol] || null) : null
           when: rowDelegate.inSight && !rowDelegate.folding
+          value: rowDelegate.inSight ? (root.quotes[rowDelegate.symbol] || null) : rowDelegate.keptQuote
           restoreMode: Binding.RestoreNone
         }
         quote: sightQuote
         property var sightNight: null
+        property var keptNight: null
+        onSightNightChanged: if (sightNight) keptNight = sightNight
         Binding on sightNight {
-          value: rowDelegate.inSight && root.nights ? (root.nights[rowDelegate.symbol] || null) : null
           when: rowDelegate.inSight && !rowDelegate.folding
+          value: rowDelegate.inSight ? (root.nights ? (root.nights[rowDelegate.symbol] || null) : null) : rowDelegate.keptNight
           restoreMode: Binding.RestoreNone
         }
         // Out of sight, the day it has, so leaving sight changes nothing.
         // Bound to per-row `quote` and `sightNight` rather than `root.quotes`
         // and `root.nights`, so off-screen updates never rebuild visible rows.
         property var sightDay: null
+        property var keptDay: null
+        onSightDayChanged: if (sightDay) keptDay = sightDay
         Binding on sightDay {
-          value: !rowDelegate.inSight ? null
+          when: rowDelegate.inSight && !rowDelegate.folding
+          value: !rowDelegate.inSight ? rowDelegate.keptDay
             : rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote,
                 root.hasNightsMap ? (rowDelegate.sightNight ? ({ [rowDelegate.symbol]: rowDelegate.sightNight }) : ({})) : null,
                 root.calendars, root.dayClock)
             : null
-          when: rowDelegate.inSight && !rowDelegate.folding
           restoreMode: Binding.RestoreNone
         }
         day: sightDay
         // Read once for both, and only while in sight: off-screen rows skip
         // map reads on every live trade.
         property var sightNewestTrade: null
+        property var keptNewestTrade: null
+        onSightNewestTradeChanged: if (sightNewestTrade) keptNewestTrade = sightNewestTrade
         Binding on sightNewestTrade {
-          value: rowDelegate.inSight ? (root.newestTrades[rowDelegate.symbol] || null) : null
           when: rowDelegate.inSight && !rowDelegate.folding
+          value: rowDelegate.inSight ? (root.newestTrades[rowDelegate.symbol] || null) : rowDelegate.keptNewestTrade
           restoreMode: Binding.RestoreNone
         }
         readonly property var newestTrade: sightNewestTrade

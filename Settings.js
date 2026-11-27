@@ -127,6 +127,45 @@ function fileSettings(src) {
   })
 }
 
+// Scalar view/preference keys that never alter `symbols` or `lists`, so
+// persisting them skips re-normalizing every list and symbol.
+var SCALAR_KEYS = {
+  featured: true, list: true, range: true, style: true,
+  changeMode: true, refreshIntervalSec: true, hinted: true, sounds: true, updateCheck: true
+}
+
+// Fast path over already-normalized settings: when `values` touches only scalar
+// keys, normalize only those keys and return `settings` unchanged when no value
+// differs; otherwise fall back to full `fileSettings`.
+function withValues(settings, values) {
+  if (!settings || !values) return fileSettings(copyWith(settings || {}, values || {}))
+  var keys = Object.keys(values)
+  for (var i = 0; i < keys.length; i++) {
+    if (!SCALAR_KEYS[keys[i]]) return fileSettings(copyWith(settings, values))
+  }
+  var patch = {}
+  var changed = false
+  for (var j = 0; j < keys.length; j++) {
+    var k = keys[j]
+    var raw = values[k]
+    var v
+    if (k === "featured") v = String(raw || "")
+    else if (k === "list") {
+      var idx = listIndex(settings.lists, raw)
+      v = idx >= 0 ? settings.lists[idx].name : ""
+    } else if (k === "range") v = History.historyRanges().indexOf(raw) >= 0 ? raw : "1D"
+    else if (k === "style") v = raw === "retro" ? "retro" : "smooth"
+    else if (k === "changeMode") v = raw === "abs" || raw === "open" ? raw : "pct"
+    else if (k === "refreshIntervalSec") v = normalizeRefreshInterval(raw)
+    else if (k === "hinted") v = raw === true
+    else if (k === "sounds") v = raw === true
+    else if (k === "updateCheck") v = raw !== false
+    patch[k] = v
+    if (settings[k] !== v) changed = true
+  }
+  return changed ? copyWith(settings, patch) : settings
+}
+
 // A copy of `from` with `values` over it, every key in the order it came.
 // Object.assign would take a key named "__proto__", as a hand edit may
 // give one, as the copy's prototype, and the next save would leave it out.

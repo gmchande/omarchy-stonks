@@ -16,10 +16,16 @@ Item {
   property var retrying: []
   property bool retried: false
   readonly property bool busy: batches.length > 0 || retrying.length > 0
-  // While a chart draws itself in, answers wait: a day's answer is one
-  // JSON.parse that can't be sliced, 17 to 24 ms for 25 listings.
+  // While a chart draws itself in, large answers wait: a 25-listing day's
+  // JSON.parse can take 17 to 24 ms. Small visible-row batches parse in a few
+  // milliseconds, so they land at once instead of holding row sparklines blank.
   property bool holding: false
   onHoldingChanged: if (!holding && landing) landTimer.start()
+  function batchHeld(batch, answer) {
+    if (!holding) return false
+    if (batch.symbols.length > 10) return true
+    return !!answer && !!answer.body && answer.body.length > 750000
+  }
 
   // `at`: the clock's own handlers may run before this binding to it has
   // caught up. While the host is paused past its first blip, a run fails a
@@ -77,12 +83,12 @@ Item {
 
   function landStep() {
     var job = landing
-    if (holding) return
     var until = Date.now() + 8
     while (job.batch < batches.length && Date.now() < until) {
       var batch = batches[job.batch].symbols
       if (!job.results) {
         var answer = job.answers[job.batch]
+        if (batchHeld(batches[job.batch], answer)) return
         try { job.results = answer && answer.kind === "ok" ? Overnight.overnightResults(JSON.parse(answer.body)) : null } catch (e) { job.results = null }
         job.answers[job.batch] = null
         job.read = 0

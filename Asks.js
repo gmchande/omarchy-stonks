@@ -24,8 +24,9 @@ var TRIES = 3
 // Reads each calendar once, not once a listing.
 function calendarsAt(calendars, now) {
   var read = new Map()
+  var lookup = Calendar.calendarLookup(calendars)
   return function(quote) {
-    var cal = Calendar.calendarFor(calendars, quote)
+    var cal = lookup(quote)
     if (!read.has(cal)) read.set(cal, Calendar.calendarNow(cal, now))
     return read.get(cal)
   }
@@ -54,15 +55,20 @@ function quotesDue(watched, entries, asked, quotes, charted, featured, now, inte
     var entry = entries[s]
     if (!entry || entry.status === "saved" || s in asked) return
     var cal = calNow(quotes[s])
-    var quiet = s === featured || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
+    var quiet = s === featured || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal, dayOf)
     at[s] = entry.answeredAt > now ? now : quiet
       || entry.answeredAt + quoteCadence(quotes[s], now, interval, charted.indexOf(s) >= 0, cal)
   })
   var symbols = Object.keys(at)
   var asking = symbols.some(function(s) { return at[s] <= now })
-  var due = symbols.filter(function(s) { return at[s] <= (asking ? now + DUE_SOON : now) })
+  var cutoff = asking ? now + DUE_SOON : now
+  var due = []
   var next = 0
-  symbols.forEach(function(s) { if (due.indexOf(s) < 0 && (next === 0 || at[s] < next)) next = at[s] })
+  for (var i = 0; i < symbols.length; i++) {
+    var sym = symbols[i]
+    if (at[sym] <= cutoff) due.push(sym)
+    else if (next === 0 || at[sym] < next) next = at[sym]
+  }
   return { due: due, next: next }
 }
 
@@ -219,9 +225,11 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!s || !s.regular || receivedAt < (s.post || s.regular).end + Quote.SETTLED) return 0
   var c = Market.clampedSession(quote.current, cal)
   if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + Quote.SETTLED) return 0
+  var raw = cal && cal.cal !== undefined ? cal.cal : cal
+  var dateOf = cal && cal.dateOf ? cal.dateOf : null
   var starts = []
-  if (cal) {
-    var day = dayOf(cal, receivedAt)
+  if (raw) {
+    var day = dayOf(raw, receivedAt, dateOf)
     if (day.to && receivedAt >= day.from && receivedAt < day.to + Quote.SETTLED) return 0
     var open = receivedAt < day.from ? day.from : day.next
     if (open) starts.push(open)
@@ -265,15 +273,22 @@ var OPENING_ASK = 15
 // stock keeps the interval.
 function quoteCadence(quote, now, interval, charted, calNow) {
   if (!quote) return 15 * 60
-  var cal = calNow ? calNow.cal : null
-  if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now, cal) ? Math.min(OPENING_ASK, interval) : interval
+  if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now, calNow) ? Math.min(OPENING_ASK, interval) : interval
   if (calNow.quiet || calNow.breakEnd) return 15 * 60
-  var phase = Market.sessionPhase(quote, now, cal)
+  var phase = Market.sessionPhase(quote, now, calNow)
   if (phase === "pre" || phase === "post") return charted ? interval : Math.max(5 * 60, interval)
   return 15 * 60
 }
 
 // ---- Robinhood
+
+// A cached quote still fresh enough to ask Robinhood for the closed pill's
+// sparkline without waiting on Yahoo's first live answer.
+var SAVED_FRESH = 7 * 24 * 60 * 60
+
+// Small visible-row batches go with the chart waited on in one request; larger
+// runs still send the waited chart alone first.
+var WAITED_BATCH = 10
 
 // Trades due within half an interval go with those due now, so the list
 // stays one request each night's 5 minutes. With a surface open, the stock
@@ -291,7 +306,9 @@ function overnightAsks(s) {
   var night = !!tonight && tonight.open && s.overnightSymbols.indexOf(featured) >= 0
   var kept = s.open || night
   var featuredEntry = s.quoteEntries[featured]
-  var live = !!featuredEntry && featuredEntry.status === "ok" && s.overnightSymbols.indexOf(featured) >= 0
+  var savedFresh = !!featuredEntry && featuredEntry.status === "saved" && !!s.quotes && !!s.quotes[featured]
+    && featuredEntry.receivedAt > 0 && s.now - featuredEntry.receivedAt <= SAVED_FRESH
+  var live = !!featuredEntry && (featuredEntry.status === "ok" || savedFresh) && s.overnightSymbols.indexOf(featured) >= 0
   if (!kept && !live) return null
   var shown = shownListings(s)
   var previewing = shown.previewing
@@ -447,9 +464,10 @@ function newestHole(quotes, now) {
 }
 
 // The chart waited on, the preview's or else the featured stock's, goes
-// alone ahead of the rest while it has no answer.
+// alone ahead of a large run while it has no answer; small visible-row
+// batches go together in one request.
 function waitedAlone(symbols, waited, answers) {
-  if (symbols.length > 1 && symbols.indexOf(waited) >= 0 && !answers[waited]) return [waited]
+  if (symbols.length > WAITED_BATCH && symbols.indexOf(waited) >= 0 && !answers[waited]) return [waited]
   return symbols
 }
 

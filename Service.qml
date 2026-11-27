@@ -40,11 +40,16 @@ Item {
   readonly property int refreshIntervalSec: fileSettings.refreshIntervalSec
   property var lastRemoval: null
   property string listsHeld: ""
+  property var lastSymbolsRef: null
+  property var lastListsRef: null
   // The same arrays until what they hold changes, so a save of a range,
   // a list or the featured stock leaves the feeds and each surface's list
   // views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
   onFileSettingsChanged: {
+    if (root.fileSettings.symbols === root.lastSymbolsRef && root.fileSettings.lists === root.lastListsRef) return
+    root.lastSymbolsRef = root.fileSettings.symbols
+    root.lastListsRef = root.fileSettings.lists
     var held = Settings.listsHeld(root.fileSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
@@ -184,6 +189,15 @@ Item {
   property var newestTrades: ({})
   // Each stock's newest price, with what it was worked out from.
   property var newestFrom: ({})
+  function newestEntry(symbol, quote, nights, lastTrades) {
+    var night = nights[symbol]
+    var bars = night ? night.bars : null
+    var through = night ? night.through : null
+    var trade = !night && lastTrades[symbol] ? lastTrades[symbol].trade : null
+    var had = root.newestFrom[symbol]
+    return had && had.quote === quote && had.bars === bars && had.through === through && had.trade === trade ? had
+      : { quote: quote, bars: bars, through: through, trade: trade, newest: Chart.newestTradeOf(symbol, quote, nights, root.calendars, lastTrades) }
+  }
   function workOutNewest() {
     var nights = root.nights
     var lastTrades = lastTradeFeed.entries
@@ -194,13 +208,7 @@ Item {
     root.allSymbols.forEach(function(symbol) {
       var quote = feed.quotes[symbol]
       if (!quote) return
-      var night = nights[symbol]
-      var bars = night ? night.bars : null
-      var through = night ? night.through : null
-      var trade = !night && lastTrades[symbol] ? lastTrades[symbol].trade : null
-      var had = root.newestFrom[symbol]
-      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trade === trade ? had
-        : { quote: quote, bars: bars, through: through, trade: trade, newest: Chart.newestTradeOf(symbol, quote, nights, root.calendars, lastTrades) }
+      from[symbol] = root.newestEntry(symbol, quote, nights, lastTrades)
       if (!from[symbol].newest) return
       out[symbol] = from[symbol].newest
       count++
@@ -209,7 +217,65 @@ Item {
     root.newestFrom = from
     if (!same || count !== Object.keys(root.newestTrades).length) root.newestTrades = out
   }
-  onNightsChanged: workOutNewest()
+  // Computes only the featured stock's newest trade during closed-surface cache
+  // seeding so shell boot paints the pill without scanning off-pill symbols.
+  function workOutNewestFeatured() {
+    var sym = root.view.featured
+    var quote = sym ? feed.quotes[sym] : null
+    if (!quote) return
+    var entry = root.newestEntry(sym, quote, root.nights, lastTradeFeed.entries)
+    root.newestFrom[sym] = entry
+    if (entry.newest && root.newestTrades[sym] !== entry.newest) {
+      var out = Object.assign({}, root.newestTrades)
+      out[sym] = entry.newest
+      root.newestTrades = out
+    } else if (!entry.newest && sym in root.newestTrades) {
+      var pruned = Object.assign({}, root.newestTrades)
+      delete pruned[sym]
+      root.newestTrades = pruned
+    }
+  }
+  property bool seedPending: false
+  property int seedIndex: 0
+  Timer {
+    id: seedSliceTimer
+    interval: 16
+    repeat: true
+    onTriggered: root.stepDeferredSeed()
+  }
+  function stepDeferredSeed() {
+    if (!root.seedPending) { seedSliceTimer.stop(); return }
+    var until = Date.now() + 3
+    var nights = root.nights
+    var lastTrades = lastTradeFeed.entries
+    var symbols = root.allSymbols
+    while (root.seedIndex < symbols.length && Date.now() < until) {
+      var sym = symbols[root.seedIndex++]
+      var quote = feed.quotes[sym]
+      if (quote) root.newestFrom[sym] = root.newestEntry(sym, quote, nights, lastTrades)
+    }
+    if (root.seedIndex >= symbols.length) {
+      root.seedPending = false
+      seedSliceTimer.stop()
+      root.updateOvernightSets()
+      root.workOutNewest()
+    }
+  }
+  function finishDeferredSeed() {
+    if (!root.seedPending) return
+    root.seedPending = false
+    seedSliceTimer.stop()
+    root.updateOvernightSets()
+    root.workOutNewest()
+  }
+  onNightsChanged: {
+    if (root.seedPending && root.openSurfaces.length === 0) {
+      workOutNewestFeatured()
+      root.seedIndex = 0
+    } else {
+      workOutNewest()
+    }
+  }
 
   // Held until every price the open asked for is in, or a site's pause
   // holds the rest once every run out is read, so the rows move once. A
@@ -241,28 +307,34 @@ Item {
     var others = root.openSurfaces.filter(function(s) { return s !== surface })
     var next = open ? others.concat([surface]) : others
     if (next.length === root.openSurfaces.length) return
+    if (open) root.finishDeferredSeed()
     root.openSurfaces = next
     if (!open) {
       root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+      if (root.sights.length === 0) root.sightsList = ""
       root.drawingIn(surface, false)
       if (root.openSurfaces.length === 0) listsFile.flush()
     }
     if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
     // The open's quote and overnight runs go a turn later, once the surface
-    // has said which rows are in sight (`rowsSeen`), so both ask for the
-    // visible rows together in one pass instead of splitting them.
+    // has painted its first frame and said which rows are in sight (`rowsSeen`),
+    // so both ask for the visible rows together in one pass instead of splitting
+    // them or scanning every symbol before the first frame.
     if (open && !root.opening) {
       root.opening = true
       Qt.callLater(function() {
         root.opening = false
+        root.askDue()
         feed.sendWaiting()
         root.askOvernight()
       })
     }
     root.tick()
     root.showHistory(false)
-    if (!open) root.askOvernight()
-    root.askDue()
+    if (!open) {
+      root.askOvernight()
+      root.askDue()
+    }
     Qt.callLater(root.releaseOrder)
   }
   property bool opening: false
@@ -353,7 +425,7 @@ Item {
   }
 
   function setRange(value) {
-    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
+    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value }, true)
   }
 
   function addSymbol(symbol) {
@@ -427,7 +499,7 @@ Item {
   }
 
   function switchList(name) {
-    root.persist({ list: name })
+    root.persist({ list: name }, true)
   }
 
   // Returns why not, or "". With a symbol, from its lists: the list holds it.
@@ -641,7 +713,10 @@ Item {
     gate: robinhoodGate
     holding: root.drawing.length > 0
     onEntriesChanged: {
-      root.updateOvernightSets()
+      if (root.seedPending && root.openSurfaces.length === 0)
+        root.updateOvernightSets(root.view.featured ? [root.view.featured] : [])
+      else
+        root.updateOvernightSets()
       root.joinNights()
       Qt.callLater(root.askOvernight)
     }
@@ -654,7 +729,10 @@ Item {
     onEntriesChanged: {
       var before = root.nights
       root.joinNights()
-      if (root.nights === before) root.workOutNewest()
+      if (root.nights === before) {
+        if (root.seedPending && root.openSurfaces.length === 0) root.workOutNewestFeatured()
+        else root.workOutNewest()
+      }
       Qt.callLater(root.askOvernight)
     }
     onBusyChanged: Qt.callLater(root.releaseOrder)
@@ -670,7 +748,12 @@ Item {
     if (joined.nights !== root.nights) root.nights = joined.nights
   }
   onCalendarsChanged: {
-    updateOvernightSets()
+    if (root.seedPending && root.openSurfaces.length === 0) {
+      updateOvernightSets(root.view.featured ? [root.view.featured] : [])
+      root.seedIndex = 0
+    } else {
+      updateOvernightSets()
+    }
     joinNights()
   }
   // Whether the night trades now, and the listings whose newest price may
@@ -694,13 +777,14 @@ Item {
   // Newest Yahoo pre-market hole across `overnightSymbols`, cached per quote
   // batch so clock ticks never scan all 152 quotes in `askOvernight`.
   property var rawYahooHole: null
-  function updateOvernightSets() {
+  function updateOvernightSets(subset) {
     var quotes = feed.quotes
     var cals = root.calendars
+    var list = subset || root.allSymbols
     var nextOver = []
     var newestHole = null
-    for (var i = 0; i < root.allSymbols.length; i++) {
-      var s = root.allSymbols[i]
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i]
       var q = quotes[s]
       if (q && Overnight.hasOvernight(q, cals)) {
         nextOver.push(s)
@@ -802,7 +886,7 @@ Item {
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
-  onPreviewRestsChanged: askDue()
+  onPreviewRestsChanged: if (previewRests && allSymbols.indexOf(previewSymbol) >= 0) askDue()
   onRefreshIntervalSecChanged: askDue()
   // Robinhood's questions go side by side, so a 1D chart waits for one
   // answer, never two in a row.
@@ -874,22 +958,44 @@ Item {
     keepDay(view.featured, view.chart)
     var chart = view.featured + "|" + view.range
     if (chart === chartOnShow) return
-    var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
+    var prev = chartOnShow !== "" ? chartOnShow.split("|") : ["", ""]
+    var featuredChanged = chartOnShow === "" || prev[0] !== view.featured
+    var rangeLeft = chartOnShow !== "" && prev[1] !== view.range
     chartOnShow = chart
     if (root.featuredTaken && view.featured !== root.featuredTaken.symbol) root.featuredTaken = null
     // Their keys name the range, so missed charts on the last are tried
     // again on a return; charts fetched ahead stay, for the cache to let go.
     if (rangeLeft) root.aheadMissed = ({})
     showHistory(false)
-    askDue()
-    askOvernight()
+    if (featuredChanged) {
+      if (root.seedPending && root.openSurfaces.length === 0) {
+        updateOvernightSets(view.featured ? [view.featured] : [])
+        workOutNewestFeatured()
+      }
+      askDue()
+      askOvernight()
+    }
   }
 
   // Written once the turn is over: an undo restores the quote before All
   // takes the symbol back, and a write between them left it out.
   onQuotesChanged: {
-    updateOvernightSets()
-    workOutNewest()
+    if (root.openSurfaces.length === 0 && !root.seeded && root.allSymbols.length > 1) {
+      var featured = root.view.featured
+      updateOvernightSets(featured ? [featured] : [])
+      workOutNewestFeatured()
+      root.seedPending = true
+      root.seedIndex = 0
+      seedSliceTimer.restart()
+    } else if (root.seedPending && root.openSurfaces.length === 0) {
+      var cur = root.view.featured
+      updateOvernightSets(cur ? [cur] : [])
+      workOutNewestFeatured()
+      root.seedIndex = 0
+    } else {
+      updateOvernightSets()
+      workOutNewest()
+    }
     settleArrivals()
     Qt.callLater(quotesCache.flush)
   }
@@ -907,8 +1013,14 @@ Item {
     root.askOvernight()
   }
   onAllSymbolsChanged: {
-    updateOvernightSets()
-    workOutNewest()
+    if (root.seedPending && root.openSurfaces.length === 0) {
+      updateOvernightSets(root.view.featured ? [root.view.featured] : [])
+      workOutNewestFeatured()
+      root.seedIndex = 0
+    } else {
+      updateOvernightSets()
+      workOutNewest()
+    }
     settleArrivals()
     Qt.callLater(forgetLeft)
   }
@@ -1036,15 +1148,26 @@ Item {
   // quotes first, Robinhood's trades only for them, and on a range their
   // charts are fetched ahead of a click.
   property var sights: []
+  property string sightsList: ""
   // Charts with no good answer, not asked ahead again on this range.
   property var aheadMissed: ({})
   function rowsSeen(surface, symbols) {
-    var others = root.sights.filter(function(s) { return s.surface !== surface })
+    var prev = null
+    var others = []
+    for (var i = 0; i < root.sights.length; i++) {
+      if (root.sights[i].surface === surface) prev = root.sights[i].symbols
+      else others.push(root.sights[i])
+    }
     var next = symbols.length ? others.concat([{ surface: surface, symbols: symbols }]) : others
     if (next.length === 0 && root.sights.length === 0) return
+    var same = !!prev && prev.length === symbols.length && prev.every(function(s, idx) { return s === symbols[idx] })
+    var switched = symbols.length > 0 && root.sightsList !== root.listName
+    if (same && !switched) return
     var first = root.sights.length === 0 && next.length > 0
+    if (symbols.length > 0) root.sightsList = root.listName
+    else if (next.length === 0) root.sightsList = ""
     root.sights = next
-    if (first) root.askOvernight()
+    if (first || switched) root.askOvernight()
     if (next.length > 0) aheadDebounce.restart()
     else aheadDebounce.stop()
   }
@@ -1231,7 +1354,7 @@ Item {
     if (githubGate.budgetDueAt > 0 && root.now >= githubGate.budgetDueAt) githubGate.budgetDueAt = 0
     stepDayClock()
     askOvernight()
-    if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
+    if (!root.opening && ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute)) askDue()
     if (Math.floor(root.now / 60) !== root.prunedMinute) {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
