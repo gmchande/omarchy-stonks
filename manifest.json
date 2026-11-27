@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "grvc.stonks",
   "name": "Stonks",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "author": "Gaurav Chande",
   "license": "MIT",
   "description": "Your stocks in the bar, day and night. Stonks is a watchlist and ticker with charts and quotes for stocks, ETFs, indexes and crypto on the world's markets. US stocks and ETFs show their pre-market, after-hours and overnight prices. Each price shows as it traded, in its own currency, with its time when it's late. From Yahoo Finance and Robinhood, free, with no account or API key.",
