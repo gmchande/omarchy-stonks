@@ -146,13 +146,16 @@ Stonks shows a US stock's night once Robinhood's prices hold a trade of it
 from 20:00 to 04:00, tonight or the night before. For such a stock, once
 tonight has traded, the chart brightens the session trading now, such as
 tonight or the pre-market. Each row shows the same price, move and chart in
-small, with "Overnight" after its name while the list's header keeps naming
-the day. Where Yahoo has no prices for half an hour or more of the
-pre-market or after hours, the chart draws Robinhood's trades there, never
-in place of Yahoo's.
+small. While rows in the list count tonight's moves, the list's header says
+OVERNIGHT, rows trading tonight show only their name, and rows still on
+their day name that day after their name (such as "Mon"). A list with no
+stock trading tonight keeps its day. Where Yahoo has no prices for half an
+hour or more of the pre-market or after hours, the chart draws Robinhood's
+trades there, never in place of Yahoo's.
 
 A price says "As of" and its time when it's more than two minutes behind
-while its market trades, or saved from before and not yet refreshed.
+while its market trades, saved from before and not yet refreshed, or dimmed
+at night because its last trade is more than two minutes old.
 
 ## Your lists
 
@@ -313,9 +316,10 @@ again.
   Mexico 20, while Nasdaq, NYSE, Toronto and crypto came within a minute.
   [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html) lists the rest.
   An overnight price is Robinhood's last trade, which Stonks asks for
-  every minute. It dims once that trade is more than two minutes old, as a
-  thinly traded stock's often is at night. By day, a thinly traded stock
-  says "As of" when it last traded more than two minutes ago.
+  every minute. Once that trade is more than two minutes old, as a thinly
+  traded stock's often is at night, it dims and the panel says "As of" and
+  its time beside the symbol. By day, a thinly traded stock says "As of" when
+  it last traded more than two minutes ago.
 - **A price looks wrong.** Check the currency, since Stonks never converts.
   PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
   £35.80. For a US stock, the large price may be a trade after the close.

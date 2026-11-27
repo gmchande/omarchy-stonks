@@ -69,8 +69,6 @@ Rectangle {
   readonly property var geometry: history ? History.historyGeometry(history) : shownDay ? Chart.chartGeometry(shownDay, calendars) : null
   readonly property real scrubX: !scrubT ? -1 : history ? History.historyFraction(history, scrubT)
     : shownDay ? Chart.fractionAtTime(shownDay, scrubT) : -1
-  // An old night's price and move dim, as the panel's do.
-  readonly property bool newestOld: Figures.newestStale(view ? view.newest : null, now)
 
   function toneColor(tone) {
     return tone === "up" ? upColor : tone === "down" ? downColor : look.dim
@@ -176,7 +174,9 @@ Rectangle {
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
-    color: root.newestOld ? root.look.dim : root.foreground
+    // A screenshot keeps its price and move in full colour: its footer gives
+    // when the price is from.
+    color: root.foreground
     font.family: root.fontFamily
     font.pixelSize: Math.round(240 * root.priceScale) * root.px
     font.bold: true
@@ -190,7 +190,7 @@ Rectangle {
     text: root.retro ? root.priceText : ""
     cell: root.cell
     gap: root.px
-    color: root.newestOld ? root.look.dim : root.foreground
+    color: root.foreground
     ghostColor: root.look.ghost
   }
   // Set like a unit, dim at the ticker's size: a price in pence says "PENCE".
@@ -210,7 +210,7 @@ Rectangle {
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
     text: Format.lookSigns(root.lines.move, root.retro)
-    color: root.newestOld ? root.look.dim : root.toneColor(root.view ? root.view.tone : "flat")
+    color: root.toneColor(root.view ? root.view.tone : "flat")
     font.family: root.fontFamily
     font.pixelSize: 64 * root.u
     font.bold: true
@@ -266,7 +266,7 @@ Rectangle {
     Caption { id: captionLabel; text: root.lines.caption.label }
     Figure {
       text: Format.lookSigns(root.lines.caption.changeText, root.retro)
-      color: root.newestOld ? root.look.dim : root.toneColor(root.lines.caption.tone)
+      color: root.toneColor(root.lines.caption.tone)
     }
   }
 

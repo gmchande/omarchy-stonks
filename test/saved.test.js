@@ -919,9 +919,10 @@ test("a listing's prices take the decimals they need, decided once from its head
   // hint of 5 decimals makes it 0.00001, twice its price.
   const shibMeta = fixture("moments/listings-2026-10-08-1054/shib-usd.json").chart.result[0].meta
   expect([shibMeta.priceHint, M.answerTick(shibMeta, [], cents)]).toEqual([5, 1e-7])
-  // A move in money keeps cents where the price has none, and a coin's
-  // decimals where it has more; its colour agrees with what is drawn.
-  expect(M.signedMoney(-2105.766, 0)).toBe("\u22122,105.77")
+  // A move in money keeps the price's decimals: none where the price shows
+  // none, and a coin's decimals where it has more; its colour agrees with what
+  // is drawn.
+  expect(M.signedMoney(-2105.766, 0)).toBe("\u22122,106")
   expect(M.changeText({ abs: -2e-8, pct: -0.37 }, "abs", 9)).toBe("\u22120.000000020")
   expect(M.changeTone({ abs: -2e-8, pct: -0.37 }, "abs", 9)).toBe("down")
   expect(M.changeTone({ abs: -2e-8, pct: -0.37 }, "abs")).toBe("flat")
@@ -2571,16 +2572,19 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const day = M.lineDay("JNJ", at.quotes.JNJ, at.nights, calendars)
     const rowLine = M.chartGeometry(day, calendars)
     const row = M.listRow(at.quotes.JNJ, "pct", at.newest.JNJ)
-    expect([day.points.at(-1).p > M.regularClose(day), row.changeText, M.rowNote(row), M.money(rowLine.lo + (1 - rowLine.baselineY) * (rowLine.hi - rowLine.lo)),
-      M.asideAt(rowLine, rowLine.points.at(-1).x), M.asideAt(rowLine, 0)]).toEqual([true, "+0.11%", "Overnight", "263.81", false, true])
+    const gspcRow = M.listRow(at.quotes["^GSPC"], "pct", at.newest["^GSPC"] || null)
+    expect([day.points.at(-1).p > M.regularClose(day), row.changeText, M.rowNote(at.quotes.JNJ, row, true, at.now),
+      M.rowNote(at.quotes["^GSPC"], gspcRow, true, at.now), M.money(rowLine.lo + (1 - rowLine.baselineY) * (rowLine.hi - rowLine.lo)),
+      M.asideAt(rowLine, rowLine.points.at(-1).x), M.asideAt(rowLine, 0)]).toEqual([true, "+0.11%", "", "Fri", "263.81", false, true])
     expect(at.pill("JNJ")).toBe("264.11 +0.11% bull | overnight as of 23:25 · Fri \u22121.42%")
   }
-  // The list's header names the day the rows measure: Friday all weekend,
-  // Sunday night too, today until midnight, then Monday until the new day's
-  // first trade.
+  // The list's header says OVERNIGHT while rows count tonight's moves, and
+  // names the day at other hours: Friday all weekend, today by day and from
+  // the pre-market's first trade. A list holding no stock trading tonight
+  // keeps its day at night too.
   const header = set => { const at = topsAt(set); return rowsDay(at.symbols, at.quotes, at.newest, at.now) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
-    .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
+    .toEqual(["FRI", "OVERNIGHT", "TODAY", "OVERNIGHT", "OVERNIGHT", "TODAY"])
   // A list with no US stock names its own shared day, or stays blank when
   // empty or when its rows disagree.
   {
@@ -2591,6 +2595,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(rowsDay([], sun.quotes, sun.newest, sun.now)).toBe("")
     const sunNight = topsAt("watch-2026-10-25-2335")
     expect(rowsDay(["SHEL.L", "7203.T"], sunNight.quotes, sunNight.newest, sunNight.now)).toBe("")
+    expect(rowsDay(["BRK-A", "^GSPC"], sunNight.quotes, sunNight.newest, sunNight.now)).toBe("FRI")
   }
   // A row Yahoo sent no time for measures no day it can name: the rest
   // still name theirs.
@@ -2677,19 +2682,19 @@ test("in every phase, a stock that has traded since its close shows that newest 
     // is still the last day's close and its move: Berkshire at 04:05 Monday,
     // Friday's close counted from Thursday's, and Toyota at 09:05 Monday in
     // Tokyo, before Yahoo's first bar, Friday's close counted from Thursday's.
-    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905.00 USD"])
+    expect(said(under(topsAt("watch-2026-10-26-0405"), "BRK-A"))).toEqual(["THU CLOSE 820,500", "FRI \u22126,905 USD"])
     expect(said(under(topsAt("watch-2026-10-25-2005"), "7203.T"))).toEqual(["THU CLOSE 3,084.00", "FRI +21.00 JPY"])
     // A coin's day is its last 24 hours: the price 24 hours ago, and the
     // move in dollars under the 24H its row says.
     const coin = savedDay("coin-2026-10-25-2005", "btc-usd")
     expect(said(M.heroLines(coin, M.rowModel(coin, 0, "pct"), null, at("2026-10-25", "20:05"), null, calendars, "pct", false)))
-      .toEqual(["24H AGO 80,711", "24H \u2212795.72 USD"])
+      .toEqual(["24H AGO 80,711", "24H \u2212796 USD"])
   }
   // Wherever those lines show, at every saved watch moment: the close plus
-  // the move under the change is the price on top, to its last digit where
-  // the price shows cents, and a price from a past day never says TODAY.
+  // the move under the change is the price on top, to its last digit, and a
+  // price from a past day never says TODAY.
   const number = text => Number(text.split(" ")[0].replace(/,/g, "").replace("\u2212", "-"))
-  const addsUp = (close, move, price, digits) => Math.abs(number(close) + number(move) - number(price)) < (digits >= 2 ? 1e-9 : 2 * Math.pow(10, -digits))
+  const addsUp = (close, move, price) => Math.abs(number(close) + number(move) - number(price)) < 1e-9
   {
     const off = []
     const sets = readdirSync(join(fixtures, "moments")).filter(set => set.startsWith("watch-") && existsSync(join(fixtures, "moments", set, "times.txt")))
@@ -2783,12 +2788,17 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // Monday 04:20 JNJ's pre-market price, up on Friday's close though Friday fell, counts up.
   const early = topsAt("watch-2026-10-26-0420")
   expect(M.listBreadth(["JNJ"], early.quotes, null, 0, "pct", early.newest)).toEqual({ up: 1, flat: 0, down: 0, none: 0 })
-  // A night's price dims once its trade is more than two minutes old, as a
-  // day's says "As of".
+  // A night's price dims once its trade is more than two minutes old, and
+  // says "AS OF" with its time beside the symbol, as a late day price does.
   const nbis = sunday.newest.NBIS
   expect([M.newestStale(nbis, nbis.t + 120), M.newestStale(nbis, nbis.t + 121)]).toEqual([false, true])
+  expect([M.staleNightNote(sunday.quotes.NBIS, nbis, nbis.t + 120, calendars),
+    M.staleNightNote(sunday.quotes.NBIS, nbis, nbis.t + 121, calendars),
+    M.staleNightNote(sunday.quotes.NBIS, nbis, at("2026-10-26", "00:05"), calendars)])
+    .toEqual(["", "AS OF 23:30", "AS OF SUN 23:30"])
   // An after-hours price never dims.
-  expect(M.newestStale(sunday.newest.PSIX, sunday.newest.PSIX.t + DAY)).toBe(false)
+  expect([M.newestStale(sunday.newest.PSIX, sunday.newest.PSIX.t + DAY),
+    M.staleNightNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.newest.PSIX.t + DAY, calendars)]).toEqual([false, ""])
   // The pill's hover gives a night's price's time once it dims, and names
   // a session outside the regular one, with its time only where a row
   // says "As of": a price saved before a refresh, a week on with its date,
@@ -2862,10 +2872,16 @@ test("in every phase, a stock that has traded since its close shows that newest 
         if (!(s in nightsMap) && M.hasOvernight(quotes[s], calendars))
           nightsMap[s] = { status: "ok", bars: [], from: null, through: null, at: 0 }
       }
+      const allNewest = {}
+      for (const s of symbols) {
+        const rn = M.newestTradeOf(s, quotes[s], nightsMap, calendars)
+        if (rn) allNewest[s] = rn
+      }
+      const overnightList = !!M.rowsSharedDay(symbols, quotes, allNewest, calendars)?.overnight
       for (const s of symbols) {
         const view = M.viewChart(s, "1D", quotes, {}, {}, nightsMap, calendars, now)
         const panelNewest = M.newestTrade(quotes[s], view.latest, calendars, view.day)
-        const rowNewest = M.newestTradeOf(s, quotes[s], nightsMap, calendars)
+        const rowNewest = allNewest[s] || null
         if (panelNewest && panelNewest.joined) nights++
         for (const mode of ["pct", "abs", "open"]) {
           const panel = M.rowModel(quotes[s], 0, mode, panelNewest)
@@ -2874,9 +2890,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
             off.push(`${set} ${s} (${mode}): row ${row.priceText} ${row.changeText} (close ${row.close}), panel ${panel.priceText} ${panel.changeText} (close ${panel.close})`)
         }
         const rowPct = M.listRow(quotes[s], "pct", rowNewest)
-        const wantNote = panelNewest && panelNewest.joined && panelNewest.closed ? "Overnight" : ""
-        if (M.rowNote(rowPct) !== wantNote)
-          off.push(`${set} ${s} (note): ${M.rowNote(rowPct)}, not ${wantNote}`)
+        const gotNote = M.rowNote(quotes[s], rowPct, overnightList, now)
+        if (!overnightList || (panelNewest && panelNewest.joined)) {
+          if (gotNote !== "") off.push(`${set} ${s} (note): ${gotNote}, not ""`)
+        } else if (now && !quotes[s].untraded && gotNote === "") {
+          off.push(`${set} ${s} (note): missing day note in overnight list`)
+        }
         const rowGeom = M.chartGeometry(M.lineDay(s, quotes[s], nightsMap, calendars, now), calendars)
         const panelGeom = M.chartGeometry(view.day, calendars)
         if (rowGeom.baselineY !== panelGeom.baselineY || JSON.stringify(rowGeom.aside) !== JSON.stringify(panelGeom.aside))
@@ -4399,9 +4418,21 @@ test("a screenshot's foot says when its price is from, a close as the close, and
   const Share = load("Share.js")
   const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, scrubT: 0, calendars })
   expect(words.foot).toBe("SAT 12 SEP 2026 · 18:32 UTC")
+  // A chart spanning days names the weekday on both ends; one inside a single
+  // day names neither.
+  expect([words.start, words.end]).toEqual(["00:00", "18:32"])
   expect([Share.subject("BTC-USD", "1D", words.said), Share.fileSymbol("BTC-USD")]).toEqual(["BTC-USD at 18:32 UTC", "btc-usd"])
   const scrubbed = (day, quote, t) => Share.words({ quote, day, history: null, scrubT: t, calendars }).foot
   const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
+  const spyWords = Share.words({ quote: spy, day: spy, history: null, scrubT: 0, calendars })
+  expect([spyWords.start, spyWords.end]).toEqual(["04:00", "19:59"])
+  const sunNight = topsAt("watch-2026-10-25-2335")
+  const sunWords = Share.words({ quote: sunNight.quotes.NBIS, day: dayAt("watch-2026-10-25-2335", "nbis").day, history: null,
+    newest: sunNight.newest.NBIS, scrubT: 0, calendars })
+  expect([sunWords.start, sunWords.end]).toEqual(["FRI 04:00", "SUN 23:30"])
+  const coinDay = M.dayChart(M.parseChart(fixture("moments/coin-2026-10-25-2005/btc-usd.json"), cents), null, calendars).day
+  const coinWords = Share.words({ quote: coinDay, day: coinDay, history: null, scrubT: 0, calendars })
+  expect([coinWords.start, coinWords.end]).toEqual(["SUN 00:05", "MON 00:05"])
   expect(["07:30", "12:00", "18:10"].map(clock => scrubbed(spy, spy, at("2026-09-11", clock))))
     .toEqual(["FRI 11 SEP 2026 · 07:30 EDT", "FRI 11 SEP 2026 · 12:00 EDT", "FRI 11 SEP 2026 · 18:10 EDT"])
   const night = dayAt("night", "nest")

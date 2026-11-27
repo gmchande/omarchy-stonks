@@ -166,15 +166,14 @@ function dayTitles() {
   return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }))
 }
 
-// The day the rows measure, "TODAY", "FRI", "8 SEP", or "24H" for coins alone,
-// worked out in two steps, so the clock reads only the second: the day the
-// rows share, which changes only with their prices, and its name, which
-// changes only at the exchange's midnight. Any list holding US stocks keeps
-// the US rows' rule (their shared day, or "TODAY" where they disagree or none
-// has a time). A list with no US stock takes the day its own rows share,
-// "24H" for rolling coins alone, and blank where they disagree or none names
-// one. A row whose move is tonight's says so itself (`rowNote`), so the
-// header keeps naming the day.
+// The day the rows measure, "TODAY", "FRI", "8 SEP", "24H" for coins alone,
+// or "OVERNIGHT" while any row on show counts tonight's move, worked out in
+// two steps, so the clock reads only the second: the day the rows share,
+// which changes only with their prices, and its name, which changes only at
+// the exchange's midnight. Any list holding US stocks keeps the US rows' rule
+// (their shared day, or "TODAY" where they disagree or none has a time). A
+// list with no US stock takes the day its own rows share, "24H" for rolling
+// coins alone, and blank where they disagree or none names one.
 function rowsSharedDay(symbols, quotes, newest, calendars) {
   var usShared = null
   var usMixed = false
@@ -185,10 +184,12 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q) continue
+    var nt = newest ? newest[symbols[i]] : null
+    if (nt && nt.joined && nt.closed) return { overnight: true }
     if (Overnight.hasOvernight(q, calendars)) {
       hasUs = true
       var usHead = Quote.headlineQuote(q)
-      var usT = newest && newest[symbols[i]] ? newest[symbols[i]].dayStart : usHead ? usHead.t : null
+      var usT = nt ? nt.dayStart : usHead ? usHead.t : null
       if (usT === null) continue
       var usDay = { quote: q, t: usT, day: exchangeDay(q, usT) }
       if (usShared && usShared.day !== usDay.day) usMixed = true
@@ -222,6 +223,7 @@ function rowsSharedDay(symbols, quotes, newest, calendars) {
 
 function rowsDayName(shared, now) {
   if (!shared) return ""
+  if (shared.overnight) return "OVERNIGHT"
   if (shared.today) return "TODAY"
   if (shared.rolling) return "24H"
   var off = shared.quote.gmtoffset || 0
@@ -297,11 +299,19 @@ function listRow(quote, mode, newest, line, scrubT) {
   return scrubbed ? rowModel(scrubbed, scrubT, mode, newest) : rowModel(quote, 0, mode, newest)
 }
 
-// A row's note after its name: "Overnight" while its move is tonight's,
-// counted from the close just gone, since the list's header keeps naming
-// the day (`rowsSharedDay`).
-function rowNote(view) {
-  return view && view.newest && view.newest.joined && view.newest.closed ? Market.phaseLabel("overnight") : ""
+// A row's note after its name: while the list's header says OVERNIGHT
+// (`overnightList`), rows trading tonight say only their name and a row still
+// on its day names that day ("Today", "Mon", "8 Sep", or "24h" for a coin).
+// Nothing at other hours.
+function rowNote(quote, view, overnightList, now) {
+  if (!overnightList || !quote || !view) return ""
+  if (view.newest && view.newest.joined) return ""
+  if (quote.untraded) return ""
+  if (quote.rolling) return "24h"
+  var t = view.newest ? view.newest.dayStart : view.asOf
+  if (!Format.isFiniteNumber(t) || !Format.isFiniteNumber(now) || now <= 0) return ""
+  var today = exchangeDay(quote, now)
+  return today === null ? "" : Format.sentenceCase(moveDay(quote, t, today))
 }
 
 // The line a row reads a scrub at `t` from: its own, once it has a trade at
@@ -579,6 +589,10 @@ function asOfNote(quote, t, now, calendars) {
 
 function newestStale(newest, now) {
   return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
+}
+
+function staleNightNote(quote, newest, now, calendars) {
+  return quote && newestStale(newest, now) ? asOfNote(quote, newest.t, now, calendars).toUpperCase() : ""
 }
 
 // The bull or bear for a stock's day move, shared by the header and the pill.

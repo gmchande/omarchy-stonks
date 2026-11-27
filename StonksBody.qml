@@ -1417,6 +1417,8 @@ Item {
     scrubShown: root.watchlistScrubShown
     changeMode: root.changeMode
     now: root.now
+    minuteNow: root.minuteNow
+    overnightList: !!root.rowsShared && !!root.rowsShared.overnight
     owed: root.owed
     asking: root.asking
     nightFailed: root.nightFailed

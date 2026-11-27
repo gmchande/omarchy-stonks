@@ -137,9 +137,10 @@ function words(o) {
     var axis = Chart.chartSpan(pictureDay(o.day))
     var first = local(o.day, axis.start, o.calendars)
     var last = local(o.day, pts[pts.length - 1].t, o.calendars)
-    out.start = first.clock
-    // A chart that runs into the next morning names the weekday it ends on.
-    out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
+    // A chart that spans days names the weekday on both ends.
+    var acrossDays = last.y !== first.y || last.m !== first.m || last.d !== first.d
+    out.start = (acrossDays ? Format.WEEKDAYS[first.weekday].toUpperCase() + " " : "") + first.clock
+    out.end = (acrossDays ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
   }
   return out
 }

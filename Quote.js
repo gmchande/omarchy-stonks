@@ -800,7 +800,7 @@ function change(quote, priceNow, mode, digits) {
   var base = mode === "open" ? quote.dayOpen : quote.prevClose
   if (!Format.isFiniteNumber(priceNow) || !Format.isFiniteNumber(base)) return { abs: null, pct: null, up: true }
   var abs = priceNow - base
-  var shown = Format.isFiniteNumber(digits) && digits >= 2 ? Number(Format.fixed(priceNow, digits)) - Number(Format.fixed(base, digits)) : abs
+  var shown = Format.isFiniteNumber(digits) && digits >= 0 ? Number(Format.fixed(priceNow, digits)) - Number(Format.fixed(base, digits)) : abs
   return { abs: shown, pct: base ? (abs / base) * 100 : 0, up: abs >= 0 }
 }
 
