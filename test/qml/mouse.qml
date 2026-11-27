@@ -974,16 +974,15 @@ Harness {
       // normal exchange + currency never elide when the text size grows.
       var heroMeta = at("listingMeta")
       var heroItem = heroMeta ? heroMeta.parent : null
-      var savedBaseSize = Style.fontBaseSize
-      Style.fontBaseSize = 20
-      var bigMetaWhole = within(1500, function() { return !!heroMeta && heroMeta.text !== "" && !heroMeta.truncated })
-      Style.fontBaseSize = savedBaseSize
-      within(1500, function() { return Style.fontBaseSize === savedBaseSize })
-
       var edgeSym = body.chartSymbol
       var edgeOrig = service.feeds.quotes.quotes
       var edgeQ = edgeOrig[edgeSym]
       var edgeMode = service.changeMode
+      var edgeIdx = body.watchlist.displayedSymbols.indexOf(edgeSym)
+      if (edgeIdx >= 0) {
+        body.watchlist.contentY = Math.max(0, edgeIdx * body.watchlist.rowPitch)
+        within(1500, function() { return body.watchlist.wholeInSight(edgeIdx, body.watchlist.contentY) })
+      }
       service.persist({ changeMode: "abs" })
       within(1500, function() { return service.changeMode === "abs" })
       var wideQ = Object.assign({}, edgeOrig)
@@ -1007,13 +1006,18 @@ Harness {
       var changeItem = rowTexts.filter(function(t) { return /0\.00000000261/.test(t.text) })[0]
       var changeFits = !!changeItem && changeItem.paintedWidth <= changeItem.width + 0.5
       var metaFits = !!heroMeta && !!heroItem && heroMeta.x + heroMeta.paintedWidth <= heroItem.width + 0.5 && heroMeta.text.indexOf(" · ") !== 0
-      var edgeDiag = [bigMetaWhole, wideReady, changeFits, changeItem ? changeItem.paintedWidth.toFixed(1) + "/" + changeItem.width.toFixed(1) : "no change",
+      var edgeDiag = [wideReady, changeFits, changeItem ? changeItem.paintedWidth.toFixed(1) + "/" + changeItem.width.toFixed(1) : "no change",
         metaFits, heroMeta ? (heroMeta.x + heroMeta.paintedWidth).toFixed(1) + "/" + (heroItem ? heroItem.width.toFixed(1) : 0) + " '" + heroMeta.text + "'" : "no meta"].join(" | ")
       service.feeds.quotes.quotes = edgeOrig
       service.persist({ changeMode: edgeMode })
       within(2000, function() { return service.changeMode === edgeMode })
+      var savedBaseSize = Style.fontBaseSize
+      Style.fontBaseSize = 20
+      var bigMetaWhole = within(1500, function() { return !!heroMeta && heroMeta.text !== "" && !heroMeta.truncated })
+      Style.fontBaseSize = savedBaseSize
+      within(1500, function() { return Style.fontBaseSize === savedBaseSize })
       harness.check("wide row figures stay within priceWidth and Hero exchange names stay whole at bigger text sizes while long ones fit inside Hero without a leading dot",
-        bigMetaWhole && wideReady && changeFits && metaFits, edgeDiag)
+        bigMetaWhole && wideReady && changeFits && metaFits, "bigMeta:" + bigMetaWhole + " | " + edgeDiag)
 
       // Fault 9: in SymbolLists with many lists, submitting an invalid New list…
       // name scrolls the error into sight, scroll stays locked while naming,
