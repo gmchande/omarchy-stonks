@@ -552,6 +552,19 @@ Harness {
         blipFailed === 0 && /^! Refresh failed · overnight /.test(long5Down) && !/^!/.test(shopDown) && !/^!/.test(long5Back),
         "blipFailed=" + blipFailed + " | down=" + long5Down + " | SHOP.TO=" + shopDown + " | back=" + long5Back)
 
+      // InfoTable's measured-width cache stays bounded across long live sessions
+      // and never collides with Object.prototype keys.
+      var periodLine = harness.find(app.body, "periodLine")
+      var infoTable = periodLine ? periodLine.parent : null
+      var protoW = infoTable ? infoTable.valueWidth("toString") : -1
+      if (infoTable) {
+        for (var wi = 0; wi < 600; wi++) infoTable.valueWidth("1," + (100 + wi) + ".00")
+      }
+      var cachedWidths = infoTable ? Object.keys(infoTable.widthCache.values).length : -1
+      harness.check("InfoTable width cache stays bounded and prototype-safe over long sessions",
+        !!infoTable && typeof protoW === "number" && protoW > 0 && cachedWidths > 0 && cachedWidths <= 512,
+        "protoW=" + typeof protoW + ":" + protoW + " | cachedWidths=" + cachedWidths)
+
       app.close()
       harness.finish()
     }

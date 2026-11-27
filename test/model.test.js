@@ -2498,6 +2498,12 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     // 1.1.0 read and kept such a pre-market.
     { name: "a saved quote whose pre-market spans centuries", call: kept,
       answer: saved(q => { q.session.pre = { start: T0 - 3600, end: 1e12 } }) },
+    { name: "a saved quote whose points pose as an array", call: kept,
+      answer: saved(q => { q.points = POSING }) },
+    { name: "a saved quote whose clocks pose as an array", call: kept,
+      answer: saved(q => { q.clocks = POSING }) },
+    { name: "a saved quote whose day before has points posing as an array", call: kept,
+      answer: saved(q => { q.before = { session: q.session, points: POSING } }) },
     // A day with no session throws where the chart, or a refresh, reads it,
     // and every refresh waits on that answer until Stonks restarts.
     { name: "a day with no session", call: read,

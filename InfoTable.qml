@@ -42,13 +42,20 @@ Item {
 
   // Cached per (font.family, font.pixelSize) and memoized list-wide totals by
   // `listInfo.key` so binding settles never re-measure every stock's shapes.
-  readonly property var widthCache: ({ fontKey: "", values: {}, factLabels: {}, listKey: "", listGap: 0, listPrice: 0, listFacts: [] })
+  // Bounded so long live sessions never retain arbitrary price strings.
+  readonly property var widthCache: ({
+    fontKey: "", values: Object.create(null), valueCount: 0,
+    factLabels: Object.create(null), factLabelCount: 0,
+    listKey: "", listGap: 0, listPrice: 0, listFacts: []
+  })
   function ensureFontCache(font) {
     var key = font.family + "|" + font.pixelSize
     if (widthCache.fontKey === key) return
     widthCache.fontKey = key
-    widthCache.values = {}
-    widthCache.factLabels = {}
+    widthCache.values = Object.create(null)
+    widthCache.valueCount = 0
+    widthCache.factLabels = Object.create(null)
+    widthCache.factLabelCount = 0
     widthCache.listKey = ""
     widthCache.listPrice = 0
     widthCache.listFacts = []
@@ -57,8 +64,13 @@ Item {
     if (!text) return 0
     var v = widthCache.values[text]
     if (v !== undefined) return v
+    if (widthCache.valueCount >= 512) {
+      widthCache.values = Object.create(null)
+      widthCache.valueCount = 0
+    }
     v = Math.ceil(metrics.advanceWidth(text))
     widthCache.values[text] = v
+    widthCache.valueCount++
     return v
   }
   function labelWidth(text) { return text ? valueWidth(text) + Math.ceil(text.length * root.labelFont.letterSpacing) : 0 }
@@ -66,8 +78,13 @@ Item {
     if (!label) return 0
     var v = widthCache.factLabels[label]
     if (v !== undefined) return v
+    if (widthCache.factLabelCount >= 64) {
+      widthCache.factLabels = Object.create(null)
+      widthCache.factLabelCount = 0
+    }
     v = Math.ceil(factMetrics.advanceWidth(factLabel(label)))
     widthCache.factLabels[label] = v
+    widthCache.factLabelCount++
     return v
   }
   function factWidth(f) {

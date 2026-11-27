@@ -671,11 +671,17 @@ function currentPeriods(current) {
 // holds one, as `parseChart` reads an answer.
 function keptQuotes(saved) {
   var out = {}
+  var maxClocks = 3 * MOST_DAYS * MOST_PERIODS
+  var hasLists = function(day) {
+    return !!day && Array.isArray(day.points) && day.points.length <= MOST_BARS
+      && (!day.clocks || (Array.isArray(day.clocks) && day.clocks.length <= maxClocks))
+  }
   for (var symbol in saved) {
     var quote = saved[symbol] && saved[symbol].quote
     var days = quote && quote.session ? [quote.session, quote.next] : []
     var before = quote && quote.before
-    if (days.length && isPeriod(quote.session.regular) && (!before || (!!before.session && isPeriod(before.session.regular)))
+    if (days.length && hasLists(quote) && isPeriod(quote.session.regular)
+      && (!before || (hasLists(before) && !!before.session && isPeriod(before.session.regular)))
       && days.every(function(day) { return !day || ((!day.pre || isPeriod(day.pre)) && (!day.post || isPeriod(day.post))) }))
       out[symbol] = saved[symbol]
   }
