@@ -166,7 +166,7 @@ function peText(value) {
 // day's high and low, compare at the listing's decimals, so float noise never
 // passes a mark. The cap and P/E slots stay while unknown, so the line keeps
 // its shape.
-function yearLine(quote, fundamentals, yearEnds, rates, trades) {
+function yearLine(quote, fundamentals, yearEnds, rates, trades, newest) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -194,7 +194,8 @@ function yearLine(quote, fundamentals, yearEnds, rates, trades) {
       if (reads(trade.p) < reads(low)) { low = trade.p; atLow = true }
     })
   }
-  var line = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
+  var current = newest && Format.isFiniteNumber(newest.p) ? newest.p : (head ? head.price : null)
+  var line = Format.infoRange(low, high, current, q.priceDigits)
   if (atHigh) line.highTone = "up"
   if (atLow) line.lowTone = "down"
   var facts = []

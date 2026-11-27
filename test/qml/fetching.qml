@@ -523,6 +523,57 @@ Harness {
         [pausedLong, offline, tried, service.now - pressedAt, gate.pause].join(" | "))
       closeWindow()
 
+      // Fault 6: scrubbing a delayed/aged stock hides its resting "As of"
+      // subtitle on the row while scrubbed, and restores it when scrub ends.
+      startAt(at(harness.wed7, 15, 10))()
+      openWindow()
+      var agedRow = null
+      var rowAged = within(3000, function() {
+        agedRow = body.watchlist.rowItem("NEST")
+        return !!agedRow && !!agedRow.day && /^As of /.test(agedRow.detail)
+      })
+      var scrubTarget = harness.find(body, "heroChart")
+      mouseMove(scrubTarget, scrubTarget.width / 2, scrubTarget.height / 2)
+      var scrubbedClean = within(2000, function() {
+        return body.scrubT !== 0 && agedRow.scrubX >= 0 && !/^As of /.test(agedRow.detail) && agedRow.detail === agedRow.view.name
+      })
+      mouseClick(scrubTarget, scrubTarget.width / 2, scrubTarget.height / 2)
+      var restoredAged = within(2000, function() {
+        return body.scrubT === 0 && agedRow.scrubX < 0 && /^As of /.test(agedRow.detail)
+      })
+      harness.check("scrubbing an aged stock hides its resting As of subtitle on the row until scrub ends",
+        rowAged && scrubbedClean && restoredAged,
+        [rowAged, scrubbedClean, restoredAged, agedRow ? agedRow.detail : "no row", agedRow ? agedRow.scrubX : -1].join(" | "))
+      closeWindow()
+
+      // Fault 17: at 20:00:00 NY before the first overnight trade, Service.keptDay
+      // and BarWidget.lineDay update when tonight and litFrom flip even though
+      // axis.start and axis.end stay 04:00-20:00.
+      var flipSettings = pill.settings
+      pill.settings = ({ id: "grvc.stonks", barStyle: "sparkline" })
+      startAt(at(harness.wed7, 19, 55))()
+      openWindow()
+      var pre20 = within(3000, function() {
+        return !!service.view.chart && !!service.view.chart.day && !!pill.lineDay
+          && service.view.chart.day.tonight === null && pill.lineDay.tonight === null
+      })
+      harness.clockTo(at(harness.wed7, 20, 0))
+      answerScreens()
+      var at20 = within(3000, function() {
+        return !!service.view.chart && !!service.view.chart.day && !!pill.lineDay
+          && service.view.chart.day.tonight === at(harness.wed7, 20, 0)
+          && pill.lineDay.tonight === at(harness.wed7, 20, 0)
+          && service.view.chart.day.litFrom === null && pill.lineDay.litFrom === null
+      })
+      var pillAt20 = pill.lineDay ? pill.lineDay.tonight + "/" + pill.lineDay.litFrom : "no pill"
+      pill.settings = flipSettings
+      harness.check("at 20:00 NY before any night trade, keptDay and pill.lineDay update when tonight and litFrom flip",
+        pre20 && at20,
+        [pre20, at20, service.view.chart && service.view.chart.day ? service.view.chart.day.tonight + "/" + service.view.chart.day.litFrom : "no day",
+          pillAt20].join(" | "))
+      closeWindow()
+      settle()
+
       // Midnight, the window left open on a workspace no screen shows: it
       // asks what a closed one asks, the pill's stock every 15 minutes, not
       // Tokyo though it trades, and Robinhood every 5 minutes through the
@@ -623,6 +674,18 @@ Harness {
 
       // Without a 1 Hz open clock, that overnight trade still wakes the clock
       // on the exact second it turns stale (01:21:31, 2 minutes + 1 s on).
+      // While stale, the arrow dims with the move; in "open" mode at night,
+      // the pill sparkline stays colored by the day's move against the close.
+      var findPillItem = function(rootItem, match) {
+        if (!rootItem) return null
+        if (match(rootItem)) return rootItem
+        var kids = rootItem.children || []
+        for (var i = 0; i < kids.length; i++) {
+          var hit = findPillItem(kids[i], match)
+          if (hit) return hit
+        }
+        return null
+      }
       openWindow()
       harness.clockTo(at(harness.wed7 + 86400, 1, 21) + 29)
       var staleWake = service.clockInterval
@@ -637,11 +700,30 @@ Harness {
       mouseMove(pill, pill.width / 2, pill.height / 2)
       staleHover = harness.copiedHover
       mouseMove(pillWindow.contentItem, 1, 100)
+      var wasPillSettings = pill.settings
+      pill.settings = ({ id: "grvc.stonks", barStyle: "arrow" })
+      var arrowText = findPillItem(pill, function(item) { return item.text === "➜" })
+      var arrowDimmed = !!arrowText && Qt.colorEqual(arrowText.color, pill.dimColor)
+      pill.settings = ({ id: "grvc.stonks", barStyle: "sparkline" })
+      var wasMode = service.changeMode
+      service.persist({ changeMode: "open" })
+      var sparkItem = null
+      within(1500, function() {
+        sparkItem = findPillItem(pill, function(item) { return item.geometry !== undefined && (item.lineColor !== undefined || item.upColor !== undefined) })
+        return service.changeMode === "open" && !!sparkItem
+      })
+      var sparkColor = sparkItem ? (sparkItem.lineColor !== undefined ? sparkItem.lineColor : sparkItem.upColor) : "transparent"
+      var sparkColoredInOpen = !!sparkItem && !Qt.colorEqual(sparkColor, pill.dimColor)
+      service.persist({ changeMode: wasMode })
+      within(1500, function() { return service.changeMode === wasMode })
+      pill.settings = wasPillSettings
       closeWindow()
-      harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second",
+      harness.check("without a 1 Hz open clock, an overnight trade's stale turn wakes the clock on its exact second, dims the pill arrow, and keeps the pill sparkline colored in open mode",
         staleWake === 2005 && !freshOld && staleOld
-          && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%",
-        ["staleWake=" + staleWake, "old=" + freshOld + "->" + staleOld, "fresh=" + freshHover, "stale=" + staleHover].join(" | "))
+          && freshHover === "Overnight · Wed \u22125.82%" && staleHover === "Overnight as of 01:19 · Wed \u22125.82%"
+          && arrowDimmed && sparkColoredInOpen,
+        ["staleWake=" + staleWake, "old=" + freshOld + "->" + staleOld, "fresh=" + freshHover, "stale=" + staleHover,
+          "arrowDimmed=" + arrowDimmed, "sparkOpen=" + sparkColoredInOpen].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that

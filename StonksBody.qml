@@ -311,7 +311,7 @@ Item {
   // highs, on every range held for the stock, and for every stock in All, so
   // neither a range change nor another stock moves its rules. A range first
   // fetched with more digits than any held widens it once.
-  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
+  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay, featuredNewest) : null
   // The trades Stonks shows for the stock, beyond Yahoo's bars and figures:
   // the 1D chart's, tonight's too, and the newest. The ranges and the 52W
   // line take them in, so none reads under the day.
@@ -372,7 +372,7 @@ Item {
   property var listInfo: ({ key: "", factLists: [], ranges: [] })
   onListInfoNowChanged: if (listInfoNow.key !== listInfo.key) listInfo = listInfoNow
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
-    historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades) : null
+    historyShown && history.range === "1Y" ? rangeEnds : null, rates, shownTrades, featuredNewest) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
     function(t) { return Market.tradeClock(featuredQuote, t, calendars) }) : null
   // Said under the price: what a scrub's move counts from, the dashed line

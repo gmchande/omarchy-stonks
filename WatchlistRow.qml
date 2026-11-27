@@ -248,8 +248,8 @@ Rectangle {
   property var freshness: null
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
-  readonly property bool warns: Freshness.freshnessWarns(shownFreshness)
-  readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
+  readonly property bool warns: scrubX < 0 && Freshness.freshnessWarns(shownFreshness)
+  readonly property string freshnessNote: quote && scrubX < 0 ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   readonly property string rowNote: Figures.rowNote(view)
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : (view ? view.name : ""))

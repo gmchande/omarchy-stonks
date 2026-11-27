@@ -707,8 +707,9 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
   // Its volume is Yahoo's, already the last 24 hours, never its bars' sum.
   expect(coin.volume).toBe(raw.meta.regularMarketVolume)
   const row = M.rowModel(coin, 0, "pct")
-  expect([row.changeText, row.periodLabel, M.dayTitle(coin, M.exchangeDay(coin, coin.marketTime))])
-    .toEqual([M.pct((coin.price - ago.p) / ago.p * 100), "24H", "24H"])
+  expect([row.changeText, row.periodLabel, M.dayTitle(coin, M.exchangeDay(coin, coin.marketTime)),
+    rowsDay(["BTC-USD"], { "BTC-USD": coin }, {}, coin.marketTime)])
+    .toEqual([M.pct((coin.price - ago.p) / ago.p * 100), "24H", "24H", "24H"])
   const line = M.chartGeometry(coin)
   expect([M.dayBase(coin), line.points[0].x, line.points.at(-1).x, M.newestPoint(line)]).toEqual([ago.p, 0, 1, line.points.at(-1)])
   // A coin never closes: the line under its chart names the price 24 hours
@@ -1295,10 +1296,33 @@ test("on 1Y the 52-week line is the range's low and high", () => {
   const googQ = { ...goog.q, fiftyTwoWeekHigh: goog.q.dayHigh }
   expect(ends(M.yearLine(googQ, null, M.rangeEnds({ ...goog.h, bars: capped }, null, googQ)))).toBe("241.18–355.25+")
   // A trade Stonks shows past the chart's high, as tonight's, is the 1Y
-  // range's high and the 52-week line's, in the 52-week high's tone.
+  // range's high and the 52-week line's, in the 52-week high's tone, and both
+  // ticks sit on that newest trade.
   const night = [{ t: goog.q.marketTime + 4 * 3600, p: 410 }]
+  const nightNewest = { t: goog.q.marketTime + 4 * 3600, p: 410, phase: "overnight", stepped: true }
   const lifted = M.rangeEnds(goog.h, null, goog.q, night)
-  expect([ends(M.rangeLine(goog.h, lifted, goog.q)), ends(M.yearLine(goog.q, null, lifted, null, night))]).toEqual(["241.18–410.00", "241.18–410.00+"])
+  const hWithNight = M.withNewest(goog.h, nightNewest, null)
+  expect([ends(M.rangeLine(hWithNight, lifted, goog.q)), ends(M.yearLine(goog.q, null, lifted, null, night, nightNewest))])
+    .toEqual(["241.18–410.00", "241.18–410.00+"])
+  expect(M.yearLine(goog.q, null, lifted, null, night, nightNewest).range.price)
+    .toBe(M.rangeLine(hWithNight, lifted, goog.q).range.price)
+  // Off 1Y, 52W also puts its tick on the newest extended/overnight trade.
+  const afterNewest = { t: quote.marketTime + 4 * 3600, p: 345.03, phase: "post", stepped: false }
+  expect(M.yearLine(quote, null, null, rates, [afterNewest], afterNewest).range.price).toBe(345.03)
+  // On 1D during after-hours, dayLine puts its tick on the newest after-hours
+  // trade (matching the range it widened); during pre-market once figuresDay
+  // turns ahead of the held day, it uses the newest pre-market trade; at night
+  // while figures are still the closed day's, the tick stays on the close.
+  const afterDay = M.dayLine(quote, M.exchangeDay(quote, quote.marketTime), quote, afterNewest)
+  expect(afterDay.range.price).toBe(345.03)
+  const nightDay = dayAt("watch-2026-10-25-2335", "nbis")
+  const nbisNewest = M.newestTrade(nightDay.quote, nightDay.latest, calendars, nightDay.day)
+  expect(M.dayLine(nightDay.quote, M.exchangeDay(nightDay.quote, at("2026-10-25", "23:35")), nightDay.day, nbisNewest).range.price)
+    .toBe(nightDay.quote.price)
+  const preFiguresQuote = { ...nightDay.quote, figuresDay: at("2026-10-26", "04:00"), dayLow: null, dayHigh: null }
+  const preNewest = { t: at("2026-10-26", "07:00"), p: 162.5, phase: "pre", stepped: true }
+  expect(M.dayLine(preFiguresQuote, M.exchangeDay(preFiguresQuote, at("2026-10-26", "07:00")), nightDay.day, preNewest).range.price)
+    .toBe(162.5)
 })
 
 test("each symbol is asked for on its own market's clock", () => {
@@ -2476,18 +2500,29 @@ test("in every phase, a stock that has traded since its close shows that newest 
       M.asideAt(rowLine, rowLine.points.at(-1).x), M.asideAt(rowLine, 0)]).toEqual([true, "+0.11%", "Overnight", "263.81", false, true])
     expect(at.pill("JNJ")).toBe("264.11 +0.11% bull | overnight as of 23:25 · Fri \u22121.42%")
   }
-  // The list's header names the day the rows measure: Friday all weekend,
-  // Sunday night too, today until midnight, then Monday until the new day's
-  // first trade.
-  const header = set => { const at = topsAt(set); return rowsDay(at.symbols, at.quotes, at.newest, at.now) }
+  // The list's header names the day every row shares: Friday all weekend,
+  // Sunday night too, today until midnight, Monday past midnight, and blank
+  // once pre-market splits the list or markets disagree across time zones.
+  const usOnly = at => at.symbols.filter(s => M.hasOvernight(at.quotes[s], calendars))
+  const header = set => { const at = topsAt(set); return rowsDay(usOnly(at), at.quotes, at.newest, at.now) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
-    .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
+    .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", ""])
+  // A list that mixes markets across days or mixes stocks with 24H crypto stays blank;
+  // single-market non-US, index, and crypto lists name their own shared day.
+  {
+    const sun = topsAt("watch-2026-10-25-1000")
+    expect(rowsDay(sun.symbols, sun.quotes, sun.newest, sun.now)).toBe("")
+    expect(rowsDay(["SHEL.L"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
+    expect(rowsDay(["7203.T"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
+    expect(rowsDay(["^GSPC"], sun.quotes, sun.newest, sun.now)).toBe("FRI")
+    expect(rowsDay([], sun.quotes, sun.newest, sun.now)).toBe("")
+  }
   // A row Yahoo sent no time for measures no day it can name: the rest
   // still name theirs.
   {
     const at = topsAt("watch-2026-10-25-1000")
     const untimed = { ...at.quotes.NBIS, symbol: "UNTIMED", marketTime: undefined }
-    expect(rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now)).toBe("FRI")
+    expect(rowsDay(usOnly(at).concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now)).toBe("FRI")
   }
   // Rows that measure tomorrow, from tonight's trades, say TODAY.
   {
@@ -2777,6 +2812,15 @@ test("in every phase, a stock that has traded since its close shows that newest 
           const panelPct = M.rowModel(quotes[s], 0, "pct", panelNewest)
           if (quotedRow.priceText !== panelPct.priceText || quotedRow.changeText !== panelPct.changeText || quotedRow.close !== panelPct.close)
             off.push(`${set} ${s} (quoted off-screen): ${quotedRow.priceText} ${quotedRow.changeText} (close ${quotedRow.close}), panel ${panelPct.priceText} ${panelPct.changeText} (close ${panelPct.close})`)
+          // Clicking that stock while on a multi-day range (1Y) before
+          // overnight bars arrive uses lastTrades so hero, header and range
+          // endpoint agree with the row and pill.
+          const hist = { range: "1Y", baseline: quotes[s].prevClose, bars: [{ t: quotes[s].session.regular.start - 86400, c: quotes[s].prevClose, h: quotes[s].prevClose, l: quotes[s].prevClose }] }
+          const rangeView = M.viewChart(s, "1Y", quotes, {}, { [M.historyKey(s, "1Y")]: { status: "ok", history: hist } }, {}, calendars, now, lastTrades)
+          const rangeNewest = M.newestTrade(quotes[s], rangeView.latest, calendars, rangeView.day)
+          const rangeEnd = rangeView.history.bars[rangeView.history.bars.length - 1].c
+          if (!rangeView.tradesAtNight || !rangeNewest || rangeNewest.p !== lastTrades[s].trade.p || rangeEnd !== lastTrades[s].trade.p)
+            off.push(`${set} ${s} (quoted 1Y before bars): tradesAtNight=${rangeView.tradesAtNight} newest=${rangeNewest ? rangeNewest.p : null} end=${rangeEnd} want=${lastTrades[s].trade.p}`)
         }
       }
     }
@@ -3421,6 +3465,26 @@ test("at the open the chart holds the last session, with the new one's first tra
   // gives only Monday's volume, so none.
   const line = M.dayLine(brk, M.exchangeDay(brk, nineThirtyFive), brkDay)
   expect([line.title, line.facts[1].value]).toEqual(["FRI", ""])
+  // Since the open on a held day, scrubbing yesterday's after-hours, the
+  // night, or today's pre-market must not measure against today's future open;
+  // only a trade at or after today's open does.
+  const heldNight = M.heldDay({ ...brk, dayOpen: 750000 }, null, true)
+  const heldOpenDay = M.dayChart(heldNight, {
+    bars: [
+      { t: at("2026-10-23", "18:00"), p: 741000, s: "post" },
+      { t: at("2026-10-25", "22:00"), p: 742000, s: "overnight" },
+      { t: at("2026-10-26", "07:00"), p: 743000, s: "pre" }
+    ],
+    through: at("2026-10-26", "07:00")
+  }, calendars, nineThirtyFive).day
+  const monToday = M.exchangeDay(heldOpenDay, nineThirtyFive)
+  for (const t of [at("2026-10-23", "18:00"), at("2026-10-25", "22:00"), at("2026-10-26", "07:00")]) {
+    expect([t, M.rowModel(heldOpenDay, t, "open").changeLine, M.scrubLegend(heldOpenDay, t, monToday, calendars, "open").startsWith("OPEN ")])
+      .toEqual([t, "\u2014", false])
+  }
+  const monOpenTrade = heldOpenDay.points.find(p => p.t >= at("2026-10-26", "09:30")).t
+  expect([M.rowModel(heldOpenDay, monOpenTrade, "open").changeLine.endsWith(" open"), M.scrubLegend(heldOpenDay, monOpenTrade, monToday, calendars, "open")])
+    .toEqual([true, "OPEN 750,000"])
   // Robinhood's first three bars of Monday end the hold as Yahoo's would:
   // with Friday's quote cached the chart is Monday's, and it stays Monday's
   // when Yahoo's two-day answer comes.

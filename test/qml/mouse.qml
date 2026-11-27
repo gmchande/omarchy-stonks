@@ -630,7 +630,18 @@ Harness {
       rest()
       fillFollows("returning to manual order")
 
-      // A long elided list name keeps its chevron in place across every sort order.
+      // A long elided list name keeps its chevron and the breadth bar steady
+      // across every sort order (on All too).
+      var breadthBar = at("breadthRule")
+      var allBreadthWidths = [breadthBar.width]
+      for (var allOrd = 0; allOrd < 4; allOrd++) {
+        var wasAllOrd = service.order
+        click("orderLabel")
+        within(1500, function() { return service.order !== wasAllOrd })
+        allBreadthWidths.push(breadthBar.width)
+      }
+      var steadyAllBreadth = allBreadthWidths.every(function(w) { return Math.abs(w - allBreadthWidths[0]) < 0.5 })
+
       var longList = "Global Semiconductors, Cloud Infrastructure, Energy Transition and Long-Term Compounders Watchlist"
       service.createList(longList)
       service.switchList(longList)
@@ -638,18 +649,24 @@ Harness {
       var longOn = within(1500, function() { return service.listName === longList && listLabelItem.truncated })
       var listChevron = at("listChevron")
       var chevronXs = [listChevron.x]
+      var longBreadthWidths = [breadthBar.width]
       for (var ord = 0; ord < 4; ord++) {
         var wasOrd = service.order
         click("orderLabel")
         within(1500, function() { return service.order !== wasOrd })
         chevronXs.push(listChevron.x)
+        longBreadthWidths.push(breadthBar.width)
       }
       var steadyChevron = chevronXs.every(function(x) { return Math.abs(x - chevronXs[0]) < 0.5 })
+      var steadyLongBreadth = longBreadthWidths.every(function(w) { return Math.abs(w - longBreadthWidths[0]) < 0.5 })
       service.switchList("")
       service.deleteList(longList)
       rest()
-      harness.check("a long list name keeps the header chevron steady across every sort order",
-        longOn && steadyChevron, [longOn, listLabelItem.truncated].concat(chevronXs.map(function(x) { return x.toFixed(1) })).join(" "))
+      harness.check("a long list name keeps the header chevron and breadth bar steady across every sort order",
+        longOn && steadyChevron && steadyAllBreadth && steadyLongBreadth,
+        [longOn, listLabelItem.truncated, "chevron:" + chevronXs.map(function(x) { return x.toFixed(1) }).join(","),
+          "allW:" + allBreadthWidths.map(function(w) { return w.toFixed(1) }).join(","),
+          "longW:" + longBreadthWidths.map(function(w) { return w.toFixed(1) }).join(",")].join(" "))
 
       // Two of them, so one range for every click can't pass.
       var options = harness.findAll(body, "rangeOption")

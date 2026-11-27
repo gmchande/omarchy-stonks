@@ -212,7 +212,7 @@ Item {
     visible: !root.rowsCovered || root.rowsOpacity > 0
     opacity: root.rowsOpacity
     anchors.left: listChevron.right
-    anchors.leftMargin: Style.space(12)
+    anchors.leftMargin: root.rowsDay !== "" ? Style.space(12) : 0
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
     text: root.rowsDay
@@ -223,16 +223,17 @@ Item {
     font.letterSpacing: 1
   }
 
-  // The list's breadth. It rests while the rows are covered.
+  // The list's breadth. It rests while the rows are covered, and reserves the
+  // widest sort-order label on the right so cycling orders never resizes it.
   BreadthRule {
     id: breadthRule
     objectName: "breadthRule"
     visible: !root.rowsCovered || root.rowsOpacity > 0
     opacity: root.rowsOpacity
     anchors.left: todayText.right
-    anchors.leftMargin: Style.space(10)
-    anchors.right: orderText.left
-    anchors.rightMargin: Style.space(10)
+    anchors.leftMargin: root.rowsDay !== "" ? Style.space(10) : Style.space(12)
+    anchors.right: unitBox.left
+    anchors.rightMargin: root.widestOrderWidth + orderText.anchors.rightMargin + Style.space(10)
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     breadth: root.breadth
@@ -303,7 +304,7 @@ Item {
     // the shell's 22 px, but never into the breadth rule, whose hover says
     // the counts.
     readonly property real wordStart: Math.round(gapMetrics.advanceWidth)
-    readonly property real arrowReach: Math.min(breadthRule.anchors.rightMargin,
+    readonly property real arrowReach: Math.min(Style.space(10),
       Math.max(Style.space(6), Style.space(22) - wordStart))
     property real lift: !root.rowsCovered && (arrowMouse.containsMouse || wordMouse.containsMouse) ? 1 : 0
     Behavior on lift { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
