@@ -182,9 +182,70 @@ function evenness(g) {
   return g.day && !g.aside ? 1 : 0
 }
 
+// Reduces an intermediate morph polyline to about `maxPoints` vertices while
+// keeping every endpoint, break, untraded step, flag transition, and each
+// bucket's min/max envelope so the moving curve matches the full shape.
+function decimate(points, maxPoints) {
+  var n = points.length
+  if (!maxPoints || maxPoints <= 0 || n <= maxPoints) return points
+  var keep = new Array(n)
+  keep[0] = true
+  keep[n - 1] = true
+  for (var i = 1; i < n - 1; i++) {
+    var prev = points[i - 1], cur = points[i], next = points[i + 1]
+    if (cur.brk || cur.untraded || next.brk || next.untraded
+      || cur.faint !== prev.faint || cur.faint !== next.faint
+      || cur.dim !== prev.dim || cur.dim !== next.dim
+      || cur.ext !== prev.ext || cur.ext !== next.ext) {
+      keep[i] = true
+    }
+  }
+  var kept = 0
+  for (var m = 0; m < n; m++) if (keep[m]) kept++
+  var room = maxPoints - kept
+  if (room > 0) {
+    var runs = []
+    var totalFlex = 0
+    var r = 0
+    while (r < n) {
+      if (keep[r]) { r++; continue }
+      var start = r
+      while (r < n && !keep[r]) r++
+      runs.push([start, r])
+      totalFlex += r - start
+    }
+    if (totalFlex <= room) return points
+    for (var ri = 0; ri < runs.length; ri++) {
+      var a = runs[ri][0], b = runs[ri][1], len = b - a
+      var share = Math.max(1, Math.round(room * len / totalFlex))
+      if (len <= share) {
+        for (var j = a; j < b; j++) keep[j] = true
+        continue
+      }
+      var buckets = Math.max(1, Math.floor(share / 2))
+      for (var bk = 0; bk < buckets; bk++) {
+        var lo = a + Math.floor(bk * len / buckets)
+        var hi = a + Math.floor((bk + 1) * len / buckets)
+        if (hi <= lo) continue
+        var minI = lo, maxI = lo
+        for (var p = lo + 1; p < hi; p++) {
+          if (points[p].y < points[minI].y) minI = p
+          if (points[p].y > points[maxI].y) maxI = p
+        }
+        keep[minI] = true
+        keep[maxI] = true
+      }
+    }
+  }
+  var out = []
+  for (var k = 0; k < n; k++) if (keep[k]) out.push(points[k])
+  return out
+}
+
 // The chart `t` of the way from `plan`'s old one to its new one, a frame of
-// the eased motion.
-function frame(p, t) {
+// the eased motion. When `maxPoints` is given, intermediate frames decimate to
+// that vertex budget while keeping exact full geometry at `t <= 0` and `t >= 1`.
+function frame(p, t, maxPoints) {
   if (t <= 0) return p.a.real
   if (t >= 1) return p.b.real
   var a = p.a, b = p.b
@@ -243,6 +304,7 @@ function frame(p, t) {
       ext: flagged(ext, u)
     })
   }
+  if (maxPoints > 0) points = decimate(points, maxPoints)
   var ticks = a.g.ticks.concat(b.g.ticks)
   var tickAlpha = a.g.ticks.map(function(x, i) { return (a.g.tickAlpha ? a.g.tickAlpha[i] : 1) * (1 - t) })
     .concat(b.g.ticks.map(function() { return t }))

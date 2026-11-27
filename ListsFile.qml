@@ -48,17 +48,18 @@ Item {
   property var settledKeys: ({})
 
   function persist(values, settles) {
-    root.store(Settings.fileSettings(Settings.copyWith(root.fileSettings, values)), settles, values)
+    var next = Settings.withValues(root.fileSettings, values)
+    root.store(next, settles, values, next !== root.fileSettings)
   }
 
   function save(next) {
     if (!Settings.settingsEqual(next, root.fileSettings)) {
-      root.store(next)
+      root.store(next, false, null, true)
     }
   }
 
-  function store(next, settles, values) {
-    var changed = !Settings.settingsEqual(next, root.fileSettings)
+  function store(next, settles, values, knownChanged) {
+    var changed = knownChanged !== undefined ? knownChanged : !Settings.settingsEqual(next, root.fileSettings)
     root.fileSettings = next
     if (!root.ready) return
     if (root.unreadable) {

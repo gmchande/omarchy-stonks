@@ -1855,6 +1855,27 @@ test("a quote run takes every quote due within half a minute of one due, and nam
   const stocks = { AAPL: usStock("AAPL"), MSFT: usStock("MSFT") }
   expect(M.quotesDue(["AAPL", "MSFT"], { AAPL: answered(late - 60), MSFT: answered(late - 60) }, {}, stocks, ["AAPL"], "AAPL", late, 60,
     M.calendarsAt(calendars, late))).toEqual({ due: ["AAPL"], next: late + 240 })
+  // Early-close half day (Black Friday 2026-11-27, regular closes 13:00, post 17:00):
+  // memoized calendar lookups agree with Exchange hours across regular, early post,
+  // and settled evening for multiple symbols sharing one calendar plus other markets.
+  const BF = "2026-11-27"
+  const bfStock = sym => ({
+    ...usStock(sym, BF),
+    session: {
+      pre: { start: at(BF, "04:00"), end: at(BF, "09:30") },
+      regular: { start: at(BF, "09:30"), end: at(BF, "16:00") }, // Yahoo full-day end, clamped to 13:00
+      post: { start: at(BF, "16:00"), end: at(BF, "20:00") }
+    }
+  })
+  const bfQuotes = { AAPL: bfStock("AAPL"), MSFT: bfStock("MSFT"), NVDA: bfStock("NVDA"), "BTC-USD": coin("BTC-USD") }
+  const bfPost = at(BF, "14:00") // after 13:00 early close, inside clamped 13:00-17:00 post
+  const bfPostEntries = { AAPL: answered(bfPost - 60), MSFT: answered(bfPost - 60), NVDA: answered(bfPost - 300), "BTC-USD": answered(bfPost - 60) }
+  expect(M.quotesDue(Object.keys(bfQuotes), bfPostEntries, {}, bfQuotes, ["AAPL"], "AAPL", bfPost, 60, M.calendarsAt(calendars, bfPost)))
+    .toEqual({ due: ["AAPL", "NVDA", "BTC-USD"], next: bfPost + 240 })
+  const bfNight = at(BF, "18:00") // past clamped 17:00 post close + SETTLED: non-featured waits for Mon 04:00
+  const bfNightEntries = { AAPL: answered(at(BF, "17:20")), MSFT: answered(at(BF, "17:20")) }
+  expect(M.quotesDue(["AAPL", "MSFT"], bfNightEntries, {}, bfQuotes, ["AAPL"], "AAPL", bfNight, 60, M.calendarsAt(calendars, bfNight)))
+    .toEqual({ due: ["AAPL"], next: at("2026-11-30", "04:00") })
 })
 
 test("a row whose market hasn't traded since its last price isn't asked for until it trades again, but the pill's is", () => {
@@ -2058,7 +2079,7 @@ test("only the request sent alone after a pause speaks for the host: answers to 
   expect(heard(M.takenFromGate(silent, yahoo, 1, false, 1002).gate, ["refused"], 1002).gate.pausedUntil - 1002).toBe(60)
 })
 
-test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and while a surface is open for the stock on show, a preview and the US rows in sight, the chart waited on alone first", () => {
+test("Robinhood is asked once for each stock the pill shows with nothing open by day (live or fresh cached quote), for it alone each 5 minutes while a night trades, and while a surface is open for the stock on show, a preview and the US rows in sight, batching small runs and sending the waited chart alone ahead of large runs", () => {
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: true, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
@@ -2066,13 +2087,17 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
-  // live; what Robinhood has answered for it is enough, failed or not. The
-  // pill moved to another stock asks about that one. With no pill in any
-  // bar, nothing, by day or at night.
+  // live or from a fresh cached quote; what Robinhood has answered for it is
+  // enough, failed or not. Stale or unquoted saved entries still wait for Yahoo.
   const noon = at(WED, "14:00")
   expect([asks({ now: noon, pill: false }), asks({ pill: false })]).toEqual([null, null])
   expect(asks({ now: noon })).toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
+  expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: noon - 3600, answeredAt: 0 } } })).toBe(null)
+  expect(asks({ now: noon, quotes: { AAPL: usStock("AAPL") }, quoteEntries: { AAPL: { status: "saved", receivedAt: noon - 3600, answeredAt: 0 } } }))
+    .toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
+  expect(asks({ now: noon, quotes: { AAPL: usStock("AAPL") }, quoteEntries: { AAPL: { status: "saved", receivedAt: noon - 10 * DAY, answeredAt: 0 } } }))
+    .toBe(null)
   const answeredNoon = status => ({ listDates: { AAPL: { status: "ok", listDate: null, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
   expect(asks({ now: noon, ...answeredNoon("ok") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
@@ -2097,9 +2122,13 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   // a night trades, Robinhood is never asked about it.
   const index = { featured: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
-  // A surface open: the stock on show and the rows in sight, the pill's
-  // alone while it has no answer; a row out of sight waits.
-  expect(asks({ open: true, inSight: ["MSFT"] })).toEqual({ listDates: ["AAPL"], trades: ["AAPL"] })
+  // A surface open: small visible-row batches go together with the stock on
+  // show in one request; larger batches (>10) still send the waited chart
+  // alone first; a row out of sight waits.
+  expect(asks({ open: true, inSight: ["MSFT"] })).toEqual({ listDates: ["AAPL", "MSFT"], trades: ["AAPL", "MSFT"] })
+  const many = Array.from({ length: 12 }, (_, i) => "S" + i)
+  expect(asks({ open: true, featured: "S0", overnightSymbols: many, allSymbols: many, inSight: many.slice(1) }))
+    .toEqual({ listDates: ["S0"], trades: ["S0"] })
   const pillAnswered = ago => ({ open: true, inSight: ["MSFT"], listDates: { AAPL: { status: "ok", listDate: null, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
   expect(asks(pillAnswered(60))).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
   expect(asks({ ...pillAnswered(60), inSight: [] })).toBe(null)
@@ -2117,10 +2146,12 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const uncarried = ago => ({ ...pillAnswered(60), listDates: listed, nights: { ...pillAnswered(60).nights, MSFT: { status: "ok", bars: [], through: null, at: now - ago } } })
   expect([asks(uncarried(5 * 60)), asks(uncarried(DAY - 60)), asks(uncarried(DAY))]).toEqual([null, null, { listDates: [], trades: ["MSFT"] }])
   // A preview outside All on view, a US stock by search's result before its
-  // quote, is asked with them, alone first while it has no answer; off
-  // view, it waits.
+  // quote, goes with a small visible batch and alone ahead of a large one;
+  // off view, it waits.
   const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
-  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ listDates: ["NVDA"], trades: ["NVDA"] })
+  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ listDates: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
+  expect(asks({ open: true, featured: "S0", overnightSymbols: many, allSymbols: many, inSight: many, ...nvda }))
+    .toEqual({ listDates: ["NVDA"], trades: ["NVDA"] })
   expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ listDates: ["MSFT"], trades: ["MSFT"] })
   // A preview already in All is asked as its row, in sight or not, not
   // first; Toronto's never.
@@ -3155,6 +3186,37 @@ describe("another stock's chart bends out of the one before", () => {
     const faint = Paint.faintRuns(lunch.points)
     expect(faint.length).toBe(1)
     expect(faint[0].length).toBe(5) // 4 faint points + 1 adjacent full point
+  })
+
+  test("intermediate morph decimation stays within its vertex budget while keeping endpoints, breaks, untraded steps, flag edges, and exact resting frames", () => {
+    const denseYear = {
+      day: false, baselineY: 0.5, aside: null, ticks: [],
+      points: Array.from({ length: 260 }, (_, i) => pt(i / 259, wobble(i * 0.7)))
+    }
+    const plan = Morph.plan(night, denseYear)
+    expect(Morph.frame(plan, 0, 100)).toBe(night)
+    expect(Morph.frame(plan, 1, 100)).toBe(denseYear)
+    const full = Morph.frame(plan, 0.5)
+    const slim = Morph.frame(plan, 0.5, 100)
+    expect(full.points.length).toBeGreaterThan(250)
+    expect(slim.points.length).toBeLessThanOrEqual(115)
+    expect(slim.points[0]).toEqual(full.points[0])
+    expect(slim.points[slim.points.length - 1]).toEqual(full.points[full.points.length - 1])
+    // Untraded steps and breaks survive decimation.
+    const lunchPlan = Morph.plan(lunch, denseYear)
+    const slimLunch = Morph.frame(lunchPlan, 0.25, 90)
+    expect(slimLunch.points.some(p => p.brk)).toBe(true)
+    expect(slim.points.some(p => p.untraded)).toBe(true)
+    // Scalar settings fast path matches full fileSettings and keeps unchanged list arrays intact.
+    const Settings = load("Settings.js")
+    const base = Settings.fileSettings({ symbols: ["AAPL", "MSFT"], lists: [{ name: "Core", symbols: ["AAPL"] }], extra: "kept" })
+    const same = Settings.withValues(base, { range: "1D", style: "smooth", list: "" })
+    expect(same).toBe(base)
+    const changed = Settings.withValues(base, { list: "core", range: "1Y", style: "retro", featured: "MSFT" })
+    expect(changed).toEqual(Settings.fileSettings(Settings.copyWith(base, { list: "core", range: "1Y", style: "retro", featured: "MSFT" })))
+    expect(changed.lists).toBe(base.lists)
+    expect(changed.symbols).toBe(base.symbols)
+    expect(changed.extra).toBe("kept")
   })
 
   test("retro's wave stands each column on its own chart's dashed row, and lights the newest cell once it has passed", () => {

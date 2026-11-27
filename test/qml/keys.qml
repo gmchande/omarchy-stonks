@@ -592,6 +592,7 @@ Harness {
       // open, its field empty, for the next, and Esc ends it.
       quiet()
       press("w")
+      var listFieldLazy = within(1500, function() { return b.listMenuOpen }) && !harness.find(b, "listNameField")
       press("↓")
       press("⏎")
       var naming = typing("listNameField")
@@ -611,9 +612,9 @@ Harness {
       fault(false)
       press("Esc")
       var done = within(2000, function() { return !b.adding })
-      harness.check("by keys alone, w makes a list, its search finds stocks All holds with Yahoo's search down, Enter adds each with search kept open, and Esc ends it",
-        naming && made && offered && kept && offeredNext && filled && done,
-        [naming, made, offered, kept, offeredNext, filled, done, service.listName, service.symbols.join(",")].join(" "))
+      harness.check("by keys alone, w makes a list (with lazy Field loading on edit), its search finds stocks All holds with Yahoo's search down, Enter adds each with search kept open, and Esc ends it",
+        listFieldLazy && naming && made && offered && kept && offeredNext && filled && done,
+        [listFieldLazy, naming, made, offered, kept, offeredNext, filled, done, service.listName, service.symbols.join(",")].join(" "))
 
       // w, down past the lists and New list to Manage lists, Enter; Delete
       // asks, Enter deletes, and All keeps the stock.
@@ -623,12 +624,13 @@ Harness {
       press("↓")
       press("⏎")
       var managing = within(1500, function() { return b.managingLists })
+      var renameFieldLazy = managing && !harness.find(b, "renameField")
       // Enter renames the list; Esc leaves its name as it was.
       press("⏎")
       var undoneRename = typing("renameField") ? undoSteps(harness.find(b, "renameField")) : "rename took no keys"
       press("Esc")
-      harness.check("in a list's rename, a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
-        undoneRename === undoWanted && b.managingLists, undoneRename + " | managing " + b.managingLists)
+      harness.check("in a list's rename (lazy Field), a paste is an undo step of its own, and undo brings back a cut or a selection pasted over, selected",
+        renameFieldLazy && undoneRename === undoWanted && b.managingLists, renameFieldLazy + " | " + undoneRename + " | managing " + b.managingLists)
       // Enter saves a rename, once: the list takes the name, and the rows
       // behind the field take no Enter, so no rename opens again.
       press("⏎")

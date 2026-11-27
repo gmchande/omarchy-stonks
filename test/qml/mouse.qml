@@ -676,6 +676,32 @@ Harness {
         [longOn, listLabelItem.truncated, "traveled:" + breadthTraveled, "fills:" + breadthFills,
           "chevron:" + chevronXs.map(function(x) { return x.toFixed(1) }).join(",")].join(" "))
 
+      // Switching away from a list and back does not replay WatchlistRow's
+      // drawLineIn() animation on rows whose 1D line was already ready.
+      var repeatTarget = body.watchlist.displayedSymbols.filter(function(s) {
+        var r = row(s)
+        return !!r && r.inSight && !!r.geometry && r.reveal >= 1
+      })[0]
+      var repeatReplayed = false
+      var repeatRow = repeatTarget ? row(repeatTarget) : null
+      var watchRepeatReveal = function() { if (repeatRow && repeatRow.reveal < 1) repeatReplayed = true }
+      if (repeatRow) {
+        service.createList("OtherTmp")
+        service.setMembership(body.watchlist.displayedSymbols[body.watchlist.displayedSymbols.length - 1], "OtherTmp", true)
+        service.switchList("OtherTmp")
+        within(1500, function() { return service.listName === "OtherTmp" })
+        repeatRow.revealChanged.connect(watchRepeatReveal)
+        service.switchList("")
+        within(1500, function() { return service.listName === "" && repeatRow.inSight })
+        waitForRendering(body)
+        repeatRow.revealChanged.disconnect(watchRepeatReveal)
+        service.deleteList("OtherTmp")
+        rest()
+      }
+      harness.check("switching back to a list whose row sparklines are already ready does not replay drawLineIn",
+        !!repeatRow && !repeatReplayed && repeatRow.reveal >= 1,
+        [repeatTarget, "replayed=" + repeatReplayed, "reveal=" + (repeatRow ? repeatRow.reveal : -1)].join(" "))
+
       // Two of them, so one range for every click can't pass.
       var options = harness.findAll(body, "rangeOption")
       var picked = [options[1], options[3]].map(function(option) {

@@ -13,21 +13,30 @@ var PHASES = {
 }
 
 function calendarOf(calendars, quote) {
-  return calendars && calendars.sessions ? calendars : Calendar.calendarFor(calendars, quote)
+  if (calendars && (calendars.sessions || calendars.cal !== undefined)) return calendars
+  return Calendar.calendarFor(calendars, quote)
 }
 
 // On a calendar half day where Yahoo still sends a full-day regular end,
 // clamp the regular close (and its after-hours span) to the early close so
 // the header, freshness, cadence and sleep agree with the exchange.
 function clampedSession(s, cal) {
-  if (!cal || !s || !s.regular) return s
-  var date = Calendar.dateStringOf(Calendar.localDate(s.regular.start, cal))
-  if (!cal.earlyCloses || !cal.earlyCloses[date]) return s
-  var segs = Calendar.segmentsOn(cal, date)
-  if (!segs.length) return s
-  var close = segs[segs.length - 1].end
+  var cache = cal && cal.dateOf ? cal : null
+  var c = cache ? cache.cal : cal
+  if (!c || !s || !s.regular) return s
+  var date = cache ? cache.dateOf(s.regular.start) : Calendar.dateStringOf(Calendar.localDate(s.regular.start, c))
+  if (!c.earlyCloses || !c.earlyCloses[date]) return s
+  var early
+  if (cache) {
+    early = cache.earlyOf(date)
+  } else {
+    var segs = Calendar.segmentsOn(c, date)
+    early = segs.length ? { close: segs[segs.length - 1].end, postEnd: c.post ? Calendar.postClose(c, date) : null } : null
+  }
+  if (!early) return s
+  var close = early.close
   if (s.regular.end <= close) return s
-  var post = s.post ? { start: close, end: cal.post ? Calendar.postClose(cal, date) : Math.min(s.post.end, close + (s.post.end - s.post.start)) } : null
+  var post = s.post ? { start: close, end: c.post ? early.postEnd : Math.min(s.post.end, close + (s.post.end - s.post.start)) } : null
   return { pre: s.pre, regular: { start: s.regular.start, end: close }, post: post }
 }
 
@@ -224,7 +233,7 @@ function inRegularSession(quote, now, calendars) {
 function regularNow(quote, now, calNow) {
   if (!quote || quote.crypto || calNow.quiet || calNow.breakEnd) return false
   if (calNow.earlyEnd && now >= calNow.earlyEnd) return false
-  return isTrading(sessionPhase(quote, now, calNow.cal)) || calNow.segment
+  return calNow.segment || isTrading(sessionPhase(quote, now, calNow))
 }
 
 // Whether a listing's market is actively trading its headline price now:
@@ -278,7 +287,7 @@ function awaitingOpen(quote, now, calendars) {
   if (!quote || quote.crypto) return false
   var cal = calendarOf(calendars, quote)
   var reg = clockSession(quote, now, cal).regular
-  if (!reg || now < reg.start || now >= reg.end) reg = Calendar.calendarRegular(cal, now)
+  if (!reg || now < reg.start || now >= reg.end) reg = cal && cal.cal !== undefined ? cal.regular : Calendar.calendarRegular(cal, now)
   var head = Quote.headlineQuote(quote)
   return !!reg && !!head && head.t !== null && head.t < reg.start && now >= reg.start && now < reg.start + OPENING_WAIT
 }

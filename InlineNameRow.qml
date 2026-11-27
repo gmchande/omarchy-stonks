@@ -25,7 +25,11 @@ Item {
   property real fieldX: 0
   property real fieldGap: Style.space(10)
   property real actionsRight: 0
-  property alias text: field.text
+  property string text: ""
+  property bool fieldLoaded: false
+  readonly property Field field: fieldLoader.item as Field
+  onEditingChanged: if (editing) fieldLoaded = true
+  onTextChanged: if (field && field.text !== text) field.text = text
   // The names the walks find them by.
   property string lineName: ""
   property string fieldName: ""
@@ -42,16 +46,17 @@ Item {
   // still typed; a rename's name whole selected.
   function edit(selectAll) {
     Qt.callLater(function() {
-      if (!row.host.active || !row.editing) return
-      field.forceActiveFocus()
-      if (selectAll) field.selectAll()
+      var input = row.field
+      if (!row.host.active || !row.editing || !input) return
+      input.forceActiveFocus()
+      if (selectAll) input.selectAll()
     })
   }
 
   // The field gives the keys back to the view, while it's on. The field lets
   // go first, or the view's scope hands them straight back.
   function release() {
-    field.focus = false
+    if (field) field.focus = false
     if (row.host.active) row.host.forceActiveFocus()
   }
 
@@ -76,25 +81,32 @@ Item {
     }
   }
 
-  Field {
-    id: field
-    objectName: row.fieldName
+  Loader {
+    id: fieldLoader
+    active: row.editing || row.fieldLoaded
     visible: row.editing
     x: row.fieldX
     width: actions.x - x - row.fieldGap
     height: row.lineHeight
-    verticalPadding: 0
-    leftPadding: row.textX - row.fieldX
-    retro: row.look.retro
-    foreground: row.look.foreground
-    dim: row.look.dim
-    font.family: row.look.fontFamily
-    font.pixelSize: Style.font.bodySmall
-    placeholderText: row.placeholder
-    // The field takes Enter itself, so it goes no further.
-    onAccepted: row.submitted(field.text)
-    Keys.onPressed: function(event) {
-      if (event.key === Qt.Key_Escape) { row.cancelled(); event.accepted = true }
+    sourceComponent: Field {
+      id: field
+      objectName: row.fieldName
+      visible: row.editing
+      verticalPadding: 0
+      leftPadding: row.textX - row.fieldX
+      retro: row.look.retro
+      foreground: row.look.foreground
+      dim: row.look.dim
+      font.family: row.look.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      placeholderText: row.placeholder
+      Component.onCompleted: text = row.text
+      onTextChanged: if (row.text !== text) row.text = text
+      // The field takes Enter itself, so it goes no further.
+      onAccepted: row.submitted(field.text)
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) { row.cancelled(); event.accepted = true }
+      }
     }
   }
 
@@ -112,7 +124,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       text: row.action
       enterTakes: true
-      onActivated: row.submitted(field.text)
+      onActivated: row.submitted(row.text)
     }
     ListAction {
       objectName: row.cancelName

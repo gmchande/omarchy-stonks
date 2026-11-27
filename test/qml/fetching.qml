@@ -1295,6 +1295,43 @@ Harness {
           "iconTip:" + iconFailTip, mixedReady, mixedDown, body.headerText, nestRow ? nestRow.detail : "no nest"].join(" | "))
       closeWindow()
 
+      // Part 1 perf invariants: (1) range-only view changes skip askDue;
+      // (2) switching lists asks Robinhood immediately in rowsSeen without a
+      // 150 ms aheadDebounce wait; (3) small visible-row Robinhood batches land
+      // even while Service.drawing is non-empty.
+      startAt(at(mon7, 11, 30))()
+      openWindow()
+      var rangeDueMarker = -42
+      service.askedMinute = rangeDueMarker
+      body.selectRange("1Y")
+      within(3000, function() { return body.historyShown && body.chartRange === "1Y" })
+      var rangeSkippedDue = service.askedMinute === rangeDueMarker
+      body.selectRange("1D")
+      within(3000, function() { return !body.historyActive })
+      rangeSkippedDue = rangeSkippedDue && service.askedMinute === rangeDueMarker
+
+      service.createList("RhFast")
+      service.setMembership("SPY", "RhFast", true)
+      service.switchList("")
+      within(1500, function() { return service.listName === "" })
+      var nextOv = Object.assign({}, service.feeds.overnight.entries)
+      delete nextOv["SPY"]
+      service.feeds.overnight.entries = nextOv
+      service.feeds.overnight.holding = true
+      var rhBeforeSwitch = harness.requests().length
+      var tSwitch = Date.now()
+      service.switchList("RhFast")
+      var rhStartedFast = within(100, function() { return service.feeds.overnight.busy || !!service.feeds.overnight.entries["SPY"] })
+      var rhSwitchElapsed = Date.now() - tSwitch
+      var rhLandedDuringDraw = within(3000, function() { return !!service.feeds.overnight.entries["SPY"] && service.feeds.overnight.entries["SPY"].status === "ok" })
+      service.feeds.overnight.holding = false
+      service.switchList("")
+      service.deleteList("RhFast")
+      harness.check("range switches skip askDue, list switches fire Robinhood immediately without 150 ms debounce, and small Robinhood batches land while drawing",
+        rangeSkippedDue && rhStartedFast && rhSwitchElapsed < 120 && rhLandedDuringDraw,
+        ["rangeSkippedDue=" + rangeSkippedDue, "rhFast=" + rhStartedFast, "elapsed=" + rhSwitchElapsed + "ms", "landedWhileDrawing=" + rhLandedDuringDraw].join(" | "))
+      closeWindow()
+
       harness.finish()
     }
   }

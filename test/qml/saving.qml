@@ -193,6 +193,22 @@ Harness {
       app.open("{}")
       tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
 
+      // View-state changes (switchList, setRange, setStyle) debounce rather
+      // than writing synchronously on every click, and flush on surface close.
+      service.switchList("")
+      service.setRange("6M")
+      body.setStyle("retro")
+      var viewDebounced = service.saving && JSON.parse(harness.readFile(harness.file)).range !== "6M"
+      app.close()
+      var viewFlushed = landed() && within(3000, function() { return !service.saving })
+      var afterViewClose = JSON.parse(harness.readFile(harness.file))
+      var viewCloseOk = viewDebounced && viewFlushed && afterViewClose.list === "" && afterViewClose.range === "6M" && afterViewClose.style === "retro"
+      app.open("{}")
+      tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
+      service.switchList("Tech")
+      body.setStyle("smooth")
+      landed()
+
       var quitting = restart.createObject(started)
       var quitReady = within(5000, function() { return quitting.ready })
       quitting.persist({ range: "2Y" }, true)
@@ -209,9 +225,9 @@ Harness {
       service.deleteList("Quick")
       landed()
       harness.check("back-to-back async saves land in order, and delayed saves flush on restart, close and quit",
-        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded
+        markedSaving && heldRestart && asyncSaved && prefLanded && flushedOnClose && closeLanded && viewCloseOk
           && quitReady && quitPending && flushedOnQuit && listSaved,
-        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded,
+        [markedSaving, heldRestart, asyncSaved, prefLanded, flushedOnClose, closeLanded, viewCloseOk,
           quitReady, quitPending, flushedOnQuit, listSaved].join(" | "))
 
       // A rapid burst of overlapping changes lands cleanly without a false

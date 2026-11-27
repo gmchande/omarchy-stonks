@@ -17,6 +17,7 @@ Item {
   property var titles: []
   property var factLists: []
   property var ranges: []
+  property var listInfo: ({ key: "", factLists: [], ranges: [] })
   property Look look
   property bool seen: true
   property bool still: false
@@ -39,11 +40,39 @@ Item {
   FontMetrics { id: metrics; font: root.valueFont }
   FontMetrics { id: factMetrics; font: root.factFont }
 
-  function valueWidth(text) { return text ? Math.ceil(metrics.advanceWidth(text)) : 0 }
-  function labelWidth(text) { return text ? Math.ceil(metrics.advanceWidth(text) + text.length * root.labelFont.letterSpacing) : 0 }
+  // Cached per (font.family, font.pixelSize) and memoized list-wide totals by
+  // `listInfo.key` so binding settles never re-measure every stock's shapes.
+  readonly property var widthCache: ({ fontKey: "", values: {}, factLabels: {}, listKey: "", listGap: 0, listPrice: 0, listFacts: [] })
+  function ensureFontCache(font) {
+    var key = font.family + "|" + font.pixelSize
+    if (widthCache.fontKey === key) return
+    widthCache.fontKey = key
+    widthCache.values = {}
+    widthCache.factLabels = {}
+    widthCache.listKey = ""
+    widthCache.listPrice = 0
+    widthCache.listFacts = []
+  }
+  function valueWidth(text) {
+    if (!text) return 0
+    var v = widthCache.values[text]
+    if (v !== undefined) return v
+    v = Math.ceil(metrics.advanceWidth(text))
+    widthCache.values[text] = v
+    return v
+  }
+  function labelWidth(text) { return text ? valueWidth(text) + Math.ceil(text.length * root.labelFont.letterSpacing) : 0 }
+  function factLabelWidth(label) {
+    if (!label) return 0
+    var v = widthCache.factLabels[label]
+    if (v !== undefined) return v
+    v = Math.ceil(factMetrics.advanceWidth(factLabel(label)))
+    widthCache.factLabels[label] = v
+    return v
+  }
   function factWidth(f) {
     var value = Math.max(valueWidth(f.widest), valueWidth(f.value))
-    var label = f.label ? Math.ceil(factMetrics.advanceWidth(factLabel(f.label))) : 0
+    var label = factLabelWidth(f.label)
     return label + (f.label ? innerGap : 0) + value
   }
   function toneColor(tone) { return tone === "up" ? look.upColor : tone === "down" ? look.downColor : look.foreground }
@@ -51,6 +80,7 @@ Item {
   // Reading `metrics.font` measures again at a new text size.
   readonly property int titleWidth: {
     var font = metrics.font
+    ensureFontCache(font)
     var widest = 0
     for (var t = 0; t < titles.length; t++) widest = Math.max(widest, labelWidth(titles[t]))
     return widest
@@ -58,8 +88,30 @@ Item {
 
   readonly property var layout: {
     var font = metrics.font
-    var price = 0
-    var facts = []
+    ensureFontCache(font)
+    if (width <= 0) return { price: 0, rule: minRule, lowX: 0, ruleX: 0, highX: 0, factXs: [], factWidths: [] }
+    var li = listInfo
+    var lKey = li && li.key ? li.key : ""
+    if (widthCache.listKey !== lKey || widthCache.listGap !== innerGap) {
+      var lp = 0
+      var lf = []
+      var lFacts = li && li.factLists ? li.factLists : []
+      for (var ll = 0; ll < lFacts.length; ll++) {
+        var list = lFacts[ll]
+        for (var lfIdx = 0; lfIdx < list.length; lfIdx++) lf[lfIdx] = Math.max(lf[lfIdx] || 0, factWidth(list[lfIdx]))
+      }
+      var lRanges = li && li.ranges ? li.ranges : []
+      for (var lr = 0; lr < lRanges.length; lr++) {
+        var rr = lRanges[lr]
+        lp = Math.max(lp, valueWidth(rr.widest), valueWidth(rr.lowText), valueWidth(rr.highText))
+      }
+      widthCache.listKey = lKey
+      widthCache.listGap = innerGap
+      widthCache.listPrice = lp
+      widthCache.listFacts = lf
+    }
+    var price = widthCache.listPrice
+    var facts = widthCache.listFacts.slice()
     var widen = function(list) {
       for (var f = 0; f < list.length; f++) facts[f] = Math.max(facts[f] || 0, factWidth(list[f]))
     }
