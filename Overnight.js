@@ -25,6 +25,7 @@ var SLOT = 5 * 60
 var OVERNIGHT_INTERVAL = 5 * 60
 
 var LIST_DATE_INTERVAL = 24 * 60 * 60
+var LIST_DATE_SETTLED = 30 * 24 * 60 * 60
 
 function overnightMarket(calendars) {
   var map = Calendar.calendarMap(calendars)
@@ -130,13 +131,17 @@ var LIST_DATE_BATCH = 50
 function listDates(json, symbols) {
   var results = Format.fetchedList(json && json.results, 2 * symbols.length)
   if (!results) return null
+  var bySymbol = Object.create(null)
+  for (var j = 0; j < results.length; j++) {
+    var r = results[j]
+    if (r && typeof r.symbol === "string" && !(r.symbol in bySymbol)
+        && typeof r.list_date === "string" && /^\d{4}-\d\d-\d\d$/.test(r.list_date))
+      bySymbol[r.symbol] = r.list_date
+  }
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
-    var wanted = robinhoodSymbol(symbols[i])
-    var found = results.filter(function(r) {
-      return r && r.symbol === wanted && typeof r.list_date === "string" && /^\d{4}-\d\d-\d\d$/.test(r.list_date)
-    })[0]
-    if (found) out[symbols[i]] = found.list_date
+    var date = bySymbol[robinhoodSymbol(symbols[i])]
+    if (date) out[symbols[i]] = date
   }
   return out
 }
@@ -168,8 +173,17 @@ function withListDates(quotes, listDates, now) {
   return out
 }
 
+// A listing whose IPO date is over a month past can never become a first
+// trading day again, so it needs no daily re-check.
+function listDateSettled(entry, now) {
+  if (!entry || entry.status !== "ok" || !entry.listDate) return false
+  var cutoff = new Date((now - LIST_DATE_SETTLED) * 1000).toISOString().slice(0, 10)
+  return entry.listDate < cutoff
+}
+
 function listDateDue(entry, now) {
   if (!entry) return true
+  if (listDateSettled(entry, now)) return false
   return now - entry.at >= (entry.status === "ok" ? LIST_DATE_INTERVAL : OVERNIGHT_INTERVAL)
 }
 
@@ -259,10 +273,14 @@ function lastTradeCap(count) {
 function lastTrades(json, symbols) {
   var results = Format.fetchedList(json && json.results, symbols.length)
   if (!results) return null
+  var bySymbol = Object.create(null)
+  for (var j = 0; j < results.length; j++) {
+    var x = results[j]
+    if (x && typeof x.symbol === "string" && !(x.symbol in bySymbol)) bySymbol[x.symbol] = x
+  }
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
-    var wanted = robinhoodSymbol(symbols[i])
-    var r = results.filter(function(x) { return x && x.symbol === wanted })[0]
+    var r = bySymbol[robinhoodSymbol(symbols[i])]
     // Its venue's clock to the nanosecond, which Date.parse can't read.
     var stamp = r && typeof r.venue_last_non_reg_trade_time === "string" ? r.venue_last_non_reg_trade_time.replace(/(\.\d{3})\d+/, "$1") : ""
     var t = Math.floor(Date.parse(stamp) / 1000)

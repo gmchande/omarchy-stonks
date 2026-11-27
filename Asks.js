@@ -411,7 +411,8 @@ function overnightNext(s) {
       else if (entry.status === "failed" || nightOpen) take(entry.at + Overnight.OVERNIGHT_INTERVAL)
     }
     var ld = s.listDates[x]
-    if (ld) take(ld.at + (ld.status === "ok" ? Overnight.LIST_DATE_INTERVAL : Overnight.OVERNIGHT_INTERVAL))
+    if (ld && !Overnight.listDateSettled(ld, s.now))
+      take(ld.at + (ld.status === "ok" ? Overnight.LIST_DATE_INTERVAL : Overnight.OVERNIGHT_INTERVAL))
   }
   if (s.rawYahooHole !== null && s.rawYahooHole !== undefined) take(s.rawYahooHole + Overnight.OVERNIGHT_LAG)
   if (shown.previewing && s.previewQuote && s.previewQuote.session) {
