@@ -518,8 +518,8 @@ function beside(quote, t) {
 // they count from the close just gone, with no open yet, and so does a
 // scrub past that day's bell (`Figures.scrubbedBase`). `joined`: tonight's,
 // which the pill keeps the day's close beside (`keepsDay`). `own`: the day
-// move may count from. `dayStart` names the day the move is of: the day
-// drawn, or the pre-market's own.
+// drawn is Yahoo's quote's, whose open the move may count from. `dayStart`
+// names the day the move is of: the day drawn, or the pre-market's own.
 function newestTrade(quote, latest, calendars, day) {
   var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
   if (!trade) return null
