@@ -191,7 +191,8 @@ function quotesLanded(held, requests, got, symbols, calendars, now) {
       retry.push(symbol)
       return
     } else {
-      entries[symbol] = Object.assign({}, entries[symbol] || { receivedAt: 0 }, { status: "failed", answeredAt: now })
+      var missing = answer.kind === "missing" || outcome === "missing"
+      entries[symbol] = Object.assign({}, entries[symbol] || { receivedAt: 0 }, { status: "failed", missing: missing, answeredAt: now })
     }
     delete asked[symbol]
     delete tries[symbol]
@@ -325,6 +326,7 @@ function overnightAsks(s) {
     // must be in.
     if (holeDue(x)) return true
     if (!kept) return false
+    if (entry.status === "failed" && (entry.retry || s.probe)) return true
     // One Robinhood doesn't carry, once a day, as its listing date is, in
     // case it carries it later.
     if (Overnight.uncarried(entry)) return at - entry.at >= Overnight.LIST_DATE_INTERVAL
@@ -380,7 +382,10 @@ function lastTradeListings(s) {
 function lastTradeAsks(s, alongside) {
   var traded = lastTradeListings(s)
   var dueBy = function(at) {
-    return function(x) { return !!s.lastTrades[x] && at - s.lastTrades[x].at >= s.interval }
+    return function(x) {
+      var e = s.lastTrades[x]
+      return !!e && ((e.status === "failed" && (!!e.retry || !!s.probe)) || at - e.at >= s.interval)
+    }
   }
   var behind = function(x) {
     var entry = s.lastTrades[x]
@@ -447,9 +452,16 @@ function waitedAlone(symbols, waited, answers) {
   return symbols
 }
 
-function refreshTrades(charts, overnightSymbols, askedAt, now) {
-  if (now - askedAt <= REFRESH_AGAIN) return []
-  return charts.filter(function(s) { return overnightSymbols.indexOf(s) >= 0 })
+function refreshTrades(charts, overnightSymbols, askedAt, now, inSight, entries) {
+  var out = []
+  var add = function(s) { if (overnightSymbols.indexOf(s) >= 0 && out.indexOf(s) < 0) out.push(s) }
+  if (now - askedAt > REFRESH_AGAIN) charts.forEach(add)
+  if (entries) {
+    charts.concat(inSight || []).forEach(function(s) {
+      if (entries[s] && entries[s].status === "failed") add(s)
+    })
+  }
+  return out
 }
 
 // ---- Charts

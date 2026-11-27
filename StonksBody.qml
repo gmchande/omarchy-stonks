@@ -488,7 +488,11 @@ Item {
   readonly property int overdueClock: Freshness.overdueClock(owed, now)
   readonly property int warnings: lists.length > 0
     ? Freshness.warningCount(lists[0].symbols, entries, previewEntries, owed, overdueClock) : 0
-  readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
+  readonly property bool yahooDown: lists.length > 0
+    && Freshness.sourceDown(lists[0].symbols, entries, previewEntries, owed, overdueClock)
+  readonly property bool previewWarns: previewing && previewSymbol !== ""
+    && (lists.length === 0 || lists[0].symbols.indexOf(previewSymbol) < 0)
+    && Freshness.warningCount([previewSymbol], entries, previewEntries, owed, overdueClock) > 0
 
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property var marketFormsNow: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
@@ -512,7 +516,7 @@ Item {
     rangeFailed: historyActive && historyFailed,
     chartRange: chartRange,
     pause: Freshness.hostPause(yahooPause.pause, yahooPause.until, now),
-    warnings: warnings,
+    warnings: warnings + (previewWarns ? 1 : 0),
     // The panel says Yahoo's pause short; the window has room for a sentence.
     compact: switchesPanels,
     yahooDown: yahooDown,

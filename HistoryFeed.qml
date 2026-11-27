@@ -25,6 +25,7 @@ Item {
   // The job's curl was stopped; only the answers it got whole are kept.
   property bool stopped: false
   property bool waitingForScreen: false
+  property bool waitingForBudget: false
 
   readonly property bool busy: job !== null || wanted !== null
 
@@ -94,7 +95,7 @@ Item {
   function want(next) {
     root.wanted = next
     if (job && !covers(job, next)) {
-      if (waitingForScreen || retryTimer.running || heldTimer.running) {
+      if (waitingForScreen || waitingForBudget || retryTimer.running || heldTimer.running) {
         retryTimer.stop()
         heldTimer.stop()
         root.endJob()
@@ -124,6 +125,7 @@ Item {
   function run() {
     if (mayAsk && !mayAsk()) { root.waitingForScreen = true; return }
     root.waitingForScreen = false
+    root.waitingForBudget = false
     if (job.ahead && gate) {
       var granted = 0
       while (granted < job.charts.length && gate.spare() && gate.take(1) === 1) granted++
@@ -138,7 +140,8 @@ Item {
         root.job = cut
       }
     } else if (gate && gate.take(1) === 0) {
-      heldTimer.restart()
+      if (gate.paused) heldTimer.restart()
+      else root.waitingForBudget = true
       return
     }
     root.attempts = attempts + 1
@@ -147,15 +150,23 @@ Item {
   }
 
   function sendWaiting() {
-    if (job && waitingForScreen) root.run()
+    if (job && (waitingForScreen || waitingForBudget)) root.run()
   }
 
   function endJob() {
     root.waitingForScreen = false
+    root.waitingForBudget = false
     root.job = null
     root.attempts = 0
     root.stopped = false
     root.sendNext()
+  }
+
+  Connections {
+    target: root.gate
+    function onPausedChanged() {
+      if (root.gate && root.gate.paused && root.waitingForBudget) root.run()
+    }
   }
 
   function parse(answer, range) {

@@ -524,7 +524,11 @@ Item {
     onPausedChanged: root.releaseOrder()
     onPausedUntilChanged: root.armClock()
     onBudgetDueAtChanged: root.armClock()
-    onReopened: Qt.callLater(root.askOvernight)
+    onReopened: {
+      overnightFeed.retryFailed()
+      lastTradeFeed.retryFailed()
+      Qt.callLater(root.askOvernight)
+    }
   }
   Gate {
     id: githubGate
@@ -556,10 +560,13 @@ Item {
   readonly property var quotes: feed.quotes
   readonly property var entries: feed.entries
   readonly property var asked: feed.asked
+  function mergedMaps(base, extra) {
+    return Object.keys(extra).length === 0 ? base : Object.assign({}, base, extra)
+  }
   // Those waiting on Yahoo, from when: freshness's overdue counts from it.
-  readonly property var owed: feed.owed
+  readonly property var owed: mergedMaps(feed.owed, previewFeed.owed)
   // Those asked under `Freshness.ASKED_GRACE` ago (`QuoteFeed.asking`).
-  readonly property var asking: feed.asking
+  readonly property var asking: mergedMaps(feed.asking, previewFeed.asking)
 
   HistoryFeed {
     id: historyFeed
@@ -663,12 +670,14 @@ Item {
   }
   // Whether the night trades now, and the listings whose newest price may
   // be a trade Robinhood failed to send meanwhile: their "!".
-  readonly property bool nightTrading: {
+  readonly property int nightStart: {
     var cal = Overnight.overnightMarket(calendars)
     var night = cal ? Overnight.nightAt(cal, now) : null
-    return !!night && night.open
+    return night && night.open ? night.start : 0
   }
-  readonly property var nightFailed: Overnight.nightFailures(overnightFeed.entries, lastTradeFeed.entries, nightTrading, Overnight.overnightMarket(calendars))
+  readonly property bool nightTrading: nightStart > 0
+  readonly property var nightFailed: Overnight.nightFailures(overnightFeed.entries, lastTradeFeed.entries, nightTrading,
+    Overnight.overnightMarket(calendars), nightStart)
   // The feeds themselves, for whoever waits until no run is out.
   readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed, lastTrade: lastTradeFeed, listDates: listDateFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked each
@@ -845,6 +854,7 @@ Item {
       listDates: listDateFeed.entries,
       nights: overnightFeed.entries,
       lastTrades: lastTradeFeed.entries,
+      probe: robinhoodGate.paused && !robinhoodGate.loneOut && root.now >= robinhoodGate.pausedUntil,
       interval: root.refreshIntervalSec,
       now: root.now,
       calendars: root.calendars
@@ -959,8 +969,10 @@ Item {
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
-    var trades = Asks.refreshTrades(root.chartsOnShow(), root.overnightSymbols, overnightFeed.askedAt, now)
-    if (trades.length > 0) overnightFeed.fetch(trades, now)
+    var trades = Asks.refreshTrades(root.chartsOnShow(), root.overnightSymbols, overnightFeed.askedAt, now,
+      root.rowsInSight(), overnightFeed.entries)
+    if (trades.length > 0 && !robinhoodGate.loneOut) overnightFeed.fetch(trades, now)
+    if (robinhoodGate.loneOut) return
     var entries = lastTradeFeed.entries
     var lastTrades = Asks.lastTradeListings(root.robinhoodAsking()).filter(function(s) {
       return !entries[s] || entries[s].status === "failed" || now - entries[s].at > Asks.REFRESH_AGAIN
@@ -1209,6 +1221,7 @@ Item {
   }
   onNowChanged: {
     if (yahooGate.budgetDueAt > 0 && root.now >= yahooGate.budgetDueAt) yahooGate.budgetDueAt = 0
+    if (historyFeed.waitingForBudget) historyFeed.sendWaiting()
     if (robinhoodGate.budgetDueAt > 0 && root.now >= robinhoodGate.budgetDueAt) robinhoodGate.budgetDueAt = 0
     if (githubGate.budgetDueAt > 0 && root.now >= githubGate.budgetDueAt) githubGate.budgetDueAt = 0
     stepDayClock()

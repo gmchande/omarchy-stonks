@@ -1451,11 +1451,20 @@ test("an open surface asks Robinhood again every five minutes of a night, and on
   expect(due(at("2026-10-02", "04:11"), at("2026-10-02", "19:59"))).toBe(false)
   expect(due(at("2026-10-02", "13:00"), at("2026-10-03", "12:00"))).toBe(false)
   expect(due(at("2026-10-03", "12:00"), at("2026-10-04", "20:05"))).toBe(true)
-  // A failed answer is asked again five minutes on, whatever the hour.
+  // A failed answer is asked again five minutes on, whatever the hour, and
+  // immediately once a new night opens if it failed before tonight started.
   const asked = at("2026-10-02", "04:11")
   expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
   expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
   expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
+  expect(M.overnightDue(at("2026-10-01", "19:58"), at("2026-10-01", "20:00"), calendars, true)).toBe(true)
+  // A failure from before tonight opened (19:58) never bleeds into 20:00.
+  const cal = M.overnightMarket(calendars)
+  const nightStart = at("2026-10-01", "20:00")
+  expect(M.nightFailures(
+    { AAPL: { status: "failed", bars: [], through: null, at: at("2026-10-01", "19:58") },
+      NVDA: { status: "failed", bars: [], through: null, at: nightStart } },
+    {}, true, cal, nightStart)).toEqual({ NVDA: true })
 })
 
 test("a run of Robinhood's trades never takes more requests than a day for all would", () => {
@@ -1849,6 +1858,9 @@ test("a refresh asks again only for quotes answered more than 10 s ago, and for 
   expect(M.refreshQuotes(["OLD", "NEW", "KEPT", "NONE"], entries, now)).toEqual(["OLD"])
   expect(M.refreshTrades(["AAPL", "SHEL.L"], ["AAPL"], now - 11, now)).toEqual(["AAPL"])
   expect(M.refreshTrades(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
+  // Failed visible US rows are retried on r even inside the 10 s cooldown.
+  expect(M.refreshTrades(["AAPL"], ["AAPL", "MSFT", "NVDA"], now - 5, now, ["MSFT", "NVDA", "SHEL.L"],
+    { AAPL: { status: "ok" }, MSFT: { status: "failed" }, NVDA: { status: "ok" } })).toEqual(["MSFT"])
 })
 
 test("a quote run charts the featured stock's quote first and the other charted stocks next, then the rest in spark batches of 20 in the order asked", () => {
@@ -2678,6 +2690,15 @@ test("the stocks that warn are those whose own freshness warns, at every second,
       }
     }
   }
+  // A symbol Yahoo explicitly answered as missing (404 / omitted) is its own
+  // trouble, not Yahoo being down; when all non-missing symbols go overdue or
+  // fail, sourceDown still turns on even with a delisted symbol in the list.
+  const bad = { status: "failed", missing: true, answeredAt: T }
+  expect(M.warningCount(["BAD"], { BAD: bad }, {}, {}, 0)).toBe(0)
+  expect(M.sourceDown(["BAD"], { BAD: bad }, {}, {}, 0)).toBe(false)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100, B: T - 100 }, T)).toBe(true)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100, B: T - 100, BAD: T - 100 }, T)).toBe(true)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100 }, T)).toBe(false)
 })
 
 test("the header says trouble first, then a chart loading, a refresh asked for, a range that failed, a range's scrub, and the market's words", () => {

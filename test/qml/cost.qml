@@ -479,10 +479,16 @@ Harness {
           + "; pacedFailed=" + pacedFailed.length + "; due=" + (pacedDue - pacedAt) + "s; refilled=" + (refilledAt - beforePace) + "s")
 
       // Real Robinhood outage still warns on US rows trading tonight (and the
-      // featured row) while leaving non-US SHOP.TO normal, and clears once back.
+      // featured row) after the 2 s probe fails too, while leaving a single
+      // blip and non-US SHOP.TO normal, and clears once back.
       runCommand(["touch", harness.state + "/ROBINHOOD.offline"])
       rhGate.gate = Gate.openGate(rhGate.capacity)
       harness.clockOn(60)
+      settleAll()
+      var blipFailed = Object.keys(service.nightFailed).length
+      if (rhGate.pausedUntil > harness.time) harness.time = rhGate.pausedUntil
+      else harness.time += 5
+      service.tick()
       settleAll()
       var downRows = list.rowItems()
       var long5Down = downRows.LONG005 ? downRows.LONG005.detail : ""
@@ -492,14 +498,12 @@ Harness {
       else harness.time += 60
       service.tick()
       settleAll()
-      harness.clockOn(60)
-      settleAll()
       var backRows = list.rowItems()
       var long5Back = backRows.LONG005 ? backRows.LONG005.detail : ""
       runCommand(["rm", "-f", harness.state + "/overnight.set", harness.state + "/NIGHT.trade"])
       harness.check("a real Robinhood outage still shows Refresh failed on US rows trading tonight, leaves SHOP.TO normal, and clears once back",
-        /^! Refresh failed · overnight /.test(long5Down) && !/^!/.test(shopDown) && !/^!/.test(long5Back),
-        "down=" + long5Down + " | SHOP.TO=" + shopDown + " | back=" + long5Back)
+        blipFailed === 0 && /^! Refresh failed · overnight /.test(long5Down) && !/^!/.test(shopDown) && !/^!/.test(long5Back),
+        "blipFailed=" + blipFailed + " | down=" + long5Down + " | SHOP.TO=" + shopDown + " | back=" + long5Back)
 
       app.close()
       harness.finish()

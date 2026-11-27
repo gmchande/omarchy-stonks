@@ -279,6 +279,7 @@ serve() {
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;
+    ZZZZ*) exit 44 ;;
     *) exit 22 ;;
   esac
 }
@@ -319,6 +320,9 @@ for i in "${!urls[@]}"; do
     status=000
     exit_code=7
     body=""
+  elif [ -e "$state/$host.bad" ]; then
+    status=502
+    body="Bad Gateway"
   elif [ -e "$state/$host.refuse" ]; then
     # A round trip, as the real one takes, so a run stopped at a refusal
     # stops before its next request.
