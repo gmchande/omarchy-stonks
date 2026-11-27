@@ -43,9 +43,11 @@ Item {
   // finish, or a save awaiting its read-back.
   readonly property bool saving: settleWrite.running || writeOwed || making || writing || writeQueued !== "" || staleTexts !== null
 
-  // Keys changed by a delayed save (`settles`) still waiting for the timer,
-  // so an external read meanwhile keeps every pending key, not only `featured`.
+  // Keys changed by `persist(values, ...)` waiting for the debounce timer or an
+  // in-flight read so an external edit merges them instead of being overwritten.
+  // `wholeWriteOwed` is true once a full `save()` waits on a read in flight.
   property var settledKeys: ({})
+  property bool wholeWriteOwed: false
 
   function persist(values, settles) {
     var next = Settings.withValues(root.fileSettings, values)
@@ -68,15 +70,24 @@ Item {
     }
     if (settles) {
       if (changed || settleWrite.running) {
-        var pending = Object.assign({}, root.settledKeys)
-        if (values) for (var k in values) pending[k] = true
-        root.settledKeys = pending
+        if (!root.wholeWriteOwed) {
+          var pending = Object.assign({}, root.settledKeys)
+          if (values) for (var k in values) pending[k] = true
+          root.settledKeys = pending
+        }
         settleWrite.restart()
       }
       return
     }
-    root.settledKeys = ({})
     settleWrite.stop()
+    if (reader.out && values && !root.wholeWriteOwed) {
+      var owedKeys = Object.assign({}, root.settledKeys)
+      for (var ok in values) owedKeys[ok] = true
+      root.settledKeys = owedKeys
+    } else {
+      root.settledKeys = ({})
+      if (reader.out) root.wholeWriteOwed = true
+    }
     root.writeFile(next)
   }
 
@@ -90,10 +101,14 @@ Item {
   function writeSettled() {
     if (!root.ready || root.unreadable) {
       root.settledKeys = ({})
+      root.wholeWriteOwed = false
       return
     }
     root.writeFile(root.fileSettings)
-    if (!root.writeOwed) root.settledKeys = ({})
+    if (!root.writeOwed) {
+      root.settledKeys = ({})
+      root.wholeWriteOwed = false
+    }
   }
   // Flush any pending delayed save at once (surface close, update restart).
   function flush() {
@@ -104,6 +119,8 @@ Item {
   // The footer's try again.
   function saveAgain() {
     settleWrite.stop()
+    root.settledKeys = ({})
+    if (reader.out) root.wholeWriteOwed = true
     root.writeSettled()
   }
   // The shell is going: any pending delayed or in-flight async change is
@@ -114,6 +131,7 @@ Item {
     var pending = settleWrite.running || root.writing || root.writeQueued !== ""
     settleWrite.stop()
     root.settledKeys = ({})
+    root.wholeWriteOwed = false
     root.writeQueued = ""
     if (!pending || !root.ready || root.unreadable || root.missing || reader.out) return
     var body = JSON.stringify(root.fileSettings, null, 2) + "\n"
@@ -262,16 +280,19 @@ Item {
       var parsed = Settings.readListsFile(answer.text)
       if (!parsed) {
         root.settledKeys = ({})
+        root.wholeWriteOwed = false
         root.takeUnreadableFile()
         root.editsUnsaved = true
         return
       }
       root.unreadable = false
+      var whole = root.wholeWriteOwed
+      root.wholeWriteOwed = false
       var keys = Object.keys(root.settledKeys)
-      if (keys.length > 0) {
+      root.settledKeys = ({})
+      if (!whole && keys.length > 0) {
         var keep = {}
         for (var i = 0; i < keys.length; i++) keep[keys[i]] = root.fileSettings[keys[i]]
-        root.settledKeys = ({})
         var merged = Settings.fileSettings(Settings.copyWith(parsed, keep))
         if (!Settings.settingsEqual(merged, root.fileSettings)) root.adopt(merged)
       }
@@ -285,6 +306,7 @@ Item {
       var gone = root.takesRead(null)
       if (owed) {
         root.settledKeys = ({})
+        root.wholeWriteOwed = false
         root.writeFile(root.fileSettings)
       } else if (gone) root.takeMissingFile()
       return
@@ -300,6 +322,7 @@ Item {
     root.takeUnreadableFile()
     if (owed) {
       root.settledKeys = ({})
+      root.wholeWriteOwed = false
       root.editsUnsaved = true
     }
   }

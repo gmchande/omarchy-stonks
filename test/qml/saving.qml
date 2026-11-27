@@ -288,13 +288,16 @@ Harness {
           && JSON.parse(harness.readFile(harness.file)).range === "1M",
         [through, service.saveFailed, footer(), service.range, JSON.stringify(harness.checks)].join(" | "))
 
-      // Closing after a debounced view-state change while an external edit's
-      // read is in flight merges the pending key onto the external edit instead
-      // of overwriting it with the stale in-memory file.
+      // Closing after an immediate stock selection + debounced range change
+      // while an external edit's read is in flight keeps both local changes
+      // and the external edit (new symbol + unknown key).
       var beforeMerge = harness.readFile(harness.file)
-      service.setRange("6M")
+      var prevFeatured = JSON.parse(beforeMerge).featured
+      var picked = prevFeatured === "NVDA" ? "MSFT" : "NVDA"
       sh('rm -f "$STONKS_FAKE_STATE/dd.read" && touch "$STONKS_FAKE_STATE/dd.hold" && jq \'.note = "kept-external" | .symbols += ["GOOG"]\' "$1" > "$1.new" && mv "$1.new" "$1"')
       var readingExt = within(3000, function() { return sh('[ -e "$STONKS_FAKE_STATE/dd.read" ] && echo read') === "read" })
+      service.feature(picked)
+      service.setRange("6M")
       app.close()
       sh('rm -f "$STONKS_FAKE_STATE/dd.hold"')
       var mergedLanded = within(3000, function() {
@@ -302,14 +305,15 @@ Harness {
         try { return JSON.parse(harness.readFile(harness.file)).range === "6M" } catch (e) { return false }
       })
       var mergedFile = JSON.parse(harness.readFile(harness.file))
-      var mergedOk = readingExt && mergedLanded && mergedFile.note === "kept-external" && mergedFile.symbols.indexOf("GOOG") >= 0
+      var mergedOk = readingExt && mergedLanded && mergedFile.featured === picked
+        && mergedFile.note === "kept-external" && mergedFile.symbols.indexOf("GOOG") >= 0
       app.open("{}")
       tryVerify(function() { return !!body && body.surfaceOpen }, 3000)
       sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', beforeMerge)
-      within(3000, function() { return service.range === "1M" && service.allSymbols.indexOf("GOOG") < 0 })
-      harness.check("closing after a debounced range change while an external edit is being read preserves the external edit",
-        mergedOk, JSON.stringify({ readingExt: readingExt, mergedLanded: mergedLanded, range: mergedFile.range,
-          note: mergedFile.note || "", hasGoog: mergedFile.symbols.indexOf("GOOG") >= 0 }))
+      within(3000, function() { return service.range === "1M" && service.featuredSymbol === prevFeatured && service.allSymbols.indexOf("GOOG") < 0 })
+      harness.check("closing after a stock click and debounced range change while an external edit is being read preserves all three",
+        mergedOk, JSON.stringify({ readingExt: readingExt, mergedLanded: mergedLanded, picked: picked,
+          featured: mergedFile.featured, range: mergedFile.range, note: mergedFile.note || "", hasGoog: mergedFile.symbols.indexOf("GOOG") >= 0 }))
 
       // A file that can't be read, put in place while a read is out, as a
       // sync tool replaces one: a change made before that read lands writes
