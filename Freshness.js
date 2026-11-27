@@ -130,6 +130,25 @@ function warningCount(symbols, entries, previewEntries, owed, clock) {
   return count
 }
 
+// Whether every non-missing symbol in `symbols` is warning (Yahoo failed or
+// overdue), with at least one such warning: true when Yahoo is down for the
+// whole list even if the list also holds a delisted 404 symbol, and false
+// when every symbol was explicitly answered as missing.
+function sourceDown(symbols, entries, previewEntries, owed, clock) {
+  var warnings = 0
+  for (var i = 0; i < symbols.length; i++) {
+    var symbol = symbols[i]
+    var entry = entries && entries[symbol] || previewEntries && previewEntries[symbol] || null
+    var owedSince = owed[symbol] || 0
+    if (entry && entry.status === "failed" && !entry.missing || owedSince > 0 && clock - owedSince >= OVERDUE_AFTER) {
+      warnings++
+    } else if (!(entry && entry.status === "failed" && entry.missing)) {
+      return false
+    }
+  }
+  return warnings > 0
+}
+
 // From the quote host's gate (`Gate.qml`); null while the host answers. A
 // pause for no answer lasts 72 s at most, so it says minutes, rounded up; a
 // refusal's can last half an hour, so it says the time. `why` and `when` are

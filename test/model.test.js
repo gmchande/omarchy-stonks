@@ -2691,8 +2691,14 @@ test("the stocks that warn are those whose own freshness warns, at every second,
     }
   }
   // A symbol Yahoo explicitly answered as missing (404 / omitted) is its own
-  // trouble, not Yahoo being down.
-  expect(M.warningCount(["BAD"], { BAD: { status: "failed", missing: true, answeredAt: T } }, {}, {}, 0)).toBe(0)
+  // trouble, not Yahoo being down; when all non-missing symbols go overdue or
+  // fail, sourceDown still turns on even with a delisted symbol in the list.
+  const bad = { status: "failed", missing: true, answeredAt: T }
+  expect(M.warningCount(["BAD"], { BAD: bad }, {}, {}, 0)).toBe(0)
+  expect(M.sourceDown(["BAD"], { BAD: bad }, {}, {}, 0)).toBe(false)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100, B: T - 100 }, T)).toBe(true)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100, B: T - 100, BAD: T - 100 }, T)).toBe(true)
+  expect(M.sourceDown(["A", "B", "BAD"], { A: ok, B: ok, BAD: bad }, {}, { A: T - 100 }, T)).toBe(false)
 })
 
 test("the header says trouble first, then a chart loading, a refresh asked for, a range that failed, a range's scrub, and the market's words", () => {

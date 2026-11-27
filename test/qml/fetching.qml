@@ -1139,24 +1139,47 @@ Harness {
       closeWindow()
 
       // Fault 13: a 1-symbol watchlist with a 404 symbol shows "! No data for
-      // this symbol" instead of false global "Can't get prices".
+      // this symbol" instead of false global "Can't get prices", and a mixed
+      // list with a delisted 404 symbol still quiets per-row warnings when
+      // Yahoo actually goes offline.
       var savedSettings = service.fileSettings
       service.save(Object.assign({}, savedSettings, { symbols: ["ZZZZBADSYM"], lists: [], list: "", featured: "ZZZZBADSYM" }))
       openWindow()
       var badLanded = within(5000, function() {
         var e = service.entries["ZZZZBADSYM"]
-        return service.featuredSymbol === "ZZZZBADSYM" && !!e && e.status === "failed" && !!body.watchlist.rowItem("ZZZZBADSYM")
+        var r = body.watchlist.rowItem("ZZZZBADSYM")
+        return body.lists.length > 0 && body.lists[0].symbols.join(",") === "ZZZZBADSYM"
+          && service.featuredSymbol === "ZZZZBADSYM" && !!e && e.status === "failed"
+          && !!r && r.detail !== "Loading…"
       })
       var badHero = harness.find(body, "hero")
       var badRow = body.watchlist.rowItem("ZZZZBADSYM")
       var badNotDown = badLanded && !body.yahooDown && !/Can't get prices/.test(body.headerText)
       var badSaysSymbol = !!badHero && /NO DATA FOR THIS SYMBOL/.test(badHero.listingLead)
         && !!badRow && /No data for this symbol/.test(badRow.detail)
+      // Now a mixed list (NEST + KILN + delisted ZZZZBADSYM) going offline
+      // during regular hours: yahooDown still turns on so rows stay quiet.
+      var mon7 = sat5 + 2 * 86400
+      service.save(Object.assign({}, savedSettings, { symbols: ["NEST", "KILN", "ZZZZBADSYM"], lists: [], list: "", featured: "NEST" }))
+      startAt(at(mon7, 11, 0))()
+      var mixedReady = within(5000, function() {
+        return !!service.quotes["NEST"] && !!service.quotes["KILN"]
+          && !!service.entries["ZZZZBADSYM"] && service.entries["ZZZZBADSYM"].status === "failed"
+      })
+      touch("YAHOO.offline")
+      tick(160, 10)
+      var nestRow = body.watchlist.rowItem("NEST")
+      var kilnRow = body.watchlist.rowItem("KILN")
+      var mixedDown = mixedReady && body.yahooDown && /^Can't connect/.test(body.headerText)
+        && !!nestRow && !/^!/.test(nestRow.detail) && !!kilnRow && !/^!/.test(kilnRow.detail)
+      remove("YAHOO.offline")
+      gate.gate = Object.assign({}, gate.gate, { left: gate.capacity, filledAt: service.now, pause: "", pausedUntil: 0, refusals: 0, silences: 0, loneOut: false })
       service.save(savedSettings)
-      within(5000, function() { return service.allSymbols.indexOf("NEST") >= 0 })
-      harness.check("a 1-symbol watchlist with a 404 symbol shows No data for this symbol, not global Can't get prices",
-        badLanded && badNotDown && badSaysSymbol,
-        [badLanded, body.yahooDown, body.headerText, badHero ? badHero.listingLead : "no hero", badRow ? badRow.detail : "no row"].join(" | "))
+      within(5000, function() { return service.allSymbols.indexOf("SPY") >= 0 })
+      harness.check("a 1-symbol 404 list says No data for this symbol, and a mixed list with a 404 symbol still quiets rows when Yahoo goes offline",
+        badLanded && badNotDown && badSaysSymbol && mixedDown,
+        [badLanded, body.yahooDown, badHero ? badHero.listingLead : "no hero", badRow ? badRow.detail : "no row",
+          mixedReady, mixedDown, body.headerText, nestRow ? nestRow.detail : "no nest"].join(" | "))
       closeWindow()
 
       harness.finish()
