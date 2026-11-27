@@ -961,10 +961,10 @@ Harness {
       tick(1200, 60)
       body.selectRange("2Y")
       var satShown = within(2000, function() { return body.historyShown && body.chartRange === "2Y" })
-      wait(500)
-      var satReasked = harness.calls("NEST.history") - satAskedBefore
+      // Time for a download that must not go.
+      var satReasked = within(500, function() { return harness.calls("NEST.history") !== satAskedBefore })
       harness.check("on a closed market, revisiting a range past 15 minutes reuses its history without re-downloading",
-        satFirst && satShown && satReasked === 0, [satFirst, satShown, "reasked=" + satReasked].join(" "))
+        satFirst && satShown && !satReasked, [satFirst, satShown, "reasked=" + satReasked].join(" "))
       body.selectRange("1D")
       closeWindow()
 
@@ -978,7 +978,10 @@ Harness {
       var ref429Hit = within(5000, function() {
         return harness.requests().slice(ref429From).some(function(l) { return / 429$/.test(l) })
       })
-      wait(600)
+      // Time for any second 429 that must not go.
+      within(600, function() {
+        return harness.requests().slice(ref429From).filter(function(l) { return / 429$/.test(l) }).length > 1
+      })
       var ref429Count = harness.requests().slice(ref429From).filter(function(l) { return / 429$/.test(l) }).length
       remove("YAHOO.refuse")
       harness.check("a non-streaming multi-URL fetch stops on the first 429 instead of hammering remaining URLs",
