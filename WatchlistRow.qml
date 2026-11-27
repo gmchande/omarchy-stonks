@@ -216,13 +216,14 @@ Rectangle {
     reveal = 1
     removeFade.stop()
   }
-  function finishRebind(nextSymbol, nextPlace, seenLine) {
+  function finishRebind(nextSymbol, nextPlace, seenLine, drawNew) {
     lastPlace = nextPlace
     lineSeen = !!seenLine
     hadLine = !!seenLine
     symbol = nextSymbol
     hadLine = !!geometry
     if (hadLine && inView && symbol !== "") {
+      if (drawNew && !lineSeen) drawLineIn()
       lineSeen = true
       lineDrawn(symbol)
     }
@@ -526,6 +527,7 @@ Rectangle {
 
           property real pressY: -1
           property bool dragged: false
+          property string pressedSymbol: ""
           // Only a release on the button with no drag between removes: Qt
           // acts on a double-click's second press at mouse-down.
           property bool pressedOnRemove: false
@@ -535,6 +537,7 @@ Rectangle {
               if (!row.rebinding) return
               mouse.pressY = -1
               mouse.dragged = false
+              mouse.pressedSymbol = ""
               mouse.pressedOnRemove = false
             }
           }
@@ -545,6 +548,7 @@ Rectangle {
           }
 
           onPressed: function(event) {
+            pressedSymbol = row.symbol
             pressY = event.button === Qt.LeftButton ? event.y : -1
             dragged = false
             pressedOnRemove = event.button === Qt.LeftButton && !(event.modifiers & Qt.ControlModifier) && onRemove(event.x, event.y)
@@ -554,7 +558,7 @@ Rectangle {
             }
           }
           onPositionChanged: function(event) {
-            if (!pressed || pressY < 0) return
+            if (!pressed || pressY < 0 || pressedSymbol !== row.symbol) return
             if (!dragged) {
               if (Math.abs(event.y - pressY) < 6) return
               dragged = true
@@ -564,16 +568,17 @@ Rectangle {
           }
           onReleased: function(event) {
             if (dragged) row.dragEnded()
-            else if (pressedOnRemove && onRemove(event.x, event.y)) {
+            else if (pressedOnRemove && pressedSymbol === row.symbol && onRemove(event.x, event.y)) {
               var at = mapToItem(null, event.x, event.y)
               row.removeReleased(at.x, at.y)
             }
           }
           onCanceled: {
             if (dragged) row.dragCanceled()
+            pressedSymbol = ""
           }
           function act(event, second) {
-            if (dragged) return
+            if (dragged || pressedSymbol === "" || pressedSymbol !== row.symbol) return
             var at = mapToItem(null, event.x, event.y)
             if (event.button === Qt.RightButton) row.menuRequested(at.x, at.y, second)
             else if (event.modifiers & Qt.ControlModifier) row.listsRequested(at.x, at.y, second)
@@ -582,6 +587,7 @@ Rectangle {
           }
           onClicked: function(event) { act(event, false) }
           onDoubleClicked: function(event) {
+            if (pressedSymbol === "" || pressedSymbol !== row.symbol) return
             if (pressedOnRemove) {
               var at = mapToItem(null, event.x, event.y)
               row.removePressed(at.x, at.y, true)

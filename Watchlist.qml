@@ -683,7 +683,7 @@ Flickable {
     if (!row || row.symbol === sym) return
     row.beginRebind()
     var nextPlace = sym !== "" ? root.reorder.slotOf(sym) : -1
-    row.finishRebind(sym, nextPlace, sym !== "" && root.seenLines[sym] === true)
+    row.finishRebind(sym, nextPlace, sym !== "" && root.seenLines[sym] === true, !switching && !sorting)
   }
 
   function syncPool() {
@@ -692,7 +692,7 @@ Flickable {
     if (reorder.lifted !== "") pinned[reorder.lifted] = true
     for (var i = 0; i < rowRepeater.count; i++) {
       var r = rowRepeater.itemAt(i) as WatchlistRow
-      if (r && r.folding && r.symbol !== "") pinned[r.symbol] = true
+      if (r && r.symbol !== "" && (r.folding || r.moving || Math.abs(r.shift) >= 0.5)) pinned[r.symbol] = true
     }
     var plan = Rows.assignPool(poolSlots, wanted, pinned)
     if (!plan.changed) return
@@ -754,6 +754,7 @@ Flickable {
     cursorSymbol = ""
     forgetClicks()
     listHover.rest()
+    settleRows()
     switching = true
     layOut()
     var featuredAt = displayedSymbols.indexOf(featuredSymbol)
@@ -877,7 +878,10 @@ Flickable {
         pitch: root.rowPitch
         liftedY: root.reorder.liftedY
         rowCount: root.displayedSymbols.length
-        onRested: if (symbol !== "") root.rowRested(symbol)
+        onRested: {
+          if (symbol !== "") root.rowRested(symbol)
+          if (!root.switching && root.arrangedView) Qt.callLater(root.syncPool)
+        }
         look: root.look
         width: parent.width
         required property int index
