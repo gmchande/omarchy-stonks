@@ -49,9 +49,9 @@ truer, lighter, quicker, simpler or better made.
 - **1D at night.** Through the night a stock's chart keeps the day that
   closed, with tonight joined at its end. Tonight's trades belong to the
   day ahead, so they count from that close, the chart's one dashed line,
-  and every colour reads against it. The rows and the pill keep the closed
-  day until 04:00 in its exchange's time. The README's "Reading the chart"
-  says the rest.
+  and every colour reads against it. A row and the pill show what the
+  panel shows for their stock. The README's "Reading the chart" says the
+  rest.
 - **Character.** The bull and the bear, their sleep while the market rests,
   the live dot and the day's named moments survive any cleanup: each says
   something true, and none cheers a number.
